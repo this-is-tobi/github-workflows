@@ -129,8 +129,6 @@ jobs:
       BUILD_AMD64: true
       BUILD_ARM64: true
       USE_QEMU: false
-      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 ```
 
 ### `label-pr.yml`
@@ -247,9 +245,9 @@ Create releases using `release-please`, optionally tag major/minor versions, and
 
 #### Secrets
 
-| Secret | Description                                  | Required | Default |
-| ------ | -------------------------------------------- | -------- | ------- |
-| GH_PAT | GitHub Personal Access Token (for automerge) | No       | -       |
+| Secret | Description                                           | Required | Default |
+| ------ | ----------------------------------------------------- | -------- | ------- |
+| GH_PAT | GitHub Personal Access Token (required for automerge) | No       | -       |
 
 #### Outputs
 
@@ -270,7 +268,6 @@ Create releases using `release-please`, optionally tag major/minor versions, and
 
 #### Notes
 
-- Reusable via `workflow_call`; reference with `uses:` from other repositories.
 - On `RELEASE_BRANCH` (default `main`), uses `release-please-config.json` and `.release-please-manifest.json`. On `PRERELEASE_BRANCH` (default `develop`), uses `release-please-config-rc.json` and `.release-please-manifest-rc.json`.
 - If `TAG_MAJOR_AND_MINOR: true`, tags `v<major>` and `v<major>.<minor>` after a release is created.
 - If `AUTOMERGE_*` is enabled and a PAT is provided, attempts to automerge the release PR.
@@ -284,6 +281,11 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/release.yml@main
     with:
       TAG_MAJOR_AND_MINOR: true
+      AUTOMERGE_PRERELEASE: true
+      AUTOMERGE_RELEASE: true
+      REBASE_PRERELEASE_BRANCH: true
+    secrets:
+      GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
 ### `scan-sonarqube.yml`
