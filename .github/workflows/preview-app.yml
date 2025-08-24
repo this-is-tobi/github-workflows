@@ -28,15 +28,16 @@ on:
         description: Token used to re-deploy Argo-CD preview app
         required: true
 
+permissions:
+  pull-requests: write
+  contents: read
+
 jobs:
   preview-comment:
     name: Add comment with preview infos
-    # if: contains(github.event.pull_request.labels.*.name, 'preview')
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
     steps:
-    - name: Checks-out repository
-      uses: actions/checkout@v4
-
     - name: Generate app url
       id: generate-url
       run: |
@@ -48,14 +49,14 @@ jobs:
         message: |
           🤖 Hey !
 
-          A preview of the application is available at : ${{ steps.generate-url.outputs.APP_URL }}
+          A preview of the application is available at: ${{ steps.generate-url.outputs.APP_URL }}
 
           *Please be patient, deployment may take a few minutes.*
         comment_tag: preview
 
   preview-sync:
     name: Redeploy preview app
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'preview') && inputs.PR_NUMBER != '' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
     steps:
     - name: Replace template fields

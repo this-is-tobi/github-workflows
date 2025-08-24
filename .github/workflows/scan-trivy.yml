@@ -12,14 +12,16 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+  security-events: write
+  pull-requests: write
+
 jobs:
   images-scan:
     name: Scan images vulnerabilities
     if: ${{ inputs.IMAGE != '' }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      security-events: write
     steps:
     - name: Checks-out repository
       uses: actions/checkout@v4
@@ -51,9 +53,6 @@ jobs:
     name: Scan config files vulnerabilities
     if: ${{ inputs.PATH != '' }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      security-events: write
     steps:
     - name: Checks-out repository
       uses: actions/checkout@v4
@@ -85,9 +84,6 @@ jobs:
   scan-notif:
     name: Notify users
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     needs:
       - images-scan
       - config-scan
@@ -99,5 +95,5 @@ jobs:
         message: |
           🤖 Hey !
 
-          The security scan report for the current pull request is available [here](https://github.com/${{ github.repository }}/security/code-scanning?query=is%3Aopen+branch%3Amain+pr%3A${{ github.event.pull_request.number || github.event.number }}).
+          The security scan report for the current pull request is available [here](https://github.com/${{ github.repository }}/security/code-scanning?query=is%3Aopen+branch%3A${{ github.ref_name }}+pr%3A${{ github.event.pull_request.number || github.event.number }}).
         comment_tag: vuln-scan

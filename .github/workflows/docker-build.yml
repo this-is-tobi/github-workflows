@@ -48,6 +48,10 @@ on:
         required: false
         type: string
 
+permissions:
+  packages: write
+  contents: read
+
 jobs:
   infos:
     name: Get build infos

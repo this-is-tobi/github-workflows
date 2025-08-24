@@ -107,6 +107,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | Scope    | Access | Description                         |
 | -------- | ------ | ----------------------------------- |
 | packages | write  | Push images to GHCR when applicable |
+| contents | read   | Read repository to build context    |
 
 #### Notes 
 
@@ -183,6 +184,7 @@ Comment on PRs with preview URLs and optionally trigger an ArgoCD redeploy for p
 | Scope         | Access | Description                  |
 | ------------- | ------ | ---------------------------- |
 | pull-requests | write  | Required to post PR comments |
+| contents      | read   | Read repository (templates)  |
 
 #### Notes
 
@@ -280,6 +282,14 @@ Run SonarQube static analysis and check the quality gate. The workflow optionall
 | ----------------- | -------------------------------- | -------- | ------- |
 | SONAR_TOKEN       | SonarQube token                  | Yes      | -       |
 | SONAR_PROJECT_KEY | SonarQube project identifier key | Yes      | -       |
+
+#### Permissions
+
+| Scope         | Access | Description                                 |
+| ------------- | ------ | ------------------------------------------- |
+| contents      | read   | Read source code for analysis               |
+| issues        | write  | Create/update issues raised by integrations |
+| pull-requests | write  | Publish PR decorations and status summaries |
 
 #### Example
 
