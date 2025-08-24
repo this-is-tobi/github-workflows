@@ -15,7 +15,7 @@ jobs:
   example:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
     with:
-      SONAR_URL: ${{ vars.SONAR_URL }}
+      SONAR_URL: 'https://sonarqube.example.com'
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
@@ -25,24 +25,13 @@ jobs:
 
 You can use reusable workflows from a private repository, but there are important requirements and limitations:
 
-- **Repository Access:** Both the caller and the reusable workflow repository must be private, or both must be internal to the same organization.
-- **Authentication:** The workflow caller must use a `GITHUB_TOKEN` or a personal access token (PAT) with `actions:read` permission to access the private reusable workflow repository.
+- **Repository Access:** Both the caller and the reusable workflow repository must be internal to the same user / organization.
 - **Reference Format:** Always reference the reusable workflow using the full path: `owner/repo/.github/workflows/workflow.yml@ref`.
-- **User Permissions:** The user or GitHub App triggering the workflow must have access to both repositories.
-- **Organization Scope:** For cross-repository usage, both repositories should belong to the same organization for seamless access.
-- **Token Permissions:** The token used must have at least `actions:read` permission on the reusable workflow repository.
 
-__Example:__
-
-```yaml
-jobs:
-  example:
-    uses: org/private-workflows/.github/workflows/build.yml@main
-    secrets:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-```
-
-> For more details, see: [GitHub Docs – Reusing workflows](https://docs.github.com/en/actions/using-workflows/reusing-workflows#using-a-workflow-from-a-private-repository)
+For more details, see: 
+- [GitHub Docs – Reusing workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
+- [GitHub Docs – Share across private repositories](https://docs.github.com/en/actions/how-tos/reuse-automations/share-across-private-repositories)
+- [GitHub Docs – Share with your organization](https://docs.github.com/en/actions/how-tos/reuse-automations/share-with-your-organization)
 
 ## Available workflows
 
@@ -137,7 +126,7 @@ jobs:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3
       BUILD_AMD64: true
-      BUILD_ARM64: false
+      BUILD_ARM64: true
       USE_QEMU: false
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
@@ -206,10 +195,11 @@ jobs:
   preview:
     uses: this-is-tobi/github-workflows/.github/workflows/preview-app.yml@main
     with:
-      APP_URL_TEMPLATE: 'https://preview.example.com/pr-<pr_number>'
+      APP_URL_TEMPLATE: 'https://app-name.pr-<pr_number>.example.com'
       PR_NUMBER: 123
-      ARGOCD_APP_NAME_TEMPLATE: 'preview-app-<pr_number>'
-      ARGOCD_SYNC_PAYLOAD_TEMPLATE: '{"force":true}'
+      ARGOCD_APP_NAME_TEMPLATE: 'app-name-pr-<pr_number>'
+      ARGOCD_SYNC_PAYLOAD_TEMPLATE: '{"appNamespace":"argocd","prune":true,"dryRun":false,"strategy":{"hook":{"force":true}},"resources":[{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-client"},{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-server"}],"syncOptions":{"items":["Replace=true"]}}'
+      ARGOCD_URL: 'https://argo-cd.example.com'
     secrets:
       ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
 ```
@@ -298,7 +288,7 @@ jobs:
   scan-sonarqube:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
     with:
-      SONAR_URL: ${{ vars.SONAR_URL }}
+      SONAR_URL: 'https://sonarqube.example.com'
       COV_IMPORT: true
       COV_ARTIFACT_NAME: unit-tests-coverage
       COV_ARTIFACT_PATH: ./coverage
@@ -344,5 +334,5 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
     with:
       IMAGE: ghcr.io/my-org/my-image:1.2.3
-      PATH: ./
+      PATH: ./apps/api
 ```

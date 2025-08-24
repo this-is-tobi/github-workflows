@@ -1,4 +1,4 @@
-name: Preview comment
+name: ArgoCD preview app
 
 on:
   workflow_call:

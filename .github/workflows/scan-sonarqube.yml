@@ -1,4 +1,4 @@
-name: Scan - sonarqube
+name: Sonarqube scan
 
 on:
   workflow_call:

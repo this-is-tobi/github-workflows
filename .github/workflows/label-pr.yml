@@ -1,4 +1,4 @@
-name: Add labels on PR
+name: Add PR labels
 
 on:
   workflow_call:
