@@ -58,7 +58,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Run Trivy vulnerability scanner on config files
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.32.0
       with:
         scan-ref: "${{ inputs.PATH }}"
         scan-type: config
