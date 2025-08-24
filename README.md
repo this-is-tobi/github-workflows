@@ -197,11 +197,11 @@ jobs:
   preview:
     uses: this-is-tobi/github-workflows/.github/workflows/preview-app.yml@main
     with:
-      APP_URL_TEMPLATE: 'https://app-name.pr-<pr_number>.example.com'
+      APP_URL_TEMPLATE: https://app-name.pr-<pr_number>.example.com
       PR_NUMBER: 123
-      ARGOCD_APP_NAME_TEMPLATE: 'app-name-pr-<pr_number>'
+      ARGOCD_APP_NAME_TEMPLATE: app-name-pr-<pr_number>
       ARGOCD_SYNC_PAYLOAD_TEMPLATE: '{"appNamespace":"argocd","prune":true,"dryRun":false,"strategy":{"hook":{"force":true}},"resources":[{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-client"},{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-server"}],"syncOptions":{"items":["Replace=true"]}}'
-      ARGOCD_URL: 'https://argo-cd.example.com'
+      ARGOCD_URL: https://argo-cd.example.com
     secrets:
       ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
 ```
@@ -268,13 +268,14 @@ Run SonarQube static analysis and check the quality gate. The workflow optionall
 
 #### Inputs
 
-| Input             | Type    | Description                                  | Required | Default             |
-| ----------------- | ------- | -------------------------------------------- | -------- | ------------------- |
-| COV_IMPORT        | boolean | Whether to download a coverage artifact      | No       | false               |
-| COV_ARTIFACT_NAME | string  | Name of the coverage artifact                | No       | unit-tests-coverage |
-| COV_ARTIFACT_PATH | string  | Path where to download the coverage artifact | No       | ./coverage          |
-| SONAR_EXTRA_ARGS  | string  | Additional SonarQube scanner arguments       | No       | -                   |
-| SONAR_URL         | string  | URL of the SonarQube server                  | Yes      | -                   |
+| Input             | Type    | Description                                                            | Required | Default             |
+| ----------------- | ------- | ---------------------------------------------------------------------- | -------- | ------------------- |
+| COV_IMPORT        | boolean | Whether to download a coverage artifact                                | No       | false               |
+| COV_ARTIFACT_NAME | string  | Name of the coverage artifact                                          | No       | unit-tests-coverage |
+| COV_ARTIFACT_PATH | string  | Path where to download the coverage artifact                           | No       | ./coverage          |
+| SONAR_EXTRA_ARGS  | string  | Additional SonarQube scanner arguments                                 | No       | -                   |
+| SOURCES_PATH      | string  | Paths to the source code that should be analyzed (eg. 'apps,packages') | Yes      | -                   |
+| SONAR_URL         | string  | URL of the SonarQube server                                            | Yes      | -                   |
 
 #### Secrets
 
@@ -298,10 +299,12 @@ jobs:
   scan-sonarqube:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
     with:
-      SONAR_URL: 'https://sonarqube.example.com'
+      SONAR_URL: https://sonarqube.example.com
       COV_IMPORT: true
       COV_ARTIFACT_NAME: unit-tests-coverage
       COV_ARTIFACT_PATH: ./coverage
+      SOURCES_PATH: apps,packages
+      SONAR_EXTRA_ARGS: -Dsonar.javascript.lcov.reportPaths=./coverage/apps/api/lcov.info,./coverage/apps/client/lcov.info,./coverage/packages/shared/lcov.info -Dsonar.coverage.exclusions=**/*.spec.js,**/*.spec.ts,**/*.vue,**/assets/** -Dsonar.exclusions=**/*.spec.js,**/*.spec.ts,**/*.vue
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}

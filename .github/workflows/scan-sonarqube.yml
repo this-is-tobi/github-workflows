@@ -22,6 +22,10 @@ on:
         description: Extra arguments to use with Sonarqube
         required: false
         type: string
+      SOURCES_PATH:
+        description: Paths to the source code that should be analyzed (eg. 'apps,packages')
+        required: false
+        type: string
       SONAR_URL:
         description: Sonarqube server URL
         required: true
@@ -72,7 +76,7 @@ jobs:
         args: >
           -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
           -Dsonar.scm.provider=git
-          -Dsonar.sources=apps,packages
+          -Dsonar.sources=${{ inputs.SOURCES_PATH}}
           ${{ github.event_name == 'pull_request' && steps.sonar-args.outputs.SONAR_ARGS_PR || steps.sonar-args.outputs.SONAR_ARGS_BRANCH }}
           ${{ inputs.SONAR_EXTRA_ARGS != '' && inputs.SONAR_EXTRA_ARGS }}
       continue-on-error: true
