@@ -56,33 +56,32 @@ jobs:
 
 ### `clean-cache.yml`
 
-Delete GitHub Actions caches related to a PR/branch and optionally delete images from GHCR.
+Delete GitHub Actions caches related to a PR/branch and optionally delete a single image from GHCR when an image reference is provided.
 
 #### Inputs
 
-| Input        | Type    | Description                                         | Required | Default |
-| ------------ | ------- | --------------------------------------------------- | -------- | ------- |
-| PR_NUMBER    | number  | ID number of the pull request associated with cache | No       | -       |
-| BRANCH_NAME  | string  | Branch name associated with the cache               | No       | -       |
-| COMMIT_SHA   | string  | Commit SHA associated with the cache                | No       | -       |
-| CLEAN_IMAGES | boolean | Delete images from ghcr.io                          | No       | false   |
+| Input       | Type   | Description                                                                                                                                                                          | Required | Default |
+| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------- |
+| PR_NUMBER   | number | ID number of the pull request associated with the cache                                                                                                                              | No       | -       |
+| BRANCH_NAME | string | Branch name associated with the cache                                                                                                                                                | No       | -       |
+| COMMIT_SHA  | string | Commit SHA associated with the cache (alternative selector)                                                                                                                          | No       | -       |
+| IMAGE       | string | Image reference to delete (optionally with registry). Non-`ghcr.io` or missing registry are treated as GHCR. Must include a tag. Examples: `ghcr.io/org/app:1.2.3`, `org/app:1.2.3`. | No       | -       |
 
 #### Permissions
 
-| Scope    | Access | Description                                                        |
-| -------- | ------ | ------------------------------------------------------------------ |
-| packages | write  | Manage GHCR packages (used when deleting images with CLEAN_IMAGES) |
-| contents | read   | Read repository contents                                           |
-| actions  | write  | Manage Actions caches via gh-actions-cache extension               |
+| Scope    | Access | Description                                        |
+| -------- | ------ | -------------------------------------------------- |
+| packages | write  | Required to delete GHCR container package versions |
+| contents | read   | Read repository contents                           |
+| actions  | write  | Manage Actions caches via cache API                |
 
 #### Notes
 
-- This workflow is now reusable via `workflow_call`.
-- The `cleanup-cache` job deletes GitHub Actions caches for a branch or PR.
-- The `infos` job generates a build matrix from `./ci/matrix/docker.json`.
-- The `cleanup-image` job deletes images from GHCR using a script, only if `CLEAN_IMAGES` is true.
-- Requires `GITHUB_TOKEN` for cache/image deletion.
-- The image cleanup job only runs when the repository variable `CLEAN_IMAGES` is set to `true`.
+- Cache deletion logic picks `BRANCH_NAME` if provided; otherwise derives a PR ref from `PR_NUMBER`.
+- Image deletion job (`cleanup-image`) only runs when `IMAGE` is supplied.
+- If `IMAGE` contains a registry different from `ghcr.io`, a warning is emitted and it is processed as if it were `ghcr.io`.
+- If no registry is provided it is assumed to be `ghcr.io`.
+- `IMAGE` must include a tag (e.g. `my-org/my-image:latest`); images are deleted via the GitHub Packages API.
 
 #### Example
 
@@ -91,8 +90,8 @@ jobs:
   cleanup:
     uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@main
     with:
-      BRANCH_NAME: 'refs/heads/feature/xyz'
-      CLEAN_IMAGES: true
+      PR_NUMBER: 123
+      IMAGE: this-is-tobi/tools/debug:pr-123
 ```
 
 ### `docker-build.yml`

@@ -15,14 +15,10 @@ on:
         description: Commit sha assiocited with the cache
         required: false
         type: string
-      CLEAN_IMAGES:
-        description: Delete images from ghcr.io
+      IMAGE:
+        description: Name of the image to delete from ghcr.io (eg. 'my-org/my-image:my-tag')
         required: false
-        type: boolean
-        default: false
-
-env:
-  CLEAN_IMAGES: ${{ inputs.CLEAN_IMAGES || false }}
+        type: string
 
 permissions:
   packages: write
@@ -33,72 +29,79 @@ jobs:
   cleanup-cache:
     name: Delete github cache
     runs-on: ubuntu-latest
+    if: ${{ inputs.PR_NUMBER || inputs.BRANCH_NAME || inputs.COMMIT_SHA }}
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-
     - name: Clean cache for closed branch
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh extension install actions/gh-actions-cache
-
         REPO=${{ github.repository }}
         if [ -n "${{ inputs.BRANCH_NAME }}" ]; then
           BRANCH="${{ inputs.BRANCH_NAME }}"
         else
-          BRANCH="refs/pull/${{ github.event.pull_request.number || inputs.PR_NUMBER }}/merge"
+          BRANCH="refs/pull/${{ inputs.PR_NUMBER }}/merge"
         fi
 
         echo "Fetching list of cache key"
-        cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH -L 100 | cut -f 1 )
+        CACHE_KEYS=$(gh cache list -R $REPO -r $BRANCH -L 100 | cut -f 1)
 
         ## Setting this to not fail the workflow while deleting cache keys.
         set +e
         echo "Deleting caches..."
-        for cacheKey in $cacheKeysForPR; do
-          gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+        for CACHE_KEY in $CACHE_KEYS; do
+          gh cache delete $CACHE_KEY -R $REPO
         done
         echo "Done"
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  infos:
-    name: Generate infos
-    runs-on: ubuntu-latest
-    outputs:
-      build-matrix: ${{ steps.build-matrix.outputs.BUILD_MATRIX }}
-    steps:
-    - name: Checks-out repository
-      uses: actions/checkout@v4
-
-    - name: Generate matrix
-      id: build-matrix
-      run: |
-        echo "BUILD_MATRIX=$(jq -c . < ./ci/matrix/docker.json)" >> $GITHUB_OUTPUT
 
   cleanup-image:
     name: Delete image from ghcr.io
     runs-on: ubuntu-latest
-    if: ${{ vars.CLEAN_IMAGES }}
-    needs:
-    - infos
-    strategy:
-      matrix:
-        images: ${{ fromJSON(needs.infos.outputs.build-matrix) }}
+    if: ${{ inputs.IMAGE }}
     steps:
-    - name: Checks-out repository
-      uses: actions/checkout@v4
-
-    - name: Get repository owner and name
-      id: image-infos
+    - name: Delete ${{ inputs.IMAGE }} image
       run: |
-        echo "ORG_NAME=$(echo '${{ github.repository }}' | cut -d "/" -f 1)" >> $GITHUB_OUTPUT
-        echo "REPO_NAME=$(echo '${{ github.repository }}' | cut -d "/" -f 2)" >> $GITHUB_OUTPUT
+        REGISTRY_CHECK="${IMAGE%%/*}"
+        if [[ "$REGISTRY_CHECK" == *.* || "$REGISTRY_CHECK" == *:* || "$REGISTRY_CHECK" == "localhost" ]]; then
+          IMAGE_WITHOUT_REGISTRY="${IMAGE#*/}"
+          PROCESSED_IMAGE="${IMAGE_WITHOUT_REGISTRY#*/}"
+        else
+          IMAGE_WITHOUT_REGISTRY="$IMAGE"
+          PROCESSED_IMAGE="${IMAGE_WITHOUT_REGISTRY#*/}"
+        fi
 
-    - name: Delete ${{ matrix.images.name }} image
-      run: |
-        ./ci/scripts/delete-image.sh \
-          -m "users" \
-          -o "${{ steps.image-infos.outputs.ORG_NAME }}" \
-          -i "${{ steps.image-infos.outputs.REPO_NAME }}" \
-          -t "${{ inputs.COMMIT_SHA || inputs.BRANCH_NAME || format('pr-{0}', inputs.PR_NUMBER || github.event.pull_request.number || github.event.number) }}" \
-          -g "${{ secrets.GITHUB_TOKEN }}"
+        OWNER="${IMAGE_WITHOUT_REGISTRY%%/*}"
+        IMAGE_NAME="${PROCESSED_IMAGE%%:*}"
+        IMAGE_TAG="${PROCESSED_IMAGE#*:}"
+        IMAGE_NAME_URL_ENCODED="$(jq -rn --arg x "${IMAGE_NAME}" '$x | @uri')"
+
+        OWNER_TYPE="$(curl -fsSL https://api.github.com/users/${OWNER} | jq -r '.type')"
+        if [ "$OWNER_TYPE" = "Organization" ]; then
+          MODE="orgs"
+        else
+          MODE="users"
+        fi
+
+        IMAGES=$(curl -fsSL \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/${MODE}/${OWNER}/packages/container/${IMAGE_NAME_URL_ENCODED}/versions?per_page=100")
+        MAIN_IMAGE_ID=$(echo "$IMAGES" | jq -r --arg t "$IMAGE_TAG" '.[] | select(.metadata.container.tags[] | contains($t)) | .id')
+
+        # Delete subsequent images
+        while read -r SHA; do
+          IMAGE_ID=$(echo "$IMAGES" | jq -r --arg s "$SHA" '.[] | select(.name == $s) | .id')
+
+          printf "\n${red}[Delete ghcr image].${no_color} Deleting subsequent image '$OWNER/$IMAGE_NAME@$SHA'\n"
+
+          curl -fsSL \
+            -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/${MODE}/${OWNER}/packages/container/${IMAGE_NAME_URL_ENCODED}/versions/${IMAGE_ID}"
+        done <<< "$(docker buildx imagetools inspect ghcr.io/${OWNER}/${IMAGE_NAME}:${IMAGE_TAG} --raw | jq -r '.manifests[] | .digest')"
+
+        # Delete main image
+        printf "\n${red}[Delete ghcr image].${no_color} Deleting image '$OWNER/$IMAGE_NAME:$IMAGE_TAG'\n"
+
+        curl -fsSL \
+          -X DELETE \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/${MODE}/${OWNER}/packages/container/${IMAGE_NAME_URL_ENCODED}/versions/${MAIN_IMAGE_ID}"
