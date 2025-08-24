@@ -38,11 +38,11 @@ For more details, see:
 - [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](./.github/workflows/clean-cache.yml)
 - [Build docker images and push it to a registry (`docker-build.yml`)](./.github/workflows/docker-build.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
-- [Post preview links and optionally redeploy an ArgoCD preview app (`preview-app.yml`)](./.github/workflows/preview-app.yml)
+- [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](./.github/workflows/argocd-preview.yml)
 - [Create releases using release-please and optional automerge (`release.yml`)](./.github/workflows/release.yml)
 - [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](./.github/workflows/scan-sonarqube.yml)
 - [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](./.github/workflows/scan-trivy.yml)
-- [Update or trigger Helm chart version bump (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
+- [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
 
 ### `clean-cache.yml`
 
@@ -182,7 +182,7 @@ ci:
 
 > For more details on the configuration file format, see the [labeler action documentation](https://github.com/actions/labeler).
 
-### `preview-app.yml`
+### `argocd-preview.yml`
 
 Comment on PRs with preview URLs and optionally trigger an ArgoCD redeploy for preview environments.
 
@@ -218,7 +218,7 @@ Comment on PRs with preview URLs and optionally trigger an ArgoCD redeploy for p
 ```yaml
 jobs:
   preview:
-    uses: this-is-tobi/github-workflows/.github/workflows/preview-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@main
     with:
       APP_URL_TEMPLATE: https://app-name.pr-<pr_number>.example.com
       PR_NUMBER: 123
@@ -416,7 +416,7 @@ Trigger a chart update workflow in a remote Helm charts repository (caller mode)
 - `UPGRADE_TYPE=prerelease` increments the prerelease component (e.g. `1.2.3` -> `1.2.4-rc`, subsequent runs -> `1.2.4-rc.1`, etc.).
 - No explicit outputs are exposed; derive the new version from the PR title or branch name if needed.
 
-#### Example *(caller mode)*:
+#### Example *(caller mode)*
 
 ```yaml
 jobs:
@@ -433,7 +433,7 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
-#### Example *(called mode)*:
+#### Example *(called mode)*
 
 ```yaml
 jobs:
@@ -446,7 +446,7 @@ jobs:
       UPGRADE_TYPE: minor
 ```
 
-#### Example *(called mode – prerelease bump)*:
+#### Example *(called mode – prerelease bump)*
 
 ```yaml
 jobs:
