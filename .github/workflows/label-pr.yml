@@ -4,6 +4,7 @@ on:
   workflow_call:
     inputs:
       CONF_PATH:
+        description: Path to the labeler configuration file
         required: true
         type: string
 

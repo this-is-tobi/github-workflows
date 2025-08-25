@@ -35,14 +35,62 @@ For more details, see:
 
 ## Available workflows
 
+- [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](./.github/workflows/argocd-preview.yml)
 - [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](./.github/workflows/clean-cache.yml)
 - [Build docker images and push it to a registry (`docker-build.yml`)](./.github/workflows/docker-build.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
-- [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](./.github/workflows/argocd-preview.yml)
+- [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](./.github/workflows/lint-helm.yml)
 - [Create releases using release-please and optional automerge (`release.yml`)](./.github/workflows/release.yml)
 - [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](./.github/workflows/scan-sonarqube.yml)
 - [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](./.github/workflows/scan-trivy.yml)
 - [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
+
+### `argocd-preview.yml`
+
+Comment on PRs with preview URLs and optionally trigger an ArgoCD redeploy for preview environments.
+
+#### Inputs
+
+| Input                        | Type   | Description                                          | Required | Default |
+| ---------------------------- | ------ | ---------------------------------------------------- | -------- | ------- |
+| APP_URL_TEMPLATE             | string | Template that can include `<pr_number>`              | Yes      | -       |
+| PR_NUMBER                    | number | Pull request number                                  | Yes      | -       |
+| ARGOCD_APP_NAME_TEMPLATE     | string | ArgoCD app name template (may include `<pr_number>`) | Yes      | -       |
+| ARGOCD_SYNC_PAYLOAD_TEMPLATE | string | ArgoCD sync payload template                         | Yes      | -       |
+| ARGOCD_URL                   | string | URL of the Argo-CD server                            | Yes      | -       |
+
+#### Secrets
+
+| Secret       | Description                           | Required | Default |
+| ------------ | ------------------------------------- | -------- | ------- |
+| ARGOCD_TOKEN | Token used to redeploy the ArgoCD app | Yes      | -       |
+
+#### Permissions
+
+| Scope         | Access | Description                  |
+| ------------- | ------ | ---------------------------- |
+| pull-requests | write  | Required to post PR comments |
+| contents      | read   | Read repository (templates)  |
+
+#### Notes
+
+- The redeploy step runs only when the PR has the `preview` label and `PR_NUMBER` is provided. `ARGOCD_TOKEN` must be set to authenticate redeploy requests. Template inputs accept the `<pr_number>` placeholder.
+
+#### Example
+
+```yaml
+jobs:
+  preview:
+    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@main
+    with:
+      APP_URL_TEMPLATE: https://app-name.pr-<pr_number>.example.com
+      PR_NUMBER: 123
+      ARGOCD_APP_NAME_TEMPLATE: app-name-pr-<pr_number>
+      ARGOCD_SYNC_PAYLOAD_TEMPLATE: '{"appNamespace":"argocd","prune":true,"dryRun":false,"strategy":{"hook":{"force":true}},"resources":[{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-client"},{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-server"}],"syncOptions":{"items":["Replace=true"]}}'
+      ARGOCD_URL: https://argo-cd.example.com
+    secrets:
+      ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+```
 
 ### `clean-cache.yml`
 
@@ -182,52 +230,96 @@ ci:
 
 > For more details on the configuration file format, see the [labeler action documentation](https://github.com/actions/labeler).
 
-### `argocd-preview.yml`
+### `lint-helm.yml`
 
-Comment on PRs with preview URLs and optionally trigger an ArgoCD redeploy for preview environments.
+Comprehensive Helm chart validation with two parallel jobs: chart structure linting using `chart-testing` and documentation validation using `helm-docs`. Ensures charts follow best practices and documentation stays current.
 
 #### Inputs
 
-| Input                        | Type   | Description                                          | Required | Default |
-| ---------------------------- | ------ | ---------------------------------------------------- | -------- | ------- |
-| APP_URL_TEMPLATE             | string | Template that can include `<pr_number>`              | Yes      | -       |
-| PR_NUMBER                    | number | Pull request number                                  | Yes      | -       |
-| ARGOCD_APP_NAME_TEMPLATE     | string | ArgoCD app name template (may include `<pr_number>`) | Yes      | -       |
-| ARGOCD_SYNC_PAYLOAD_TEMPLATE | string | ArgoCD sync payload template                         | Yes      | -       |
-| ARGOCD_URL                   | string | URL of the Argo-CD server                            | Yes      | -       |
-
-#### Secrets
-
-| Secret       | Description                           | Required | Default |
-| ------------ | ------------------------------------- | -------- | ------- |
-| ARGOCD_TOKEN | Token used to redeploy the ArgoCD app | Yes      | -       |
+| Input             | Type    | Description                                  | Required | Default |
+| ----------------- | ------- | -------------------------------------------- | -------- | ------- |
+| HELM_DOCS_VERSION | string  | Version (image tag) of `jnorwood/helm-docs`  | No       | 1.14.2  |
+| CT_CONF_PATH      | string  | Path to the chart-testing configuration file | Yes      | -       |
+| LINT_CHARTS       | boolean | Whether to run the chart linting job         | No       | true    |
+| LINT_DOCS         | boolean | Whether to run the chart docs linting job    | No       | true    |
 
 #### Permissions
 
-| Scope         | Access | Description                  |
-| ------------- | ------ | ---------------------------- |
-| pull-requests | write  | Required to post PR comments |
-| contents      | read   | Read repository (templates)  |
+| Scope    | Access | Description               |
+| -------- | ------ | ------------------------- |
+| contents | read   | Read chart sources & docs |
 
 #### Notes
 
-- The redeploy step runs only when the PR has the `preview` label and `PR_NUMBER` is provided. `ARGOCD_TOKEN` must be set to authenticate redeploy requests. Template inputs accept the `<pr_number>` placeholder.
+- **Two conditional jobs for flexible validation:**
+  - **`lint-charts`**: Uses `helm/chart-testing-action` with `ct lint` to validate chart structure, syntax, dependencies, best practices, and version increment requirements. Runs only if `LINT_CHARTS=true`.
+  - **`lint-docs`**: Uses `jnorwood/helm-docs` with `--validate` flag to ensure documentation matches current chart configuration without making changes. Runs only if `LINT_DOCS=true`.
+- Set `LINT_CHARTS=false` to skip chart structure validation (useful for docs-only changes).
+- Set `LINT_DOCS=false` to skip documentation validation (useful for chart logic changes without doc updates).
+- Chart-testing requires a configuration file (typically `.github/ct.yaml`) to define linting rules, target branch, chart directories, and validation options.
+- Documentation validation mounts `./charts` read-only and exits non-zero if generated docs would differ from committed files.
+- Jobs run independently when both are enabled; workflow succeeds if all enabled jobs pass.
+- Consider pinning Docker images by digest for stronger supply-chain guarantees if stability is critical.
+- When you modify `Chart.yaml`, `values.yaml`, or templates that affect documentation, regenerate the docs locally:
+  ```bash
+  docker run --rm \
+    -v "$(pwd)/charts:/helm-docs" \
+    -u $(id -u) \
+    docker.io/jnorwood/helm-docs:1.14.2
+  ```
+  Then review and commit the updated `README.md` under `charts/<chart-name>/`. After committing, the `lint-docs` job should pass again.
 
 #### Example
 
 ```yaml
 jobs:
-  preview:
-    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@main
+  lint-helm:
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
     with:
-      APP_URL_TEMPLATE: https://app-name.pr-<pr_number>.example.com
-      PR_NUMBER: 123
-      ARGOCD_APP_NAME_TEMPLATE: app-name-pr-<pr_number>
-      ARGOCD_SYNC_PAYLOAD_TEMPLATE: '{"appNamespace":"argocd","prune":true,"dryRun":false,"strategy":{"hook":{"force":true}},"resources":[{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-client"},{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-server"}],"syncOptions":{"items":["Replace=true"]}}'
-      ARGOCD_URL: https://argo-cd.example.com
-    secrets:
-      ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+      HELM_DOCS_VERSION: 1.14.2
+      CT_CONF_PATH: .github/ct.yaml
 ```
+
+Example chart-testing configuration (`.github/ct.yaml`):
+
+```yaml
+# See https://github.com/helm/chart-testing/blob/main/doc/ct_lint.md
+target-branch: main
+chart-dirs:
+  - charts
+helm-extra-args: --timeout 600s
+check-version-increment: true
+validate-maintainers: false
+excluded-charts:
+  - unstable-chart
+chart-repos:
+  - bitnami=https://charts.bitnami.com/bitnami
+```
+
+#### Example *(docs-only validation)*
+
+```yaml
+jobs:
+  lint-helm-docs-only:
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    with:
+      CT_CONF_PATH: .github/ct.yaml
+      LINT_CHARTS: false
+      LINT_DOCS: true
+```
+
+#### Example *(charts-only validation)*
+
+```yaml
+jobs:
+  lint-helm-charts-only:
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    with:
+      CT_CONF_PATH: .github/ct.yaml
+      LINT_CHARTS: true
+      LINT_DOCS: false
+```
+
 
 ### `release.yml`
 
