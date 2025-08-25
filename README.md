@@ -40,7 +40,8 @@ For more details, see:
 - [Build docker images and push it to a registry (`docker-build.yml`)](./.github/workflows/docker-build.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
 - [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](./.github/workflows/lint-helm.yml)
-- [Create releases using release-please and optional automerge (`release-app.yml`)](./.github/workflows/release-app.yml)
+- [Release Apps using release-please and optional automerge (`release-app.yml`)](./.github/workflows/release-app.yml)
+- [Release Helm charts using chart-releaser (`release-helm.yml`)](./.github/workflows/release-helm.yml)
 - [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](./.github/workflows/scan-sonarqube.yml)
 - [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](./.github/workflows/scan-trivy.yml)
 - [Test Helm charts installation with chart-testing (`test-helm.yml`)](./.github/workflows/test-helm.yml)
@@ -382,6 +383,44 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
+### `release-helm.yml`
+
+Release Helm charts using `chart-releaser-action`. Automatically creates GitHub releases and publishes chart packages when chart versions are updated.
+
+#### Inputs
+
+| Input      | Type   | Description                                          | Required | Default  |
+| ---------- | ------ | ---------------------------------------------------- | -------- | -------- |
+| CHARTS_DIR | string | Directory containing the Helm charts                 | No       | ./charts |
+| HELM_REPOS | string | Helm repositories to add (name=url, comma-separated) | No       | -        |
+
+#### Permissions
+
+| Scope    | Access | Description                                       |
+| -------- | ------ | ------------------------------------------------- |
+| contents | write  | Create releases, tags, and publish chart packages |
+
+#### Notes
+
+- Uses `helm/chart-releaser-action` to automatically detect chart version changes and create corresponding GitHub releases.
+- Only creates releases for charts that have version bumps compared to the previous release.
+- Chart packages are uploaded as release assets and indexed for use as a Helm repository.
+- If `HELM_REPOS` is provided, adds external repositories before packaging (useful for charts with dependencies).
+- Repository must have GitHub Pages enabled to serve the chart repository index.
+- Requires chart versions to follow semantic versioning.
+- Automatically configures Git user as `github-actions[bot]` for any commits made during the release process.
+
+#### Example
+
+```yaml
+jobs:
+  release-charts:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@main
+    with:
+      CHARTS_DIR: ./charts
+      HELM_REPOS: "bitnami=https://charts.bitnami.com/bitnami,jetstack=https://charts.jetstack.io"
+```
+
 ### `scan-sonarqube.yml`
 
 Run SonarQube static analysis and check the quality gate. The workflow optionally downloads a coverage artifact and passes it to SonarQube.
@@ -577,6 +616,24 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
+#### Example *(caller mode – prerelease bump)*
+
+```yaml
+jobs:
+  bump-chart-prerelease:
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    with:
+      RUN_MODE: caller
+      WORKFLOW_NAME: update-app-version.yml
+      CHART_REPO: this-is-tobi/helm-charts
+      CHART_NAME: my-service
+      APP_VERSION: 1.4.0-rc.1
+      UPGRADE_TYPE: prerelease
+      PRERELEASE_IDENTIFIER: rc
+    secrets:
+      GH_PAT: ${{ secrets.GH_PAT }}
+```
+
 #### Example *(called mode)*
 
 ```yaml
@@ -588,18 +645,4 @@ jobs:
       CHART_NAME: my-service
       APP_VERSION: 1.4.0
       UPGRADE_TYPE: minor
-```
-
-#### Example *(called mode – prerelease bump)*
-
-```yaml
-jobs:
-  bump-chart-prerelease:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
-    with:
-      RUN_MODE: called
-      CHART_NAME: my-service
-      APP_VERSION: 1.4.0-rc.1
-      UPGRADE_TYPE: prerelease
-      PRERELEASE_IDENTIFIER: rc
 ```
