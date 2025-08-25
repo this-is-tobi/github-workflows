@@ -43,6 +43,7 @@ For more details, see:
 - [Create releases using release-please and optional automerge (`release.yml`)](./.github/workflows/release.yml)
 - [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](./.github/workflows/scan-sonarqube.yml)
 - [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](./.github/workflows/scan-trivy.yml)
+- [Test Helm charts installation with chart-testing (`test-helm.yml`)](./.github/workflows/test-helm.yml)
 - [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
 
 ### `argocd-preview.yml`
@@ -467,6 +468,57 @@ jobs:
     with:
       IMAGE: ghcr.io/my-org/my-image:1.2.3
       PATH: ./apps/api
+```
+
+### `test-helm.yml`
+
+Test Helm charts by installing them in a Kubernetes cluster using `chart-testing`. Creates a temporary Kind cluster and attempts to install charts to verify they work correctly.
+
+#### Inputs
+
+| Input        | Type   | Description                                  | Required | Default |
+| ------------ | ------ | -------------------------------------------- | -------- | ------- |
+| CT_CONF_PATH | string | Path to the chart-testing configuration file | Yes      | -       |
+
+#### Permissions
+
+| Scope    | Access | Description                    |
+| -------- | ------ | ------------------------------ |
+| contents | read   | Read chart sources for testing |
+
+#### Notes
+
+- Uses `helm/chart-testing-action` with `ct install` to test chart installations in a real Kubernetes environment.
+- Creates a temporary Kind (Kubernetes in Docker) cluster using `helm/kind-action` for testing.
+- Dynamically selects target branch: uses PR head branch (`github.head_ref`) when testing pull requests, otherwise falls back to repository default branch.
+- Chart-testing configuration file defines which charts to test, dependencies, and installation parameters.
+- Requires charts to have valid `values.yaml` and proper Kubernetes manifests that can be deployed.
+- Consider adding integration tests or custom validation scripts in your chart-testing configuration.
+
+#### Example
+
+```yaml
+jobs:
+  test-helm-charts:
+    uses: this-is-tobi/github-workflows/.github/workflows/test-helm.yml@main
+    with:
+      CT_CONF_PATH: .github/ct.yaml
+```
+
+Example chart-testing configuration for testing (`.github/ct.yaml`):
+
+```yaml
+# See https://github.com/helm/chart-testing/blob/main/doc/ct_install.md
+target-branch: main
+chart-dirs:
+  - charts
+helm-extra-args: --timeout 600s
+check-version-increment: false  # Usually false for install testing
+validate-maintainers: false
+excluded-charts:
+  - unstable-chart
+chart-repos:
+  - bitnami=https://charts.bitnami.com/bitnami
 ```
 
 ### `update-helm-chart.yml`
