@@ -40,7 +40,7 @@ For more details, see:
 - [Build docker images and push it to a registry (`docker-build.yml`)](./.github/workflows/docker-build.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
 - [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](./.github/workflows/lint-helm.yml)
-- [Create releases using release-please and optional automerge (`release.yml`)](./.github/workflows/release.yml)
+- [Create releases using release-please and optional automerge (`release-app.yml`)](./.github/workflows/release-app.yml)
 - [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](./.github/workflows/scan-sonarqube.yml)
 - [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](./.github/workflows/scan-trivy.yml)
 - [Test Helm charts installation with chart-testing (`test-helm.yml`)](./.github/workflows/test-helm.yml)
@@ -322,7 +322,7 @@ jobs:
 ```
 
 
-### `release.yml`
+### `release-app.yml`
 
 Create releases using `release-please`, optionally tag major/minor versions, and support automerge of generated PRs.
 
@@ -372,7 +372,7 @@ Create releases using `release-please`, optionally tag major/minor versions, and
 ```yaml
 jobs:
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/release.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
     with:
       TAG_MAJOR_AND_MINOR: true
       AUTOMERGE_PRERELEASE: true
