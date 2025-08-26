@@ -87,7 +87,7 @@ jobs:
     needs:
       - images-scan
       - config-scan
-    if: ${{ inputs.IMAGE != '' && inputs.PATH != '' && github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'pull_request' && (inputs.IMAGE != '' || inputs.PATH != '') }}
     steps:
     - name: Comment PR
       uses: thollander/actions-comment-pull-request@v2
@@ -95,5 +95,5 @@ jobs:
         message: |
           🤖 Hey !
 
-          The security scan report for the current pull request is available [here](https://github.com/${{ github.repository }}/security/code-scanning?query=is%3Aopen+branch%3A${{ github.ref_name }}+pr%3A${{ github.event.pull_request.number || github.event.number }}).
+          The security scan report for the current pull request is available in [the GitHub Security Tab](https://github.com/${{ github.repository }}/security/code-scanning?query=is%3Aopen+branch%3A${{ github.ref_name }}+pr%3A${{ github.event.pull_request.number || github.event.number }}).
         comment_tag: vuln-scan
