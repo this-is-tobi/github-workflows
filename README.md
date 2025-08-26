@@ -36,8 +36,8 @@ For more details, see:
 ## Available workflows
 
 - [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](./.github/workflows/argocd-preview.yml)
+- [Build docker images and push it to a registry (`build-docker.yml`)](./.github/workflows/build-docker.yml)
 - [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](./.github/workflows/clean-cache.yml)
-- [Build docker images and push it to a registry (`docker-build.yml`)](./.github/workflows/docker-build.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
 - [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](./.github/workflows/lint-helm.yml)
 - [Release Apps using release-please and optional automerge (`release-app.yml`)](./.github/workflows/release-app.yml)
@@ -94,47 +94,7 @@ jobs:
       ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
 ```
 
-### `clean-cache.yml`
-
-Delete GitHub Actions caches related to a PR/branch and optionally delete a single image from GHCR when an image reference is provided.
-
-#### Inputs
-
-| Input       | Type   | Description                                                                                                                                                                          | Required | Default |
-| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------- |
-| PR_NUMBER   | number | ID number of the pull request associated with the cache                                                                                                                              | No       | -       |
-| BRANCH_NAME | string | Branch name associated with the cache                                                                                                                                                | No       | -       |
-| COMMIT_SHA  | string | Commit SHA associated with the cache (alternative selector)                                                                                                                          | No       | -       |
-| IMAGE       | string | Image reference to delete (optionally with registry). Non-`ghcr.io` or missing registry are treated as GHCR. Must include a tag. Examples: `ghcr.io/org/app:1.2.3`, `org/app:1.2.3`. | No       | -       |
-
-#### Permissions
-
-| Scope    | Access | Description                                        |
-| -------- | ------ | -------------------------------------------------- |
-| packages | write  | Required to delete GHCR container package versions |
-| contents | read   | Read repository contents                           |
-| actions  | write  | Manage Actions caches via cache API                |
-
-#### Notes
-
-- Cache deletion logic picks `BRANCH_NAME` if provided; otherwise derives a PR ref from `PR_NUMBER`.
-- Image deletion job (`cleanup-image`) only runs when `IMAGE` is supplied.
-- If `IMAGE` contains a registry different from `ghcr.io`, a warning is emitted and it is processed as if it were `ghcr.io`.
-- If no registry is provided it is assumed to be `ghcr.io`.
-- `IMAGE` must include a tag (e.g. `my-org/my-image:latest`); images are deleted via the GitHub Packages API.
-
-#### Example
-
-```yaml
-jobs:
-  cleanup:
-    uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@main
-    with:
-      PR_NUMBER: 123
-      IMAGE: this-is-tobi/tools/debug:pr-123
-```
-
-### `docker-build.yml`
+### `build-docker.yml`
 
 Build and push container images using Docker Buildx with optional multi-arch support.
 
@@ -173,13 +133,53 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 ```yaml
 jobs:
   build:
-    uses: this-is-tobi/github-workflows/.github/workflows/docker-build.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3
       BUILD_AMD64: true
       BUILD_ARM64: true
       USE_QEMU: false
+```
+
+### `clean-cache.yml`
+
+Delete GitHub Actions caches related to a PR/branch and optionally delete a single image from GHCR when an image reference is provided.
+
+#### Inputs
+
+| Input       | Type   | Description                                                                                                                                                                          | Required | Default |
+| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------- |
+| PR_NUMBER   | number | ID number of the pull request associated with the cache                                                                                                                              | No       | -       |
+| BRANCH_NAME | string | Branch name associated with the cache                                                                                                                                                | No       | -       |
+| COMMIT_SHA  | string | Commit SHA associated with the cache (alternative selector)                                                                                                                          | No       | -       |
+| IMAGE       | string | Image reference to delete (optionally with registry). Non-`ghcr.io` or missing registry are treated as GHCR. Must include a tag. Examples: `ghcr.io/org/app:1.2.3`, `org/app:1.2.3`. | No       | -       |
+
+#### Permissions
+
+| Scope    | Access | Description                                        |
+| -------- | ------ | -------------------------------------------------- |
+| packages | write  | Required to delete GHCR container package versions |
+| contents | read   | Read repository contents                           |
+| actions  | write  | Manage Actions caches via cache API                |
+
+#### Notes
+
+- Cache deletion logic picks `BRANCH_NAME` if provided; otherwise derives a PR ref from `PR_NUMBER`.
+- Image deletion job (`cleanup-image`) only runs when `IMAGE` is supplied.
+- If `IMAGE` contains a registry different from `ghcr.io`, a warning is emitted and it is processed as if it were `ghcr.io`.
+- If no registry is provided it is assumed to be `ghcr.io`.
+- `IMAGE` must include a tag (e.g. `my-org/my-image:latest`); images are deleted via the GitHub Packages API.
+
+#### Example
+
+```yaml
+jobs:
+  cleanup:
+    uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@main
+    with:
+      PR_NUMBER: 123
+      IMAGE: this-is-tobi/tools/debug:pr-123
 ```
 
 ### `label-pr.yml`
