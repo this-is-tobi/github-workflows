@@ -11,10 +11,6 @@ on:
         description: Branch name assiocited with the cache
         required: false
         type: string
-      COMMIT_SHA:
-        description: Commit sha assiocited with the cache
-        required: false
-        type: string
       IMAGE:
         description: Name of the image to delete from ghcr.io (eg. 'my-org/my-image:my-tag')
         required: false
@@ -29,7 +25,7 @@ jobs:
   cleanup-cache:
     name: Delete github cache
     runs-on: ubuntu-latest
-    if: ${{ inputs.PR_NUMBER || inputs.BRANCH_NAME || inputs.COMMIT_SHA }}
+    if: ${{ inputs.PR_NUMBER || inputs.BRANCH_NAME }}
     steps:
     - name: Clean cache for closed branch
       env:
@@ -38,7 +34,7 @@ jobs:
         REPO=${{ github.repository }}
         if [ -n "${{ inputs.BRANCH_NAME }}" ]; then
           BRANCH="${{ inputs.BRANCH_NAME }}"
-        else
+        elif [ -n "${{ inputs.PR_NUMBER }}" ]; then
           BRANCH="refs/pull/${{ inputs.PR_NUMBER }}/merge"
         fi
 

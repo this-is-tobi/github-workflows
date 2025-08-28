@@ -155,7 +155,6 @@ Delete GitHub Actions caches related to a PR/branch and optionally delete a sing
 | ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------- |
 | PR_NUMBER   | number | ID number of the pull request associated with the cache                                                                                                                              | No       | -       |
 | BRANCH_NAME | string | Branch name associated with the cache                                                                                                                                                | No       | -       |
-| COMMIT_SHA  | string | Commit SHA associated with the cache (alternative selector)                                                                                                                          | No       | -       |
 | IMAGE       | string | Image reference to delete (optionally with registry). Non-`ghcr.io` or missing registry are treated as GHCR. Must include a tag. Examples: `ghcr.io/org/app:1.2.3`, `org/app:1.2.3`. | No       | -       |
 
 #### Permissions
