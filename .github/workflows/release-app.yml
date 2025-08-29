@@ -3,6 +3,11 @@ name: Release app
 on:
   workflow_call:
     inputs:
+      ENABLE_PRERELEASE:
+        description: Enable prerelease functionality
+        type: boolean
+        required: false
+        default: false
       TAG_MAJOR_AND_MINOR:
         description: Tag major and minor versions
         type: boolean
@@ -33,6 +38,26 @@ on:
         type: boolean
         required: false
         default: false
+      RELEASE_CONFIG_FILE:
+        description: Release-please config file for release branch
+        type: string
+        required: false
+        default: release-please-config.json
+      RELEASE_MANIFEST_FILE:
+        description: Release-please manifest file for release branch
+        type: string
+        required: false
+        default: .release-please-manifest.json
+      PRERELEASE_CONFIG_FILE:
+        description: Release-please config file for prerelease branch
+        type: string
+        required: false
+        default: release-please-config-rc.json
+      PRERELEASE_MANIFEST_FILE:
+        description: Release-please manifest file for prerelease branch
+        type: string
+        required: false
+        default: .release-please-manifest-rc.json
     secrets:
       GH_PAT:
         description: GitHub Personal Access Token (needed for automerge)
@@ -75,8 +100,8 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         target-branch: ${{ github.ref_name }}
-        config-file: ${{ (github.ref_name == inputs.RELEASE_BRANCH && 'release-please-config.json') || (github.ref_name == inputs.PRERELEASE_BRANCH && 'release-please-config-rc.json') }}
-        manifest-file: ${{ (github.ref_name == inputs.RELEASE_BRANCH && '.release-please-manifest.json') || (github.ref_name == inputs.PRERELEASE_BRANCH && '.release-please-manifest-rc.json') }}
+        config-file: ${{ (github.ref_name == inputs.RELEASE_BRANCH && inputs.RELEASE_CONFIG_FILE) || (inputs.ENABLE_PRERELEASE && github.ref_name == inputs.PRERELEASE_BRANCH && inputs.PRERELEASE_CONFIG_FILE) || inputs.RELEASE_CONFIG_FILE }}
+        manifest-file: ${{ (github.ref_name == inputs.RELEASE_BRANCH && inputs.RELEASE_MANIFEST_FILE) || (inputs.ENABLE_PRERELEASE && github.ref_name == inputs.PRERELEASE_BRANCH && inputs.PRERELEASE_MANIFEST_FILE) || inputs.RELEASE_MANIFEST_FILE }}
 
     - name: Tag major and minor versions
       if: ${{ steps.release.outputs.release_created && inputs.TAG_MAJOR_AND_MINOR }}
@@ -96,7 +121,7 @@ jobs:
         git push origin v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}
 
     - name: Synchronize release-please-rc manifest
-      if: ${{ github.ref_name == inputs.RELEASE_BRANCH && !steps.release.outputs.release_created }}
+      if: ${{ inputs.ENABLE_PRERELEASE && github.ref_name == inputs.RELEASE_BRANCH && !steps.release.outputs.release_created }}
       run: |
         git config user.name github-actions[bot]
         git config user.email github-actions[bot]@users.noreply.github.com
@@ -110,12 +135,12 @@ jobs:
           git fetch origin $pr_branch
           git checkout $pr_branch
 
-          if ! git diff --no-index --quiet .release-please-manifest.json .release-please-manifest-rc.json; then
+          if ! git diff --no-index --quiet ${{ inputs.RELEASE_MANIFEST_FILE }} ${{ inputs.PRERELEASE_MANIFEST_FILE }}; then
             echo "Files differ, updating release-please-rc manifest"
 
-            cat .release-please-manifest.json > .release-please-manifest-rc.json
+            cat ${{ inputs.RELEASE_MANIFEST_FILE }} > ${{ inputs.PRERELEASE_MANIFEST_FILE }}
 
-            git add .release-please-manifest-rc.json
+            git add ${{ inputs.PRERELEASE_MANIFEST_FILE }}
             git commit --amend --no-edit
             git push --force-with-lease --force-if-includes
           else
@@ -126,7 +151,7 @@ jobs:
         fi
 
     - name: Automerge release PR
-      if: ${{ ((inputs.AUTOMERGE_PRERELEASE && github.ref_name == inputs.PRERELEASE_BRANCH) || (inputs.AUTOMERGE_RELEASE && github.ref_name == inputs.RELEASE_BRANCH)) && !steps.release.outputs.release_created }}
+      if: ${{ ((inputs.ENABLE_PRERELEASE && inputs.AUTOMERGE_PRERELEASE && github.ref_name == inputs.PRERELEASE_BRANCH) || (inputs.AUTOMERGE_RELEASE && github.ref_name == inputs.RELEASE_BRANCH)) && !steps.release.outputs.release_created }}
       env:
         GH_TOKEN: ${{ secrets.GH_PAT }}
       run: |
@@ -164,7 +189,7 @@ jobs:
         fi
 
     - name: Ensure ${{ inputs.PRERELEASE_BRANCH }} is up to date with ${{ inputs.RELEASE_BRANCH }}
-      if: ${{ inputs.REBASE_PRERELEASE_BRANCH && github.ref_name == inputs.RELEASE_BRANCH && steps.release.outputs.release_created }}
+      if: ${{ inputs.ENABLE_PRERELEASE && inputs.REBASE_PRERELEASE_BRANCH && github.ref_name == inputs.RELEASE_BRANCH && steps.release.outputs.release_created }}
       run: |
         set -euo pipefail
         git fetch origin ${{ inputs.RELEASE_BRANCH }} ${{ inputs.PRERELEASE_BRANCH }} || true
