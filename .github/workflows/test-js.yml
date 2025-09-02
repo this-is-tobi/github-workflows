@@ -1,0 +1,288 @@
+name: Test JavaScript files
+
+on:
+  workflow_call:
+    inputs:
+      RUNTIME_VERSION:
+        description: Runtime version to use (Node.js or Bun version)
+        type: string
+        required: false
+        default: "22"
+      PACKAGE_MANAGER:
+        description: Package manager to use (npm, pnpm, yarn, bun)
+        type: string
+        required: false
+        default: "npm"
+      RUNTIME:
+        description: JavaScript runtime to use (node, bun)
+        type: string
+        required: false
+        default: "node"
+      WORKING_DIRECTORY:
+        description: Working directory for the project
+        type: string
+        required: false
+        default: "."
+      TEST_COMMAND:
+        description: Custom test command to run (defaults to vitest run)
+        type: string
+        required: false
+        default: ""
+      COVERAGE:
+        description: Whether to collect test coverage
+        type: boolean
+        required: false
+        default: false
+      COVERAGE_REPORTER:
+        description: Coverage reporter to use (text, lcov, html, json, etc.)
+        type: string
+        required: false
+        default: "text"
+      COVERAGE_ARTIFACT_NAME:
+        description: Artifact name of the coverage reports
+        required: false
+        type: string
+        default: unit-tests-coverage
+      COVERAGE_ARTIFACT_PATH:
+        description: Target path to download coverage artifact
+        required: false
+        type: string
+        default: ./coverage
+      FAIL_ON_ERROR:
+        description: Whether to fail the workflow on test failures
+        type: boolean
+        required: false
+        default: true
+      TIMEOUT:
+        description: Test timeout in milliseconds
+        type: string
+        required: false
+        default: "60000"
+
+permissions:
+  contents: read
+
+jobs:
+  detect-setup:
+    name: Detect project setup
+    runs-on: ubuntu-latest
+    outputs:
+      package-manager: ${{ steps.detect.outputs.package-manager }}
+      runtime: ${{ steps.detect.outputs.runtime }}
+      has-vitest: ${{ steps.detect.outputs.has-vitest }}
+      has-tests: ${{ steps.detect.outputs.has-tests }}
+      package-file: ${{ steps.detect.outputs.package-file }}
+      test-command: ${{ steps.detect.outputs.test-command }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@v4
+
+    - name: Detect project configuration
+      id: detect
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        # Detect package manager
+        if [ "${{ inputs.PACKAGE_MANAGER }}" != "npm" ]; then
+          DETECTED_PM="${{ inputs.PACKAGE_MANAGER }}"
+        elif [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
+          DETECTED_PM="bun"
+        elif [ -f "pnpm-lock.yaml" ]; then
+          DETECTED_PM="pnpm"
+        elif [ -f "yarn.lock" ]; then
+          DETECTED_PM="yarn"
+        else
+          DETECTED_PM="npm"
+        fi
+        echo "Package manager detected: $DETECTED_PM"
+        echo "package-manager=${DETECTED_PM}" >> $GITHUB_OUTPUT
+
+        # Detect runtime
+        if [ "${{ inputs.RUNTIME }}" != "node" ]; then
+          DETECTED_RUNTIME="${{ inputs.RUNTIME }}"
+        elif [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
+          DETECTED_RUNTIME="bun"
+        else
+          DETECTED_RUNTIME="node"
+        fi
+        echo "Runtime detected: $DETECTED_RUNTIME"
+        echo "runtime=${DETECTED_RUNTIME}" >> $GITHUB_OUTPUT
+
+        # Check for package.json
+        if [ -f "package.json" ]; then
+          echo "package-file=package.json" >> $GITHUB_OUTPUT
+          
+          # Check if vitest is in dependencies
+          HAS_VITEST="false"
+          if grep -q '"vitest"' package.json; then
+            HAS_VITEST="true"
+          fi
+          echo "Vitest found in package.json: $HAS_VITEST"
+          echo "has-vitest=${HAS_VITEST}" >> $GITHUB_OUTPUT
+          
+          # Check for test script in package.json
+          if grep -q '"test"' package.json; then
+            echo "Test script found in package.json"
+            echo "test-command=npm run test" >> $GITHUB_OUTPUT
+          else
+            echo "No test script found in package.json"
+            echo "test-command=" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "package-file=" >> $GITHUB_OUTPUT
+          echo "has-vitest=false" >> $GITHUB_OUTPUT
+          echo "test-command=" >> $GITHUB_OUTPUT
+        fi
+
+        # Check for test files
+        HAS_TESTS="false"
+        if find . -name "*.test.js" -o -name "*.test.ts" -o -name "*.test.mjs" -o -name "*.spec.js" -o -name "*.spec.ts" -o -name "*.spec.mjs" | head -1 | grep -q .; then
+          HAS_TESTS="true"
+        elif [ -d "test" ] || [ -d "tests" ] || [ -d "__tests__" ]; then
+          HAS_TESTS="true"
+        fi
+        echo "Test files found: $HAS_TESTS"
+        echo "has-tests=${HAS_TESTS}" >> $GITHUB_OUTPUT
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-tests == 'true' && needs.detect-setup.outputs.has-vitest == 'true' }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.RUNTIME_VERSION }}
+
+    - name: Setup Bun
+      if: ${{ needs.detect-setup.outputs.runtime == 'bun' }}
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.RUNTIME_VERSION }}
+
+    - name: Setup pnpm
+      if: ${{ needs.detect-setup.outputs.package-manager == 'pnpm' }}
+      uses: pnpm/action-setup@v4
+      with:
+        version: latest
+
+    - name: Install dependencies (npm)
+      if: ${{ needs.detect-setup.outputs.package-manager == 'npm' }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: npm ci
+
+    - name: Install dependencies (pnpm)
+      if: ${{ needs.detect-setup.outputs.package-manager == 'pnpm' }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: pnpm install --frozen-lockfile
+
+    - name: Install dependencies (yarn)
+      if: ${{ needs.detect-setup.outputs.package-manager == 'yarn' }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: yarn install --frozen-lockfile
+
+    - name: Install dependencies (bun)
+      if: ${{ needs.detect-setup.outputs.package-manager == 'bun' }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: bun install --frozen-lockfile
+
+    - name: Run tests
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        # Determine test command
+        if [ -n "${{ inputs.TEST_COMMAND }}" ]; then
+          TEST_CMD="${{ inputs.TEST_COMMAND }}"
+        elif [ -n "${{ needs.detect-setup.outputs.test-command }}" ]; then
+          case "${{ needs.detect-setup.outputs.package-manager }}" in
+            npm)
+              TEST_CMD="npm run test"
+              ;;
+            pnpm)
+              TEST_CMD="pnpm test"
+              ;;
+            yarn)
+              TEST_CMD="yarn test"
+              ;;
+            bun)
+              TEST_CMD="bun run test"
+              ;;
+          esac
+        else
+          # Use vitest directly
+          VITEST_ARGS="run --reporter=verbose"
+          
+          # Add coverage if requested
+          if [ "${{ inputs.COVERAGE }}" = "true" ]; then
+            VITEST_ARGS="$VITEST_ARGS --coverage --coverage.reporter=${{ inputs.COVERAGE_REPORTER }}"
+          fi
+          
+          # Add timeout
+          VITEST_ARGS="$VITEST_ARGS --testTimeout=${{ inputs.TIMEOUT }}"
+          
+          case "${{ needs.detect-setup.outputs.package-manager }}" in
+            npm)
+              TEST_CMD="npx vitest $VITEST_ARGS"
+              ;;
+            pnpm)
+              TEST_CMD="pnpm exec vitest $VITEST_ARGS"
+              ;;
+            yarn)
+              TEST_CMD="yarn vitest $VITEST_ARGS"
+              ;;
+            bun)
+              TEST_CMD="bunx vitest $VITEST_ARGS"
+              ;;
+          esac
+        fi
+
+        echo "Running test command: $TEST_CMD"
+        
+        # Run tests and capture exit code
+        EXIT_CODE=0
+        $TEST_CMD || EXIT_CODE=$?
+
+        # Handle the exit code based on FAIL_ON_ERROR setting
+        if [ $EXIT_CODE -ne 0 ]; then
+          if [ "${{ inputs.FAIL_ON_ERROR }}" = "true" ]; then
+            echo "❌ Tests failed and FAIL_ON_ERROR is true. Failing the workflow."
+            exit $EXIT_CODE
+          else
+            echo "⚠️ Tests failed but FAIL_ON_ERROR is false. Workflow will continue."
+            echo "Please review and fix the failing tests manually."
+          fi
+        else
+          echo "✅ All tests passed successfully."
+        fi
+
+    - name: Upload coverage reports
+      if: ${{ inputs.COVERAGE == true && inputs.COVERAGE_REPORTER == 'lcov' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.COVERAGE_ARTIFACT_NAME }}
+        path: ${{ inputs.COVERAGE_ARTIFACT_PATH }}
+
+  no-tests:
+    name: No tests found
+    runs-on: ubuntu-latest
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-tests == 'false' }}
+    steps:
+    - name: Skip tests
+      run: |
+        echo "ℹ️ No test files found in the project."
+        echo "Vitest requires test files to be present to run tests."
+        echo "Expected patterns: *.test.{js,ts,mjs}, *.spec.{js,ts,mjs}, or test/tests/__tests__ directories"
+
+  no-vitest:
+    name: No tests found
+    runs-on: ubuntu-latest
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-vitest == 'false' }}
+    steps:
+    - name: Skip tests
+      run: |
+        echo "ℹ️ Vitest is not listed as a dependency in package.json."
