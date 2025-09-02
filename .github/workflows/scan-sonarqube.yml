@@ -3,17 +3,17 @@ name: Sonarqube scan
 on:
   workflow_call:
     inputs:
-      COV_IMPORT:
+      COVERAGE_IMPORT:
         description: Whether or not to import coverage artifact
         required: false
         type: boolean
         default: false
-      COV_ARTIFACT_NAME:
+      COVERAGE_ARTIFACT_NAME:
         description: Artifact name of the coverage reports
         required: false
         type: string
         default: unit-tests-coverage
-      COV_ARTIFACT_PATH:
+      COVERAGE_ARTIFACT_PATH:
         description: Target path to download coverage artifact
         required: false
         type: string
@@ -55,10 +55,10 @@ jobs:
 
     - name: Download artifact
       uses: actions/download-artifact@v4
-      if: ${{ inputs.COV_IMPORT }}
+      if: ${{ inputs.COVERAGE_IMPORT }}
       with:
-        name: ${{ inputs.COV_ARTIFACT_NAME }}
-        path: ${{ inputs.COV_ARTIFACT_PATH }}
+        name: ${{ inputs.COVERAGE_ARTIFACT_NAME }}
+        path: ${{ inputs.COVERAGE_ARTIFACT_PATH }}
 
     - name: Set sonarqube args
       id: sonar-args
