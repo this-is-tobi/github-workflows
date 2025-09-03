@@ -75,7 +75,7 @@ jobs:
       test-command: ${{ steps.detect.outputs.test-command }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Detect project configuration
       id: detect
@@ -150,7 +150,7 @@ jobs:
     if: ${{ needs.detect-setup.outputs.has-tests == 'true' && needs.detect-setup.outputs.has-vitest == 'true' }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}

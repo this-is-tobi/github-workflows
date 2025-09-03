@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Run Trivy vulnerability scanner on images
       uses: aquasecurity/trivy-action@master
@@ -55,10 +55,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Run Trivy vulnerability scanner on config files
-      uses: aquasecurity/trivy-action@0.32.0
+      uses: aquasecurity/trivy-action@0.33.1
       with:
         scan-ref: "${{ inputs.PATH }}"
         scan-type: config
@@ -90,10 +90,10 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && (inputs.IMAGE != '' || inputs.PATH != '') }}
     steps:
     - name: Comment PR
-      uses: thollander/actions-comment-pull-request@v2
+      uses: thollander/actions-comment-pull-request@v3
       with:
         message: |
           🤖 Hey !
 
           The security scan report for the current pull request is available in [the GitHub Security Tab](https://github.com/${{ github.repository }}/security/code-scanning?query=is%3Aopen+branch%3A${{ github.ref_name }}+pr%3A${{ github.event.pull_request.number || github.event.number }}).
-        comment_tag: vuln-scan
+        comment-tag: vuln-scan

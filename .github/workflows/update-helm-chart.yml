@@ -74,7 +74,7 @@ jobs:
     if: ${{ inputs.RUN_MODE == 'called' }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: update chart version
       id: update-chart

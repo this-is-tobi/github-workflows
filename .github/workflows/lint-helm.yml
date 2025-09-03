@@ -33,7 +33,7 @@ jobs:
     if: ${{ inputs.LINT_CHARTS }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Helm
       uses: azure/setup-helm@v4
@@ -59,7 +59,7 @@ jobs:
     if: ${{ inputs.LINT_DOCS }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Run helm-docs
       run: |
