@@ -36,7 +36,7 @@ Comment on PRs with preview URLs and optionally trigger an ArgoCD redeploy for p
 ```yaml
 jobs:
   preview:
-    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/argocd-preview.yml@main
     with:
       APP_URL_TEMPLATE: https://app-name.pr-<pr_number>.example.com
       PR_NUMBER: 123

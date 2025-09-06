@@ -30,7 +30,7 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 ```yaml
 jobs:
   vuln-scan:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/scan-trivy.yml@main
     with:
       IMAGE: ghcr.io/my-org/my-image:1.2.3
       PATH: ./apps/api

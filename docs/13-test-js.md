@@ -44,7 +44,7 @@ Comprehensive JavaScript/TypeScript test execution using Vitest with automatic r
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-js.yml@main
     with:
       RUNTIME_VERSION: "20"
       PACKAGE_MANAGER: "pnpm"
@@ -55,7 +55,7 @@ jobs:
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-js.yml@main
     with:
       COVERAGE: true
       COVERAGE_REPORTER: "lcov"
@@ -67,7 +67,7 @@ jobs:
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-js.yml@main
     with:
       RUNTIME: "bun"
       PACKAGE_MANAGER: "bun"
@@ -79,7 +79,7 @@ jobs:
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-js.yml@main
     with:
       TEST_COMMAND: "npm run test:unit"
       TIMEOUT: "120000"
@@ -90,14 +90,14 @@ jobs:
 ```yaml
 jobs:
   test-frontend:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-js.yml@main
     with:
       WORKING_DIRECTORY: "packages/frontend"
       COVERAGE: true
       COVERAGE_REPORTER: "text"
       
   test-backend:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-js.yml@main
     with:
       WORKING_DIRECTORY: "packages/backend"
       PACKAGE_MANAGER: "pnpm"
@@ -109,7 +109,7 @@ jobs:
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-js.yml@main
     with:
       FAIL_ON_ERROR: false
       COVERAGE: true

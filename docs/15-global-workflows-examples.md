@@ -49,7 +49,7 @@ jobs:
           packages:
             - 'packages/**'
           ci:
-            - '.github/workflows/**'
+            - '.github/workflows/catalog/**'
 
   expose-vars:
     runs-on: ubuntu-latest
@@ -65,7 +65,7 @@ jobs:
       run: echo "Exposing env vars"
 
   build-docker:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/build-docker.yml@main
     needs:
     - expose-vars
     permissions:
@@ -94,7 +94,7 @@ jobs:
       USE_QEMU: ${{ needs.expose-vars.outputs.USE_QEMU == 'true' }}
 
   scan-sonarqube:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/scan-sonarqube.yml@main
     needs:
     - expose-vars
     - build-docker
@@ -111,7 +111,7 @@ jobs:
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
 
   scan-trivy-conf:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/scan-trivy.yml@main
     needs:
     - expose-vars
     - build-docker
@@ -121,7 +121,7 @@ jobs:
       PATH: ./
 
   scan-trivy-images:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/scan-trivy.yml@main
     needs:
     - expose-vars
     - build-docker
@@ -214,7 +214,7 @@ jobs:
       run: echo "Exposing env vars"
 
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/release-app.yml@main
     needs:
     - expose-vars
     permissions:
@@ -232,7 +232,7 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 
   build-docker:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/build-docker.yml@main
     if: ${{ needs.release.outputs.release-created == 'true' }}
     needs:
     - expose-vars
@@ -263,7 +263,7 @@ jobs:
       USE_QEMU: ${{ needs.expose-vars.outputs.USE_QEMU == 'true' }}
 
   bump-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/update-helm-chart.yml@main
     needs:
     - expose-vars
     - release
@@ -314,7 +314,7 @@ jobs:
       run: echo "Exposing env vars"
 
   lint-helm-docs:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-helm.yml@main
     needs:
     - expose-vars
     permissions:
@@ -326,7 +326,7 @@ jobs:
       LINT_DOCS: true
 
   lint-helm-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-helm.yml@main
     needs:
     - expose-vars
     permissions:
@@ -338,7 +338,7 @@ jobs:
       LINT_DOCS: false
 
   test-helm-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-helm.yml@main
     needs:
     - expose-vars
     with:
@@ -359,7 +359,7 @@ on:
 
 jobs:
   release-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/release-helm.yml@main
     permissions:
       contents: write
     with:
@@ -436,7 +436,7 @@ on:
 
 jobs:
   bump-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/update-helm-chart.yml@main
     permissions:
       issues: write
       pull-requests: write

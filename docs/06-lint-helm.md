@@ -44,7 +44,7 @@ Comprehensive Helm chart validation with two parallel jobs: chart structure lint
 ```yaml
 jobs:
   lint-helm:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-helm.yml@main
     with:
       HELM_DOCS_VERSION: 1.14.2
       CT_CONF_PATH: .github/ct.yaml
@@ -71,7 +71,7 @@ chart-repos:
 ```yaml
 jobs:
   lint-helm-docs-only:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-helm.yml@main
     with:
       CT_CONF_PATH: .github/ct.yaml
       LINT_CHARTS: false
@@ -83,7 +83,7 @@ jobs:
 ```yaml
 jobs:
   lint-helm-charts-only:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-helm.yml@main
     with:
       CT_CONF_PATH: .github/ct.yaml
       LINT_CHARTS: true

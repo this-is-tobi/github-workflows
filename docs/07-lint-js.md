@@ -42,7 +42,7 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-js.yml@main
     with:
       RUNTIME_VERSION: "18"
       PACKAGE_MANAGER: "pnpm"
@@ -54,7 +54,7 @@ jobs:
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-js.yml@main
     with:
       RUNTIME: "bun"
       PACKAGE_MANAGER: "bun"
@@ -66,7 +66,7 @@ jobs:
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-js.yml@main
     with:
       ESLINT_CONFIG: "@company/eslint-config"
       LINT_PATHS: "apps packages"
@@ -77,13 +77,13 @@ jobs:
 ```yaml
 jobs:
   lint-frontend:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-js.yml@main
     with:
       WORKING_DIRECTORY: "packages/frontend"
       LINT_PATHS: "src components"
       
   lint-backend:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-js.yml@main
     with:
       WORKING_DIRECTORY: "packages/backend"
       PACKAGE_MANAGER: "pnpm"
@@ -95,7 +95,7 @@ jobs:
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-js.yml@main
     with:
       FAIL_ON_ERROR: false
       LINT_PATHS: "src tests docs"
@@ -106,7 +106,7 @@ jobs:
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/catalog/lint-js.yml@main
     with:
       ESLINT_CONFIG_FILE: ".eslintrc.custom.js"
       LINT_PATHS: "apps,packages,tools"
