@@ -44,7 +44,7 @@ Trigger a chart update workflow in a remote Helm charts repository (caller mode)
 ```yaml
 jobs:
   trigger-chart-update:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
     with:
       RUN_MODE: caller
       WORKFLOW_NAME: update-app-version.yml
@@ -61,7 +61,7 @@ jobs:
 ```yaml
 jobs:
   bump-chart-prerelease:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
     with:
       RUN_MODE: caller
       WORKFLOW_NAME: update-app-version.yml
@@ -79,7 +79,7 @@ jobs:
 ```yaml
 jobs:
   bump-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
     with:
       RUN_MODE: called
       CHART_NAME: my-service

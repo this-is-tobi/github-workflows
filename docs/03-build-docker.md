@@ -39,7 +39,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 ```yaml
 jobs:
   build:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3

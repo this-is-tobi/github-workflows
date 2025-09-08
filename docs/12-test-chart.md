@@ -30,7 +30,7 @@ Test Helm charts by installing them in a Kubernetes cluster using `chart-testing
 ```yaml
 jobs:
   test-helm-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/test-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/test-helm.yml@main
     with:
       CT_CONF_PATH: .github/ct.yaml
 ```

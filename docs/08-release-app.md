@@ -58,7 +58,7 @@ Create releases using `release-please`, optionally tag major/minor versions, and
 ```yaml
 jobs:
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
     with:
       ENABLE_PRERELEASE: true
       TAG_MAJOR_AND_MINOR: true
@@ -77,7 +77,7 @@ jobs:
 ```yaml
 jobs:
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
     with:
       ENABLE_PRERELEASE: false
       TAG_MAJOR_AND_MINOR: true

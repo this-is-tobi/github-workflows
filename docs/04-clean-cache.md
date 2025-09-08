@@ -33,7 +33,7 @@ Delete GitHub Actions caches related to a PR/branch and optionally delete a sing
 ```yaml
 jobs:
   cleanup:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/clean-cache.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@main
     with:
       PR_NUMBER: 123
       IMAGE: this-is-tobi/tools/debug:pr-123

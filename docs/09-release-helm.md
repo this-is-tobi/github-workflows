@@ -32,7 +32,7 @@ Release Helm charts using `chart-releaser-action`. Automatically creates GitHub 
 ```yaml
 jobs:
   release-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/release-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@main
     with:
       CHARTS_DIR: ./charts
       HELM_REPOS: "bitnami=https://charts.bitnami.com/bitnami,jetstack=https://charts.jetstack.io"

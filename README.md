@@ -2,7 +2,7 @@
 
 This repository serves as a centralized location for reusable GitHub workflows. By defining shared workflows here, we streamline the process of maintaining consistency and quality across all repositories.
 
-This repository contains reusable GitHub workflows intended to be referenced from other repositories via the `uses: owner/repo/.github/workflows/catalog/<file>@<ref>` mechanism.
+This repository contains reusable GitHub workflows intended to be referenced from other repositories via the `uses: owner/repo/.github/workflows/<file>@<ref>` mechanism.
 
 ## How to reference these workflows
 
@@ -13,7 +13,7 @@ __Example:__
 ```yaml
 jobs:
   example:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
     with:
       SONAR_URL: 'https://sonarqube.example.com'
     secrets:
@@ -26,7 +26,7 @@ jobs:
 You can use reusable workflows from a private repository, but there are important requirements and limitations:
 
 - **Repository Access:** Both the caller and the reusable workflow repository must be internal to the same user / organization.
-- **Reference Format:** Always reference the reusable workflow using the full path: `owner/repo/.github/workflows/catalog/workflow.yml@ref`.
+- **Reference Format:** Always reference the reusable workflow using the full path: `owner/repo/.github/workflows/workflow.yml@ref`.
 
 For more details, see: 
 - [GitHub Docs – Reusing workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
@@ -35,19 +35,19 @@ For more details, see:
 
 ## Available workflows
 
-- [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](./.github/workflows/catalog/argocd-preview.yml)
-- [Build docker images and push it to a registry (`build-docker.yml`)](./.github/workflows/catalog/build-docker.yml)
-- [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](./.github/workflows/catalog/clean-cache.yml)
-- [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/catalog/label-pr.yml)
-- [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](./.github/workflows/catalog/lint-helm.yml)
-- [Lint JavaScript, JSON, Markdown and YAML files using ESLint (`lint-js.yml`)](./.github/workflows/catalog/lint-js.yml)
-- [Release Apps using release-please and optional automerge (`release-app.yml`)](./.github/workflows/catalog/release-app.yml)
-- [Release Helm charts using chart-releaser (`release-helm.yml`)](./.github/workflows/catalog/release-helm.yml)
-- [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](./.github/workflows/catalog/scan-sonarqube.yml)
-- [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](./.github/workflows/catalog/scan-trivy.yml)
-- [Test Helm charts installation with chart-testing (`test-helm.yml`)](./.github/workflows/catalog/test-helm.yml)
-- [Test JavaScript/Typescript codebase using Vitest (`test-js.yml`)](./.github/workflows/catalog/test-js.yml)
-- [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](./.github/workflows/catalog/update-helm-chart.yml)
+- [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](./.github/workflows/argocd-preview.yml)
+- [Build docker images and push it to a registry (`build-docker.yml`)](./.github/workflows/build-docker.yml)
+- [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](./.github/workflows/clean-cache.yml)
+- [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
+- [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](./.github/workflows/lint-helm.yml)
+- [Lint JavaScript, JSON, Markdown and YAML files using ESLint (`lint-js.yml`)](./.github/workflows/lint-js.yml)
+- [Release Apps using release-please and optional automerge (`release-app.yml`)](./.github/workflows/release-app.yml)
+- [Release Helm charts using chart-releaser (`release-helm.yml`)](./.github/workflows/release-helm.yml)
+- [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](./.github/workflows/scan-sonarqube.yml)
+- [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](./.github/workflows/scan-trivy.yml)
+- [Test Helm charts installation with chart-testing (`test-helm.yml`)](./.github/workflows/test-helm.yml)
+- [Test JavaScript/Typescript codebase using Vitest (`test-js.yml`)](./.github/workflows/test-js.yml)
+- [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
 
 
 ## Documentation

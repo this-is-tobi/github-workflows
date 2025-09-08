@@ -21,7 +21,7 @@ Add or sync labels on pull requests using a configuration file.
 ```yaml
 jobs:
   label:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/label-pr.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/label-pr.yml@main
     with:
       CONF_PATH: .github/labeler-conf.yml
 ```

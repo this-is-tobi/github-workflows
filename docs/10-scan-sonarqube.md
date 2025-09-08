@@ -43,7 +43,7 @@ Run SonarQube static analysis and check the quality gate. The workflow optionall
 ```yaml
 jobs:
   scan-sonarqube:
-    uses: this-is-tobi/github-workflows/.github/workflows/catalog/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
     with:
       SONAR_URL: https://sonarqube.example.com
       COVERAGE_IMPORT: true
