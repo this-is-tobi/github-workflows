@@ -28,6 +28,11 @@ on:
         type: string
         required: false
         default: ""
+      TEST_PRECOMMAND:
+        description: Custom command to run before tests (e.g. build)
+        type: string
+        required: false
+        default: ""
       COVERAGE:
         description: Whether to collect test coverage
         type: boolean
@@ -239,9 +244,14 @@ jobs:
           esac
         fi
 
-        echo "Running test command: $TEST_CMD"
+        # Run pre-command if specified
+        if [ -n "${{ inputs.TEST_PRECOMMAND }}" ]; then
+          echo "Running pre-command: ${{ inputs.TEST_PRECOMMAND }}"
+          ${{ inputs.TEST_PRECOMMAND }}
+        fi
         
         # Run tests and capture exit code
+        echo "Running test command: $TEST_CMD"
         EXIT_CODE=0
         $TEST_CMD || EXIT_CODE=$?
 
@@ -278,7 +288,7 @@ jobs:
         echo "Expected patterns: *.test.{js,ts,mjs}, *.spec.{js,ts,mjs}, or test/tests/__tests__ directories"
 
   no-vitest:
-    name: No tests found
+    name: Vitest not found
     runs-on: ubuntu-latest
     needs: detect-setup
     if: ${{ needs.detect-setup.outputs.has-vitest == 'false' }}
