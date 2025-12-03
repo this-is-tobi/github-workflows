@@ -376,7 +376,7 @@ on:
   workflow_call:
     inputs:
       RUN_MODE:
-        description: Execution mode: 'caller' (trigger remote repo workflow) or 'called' (update chart in current repo)
+        description: Execution mode 'caller' (trigger remote repo workflow) or 'called' (update chart in current repo)
         required: false
         type: string
         default: called
@@ -401,7 +401,7 @@ on:
   workflow_dispatch:
     inputs:
       RUN_MODE:
-        description: Execution mode: 'caller' (trigger remote repo workflow) or 'called' (update chart in current repo)
+        description: Execution mode 'caller' (trigger remote repo workflow) or 'called' (update chart in current repo)
         required: false
         type: choice
         options:
@@ -445,6 +445,6 @@ jobs:
       RUN_MODE: ${{ inputs.RUN_MODE }}
       CHART_NAME: ${{ inputs.CHART_NAME }}
       APP_VERSION: ${{ inputs.APP_VERSION }}
-      UPGRADE_TYPE: ${{ inputs.UPDATE_TYPE }}
+      UPGRADE_TYPE: ${{ inputs.UPGRADE_TYPE }}
       PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
 ```
