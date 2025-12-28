@@ -31,10 +31,14 @@ Trigger a chart update workflow in a remote Helm charts repository (caller mode)
 ## Notes
 
 - `RUN_MODE=caller`: Validates `CHART_REPO` is provided, then invokes `gh workflow run <WORKFLOW_NAME>` in the target repo, forwarding: `CHART_NAME`, `APP_VERSION`, `UPGRADE_TYPE`, `PRERELEASE_IDENTIFIER`, and forcing `RUN_MODE=called` in the remote execution.
-- `RUN_MODE=called`: Reads current chart `version` from `charts/<CHART_NAME>/Chart.yaml` (via `yq`), computes `NEXT_VERSION` using `npx semver -i <UPGRADE_TYPE>` (adding `--preid <PRERELEASE_IDENTIFIER>` when `UPGRADE_TYPE=prerelease`), updates both `version` and `appVersion`, regenerates docs with `helm-docs`, and creates/updates a PR containing the bump.
+- `RUN_MODE=called`: Reads current chart `version` from `charts/<CHART_NAME>/Chart.yaml` (via `yq`), computes `NEXT_VERSION` using Release Please-compatible logic, updates both `version` and `appVersion`, regenerates docs with `helm-docs`, and creates/updates a PR containing the bump.
+- **Version bump logic** (Release Please compatible):
+  - `major`: `1.2.3` → `2.0.0`
+  - `minor`: `1.2.3` → `1.3.0`
+  - `patch`: `1.2.3` → `1.2.4`
+  - `prerelease`: `1.2.3` → `1.2.3-rc` → `1.2.3-rc.1` → `1.2.3-rc.2` (increments prerelease number)
 - Branch naming pattern: `<chart-name>-v<NEXT_VERSION>`.
-- Tooling requirements: `yq`, `node` (for `npx semver`), and `docker` (for `jnorwood/helm-docs`). Use an image / setup step that provides them.
-- `UPGRADE_TYPE=prerelease` increments the prerelease component (e.g. `1.2.3` -> `1.2.4-rc`, subsequent runs -> `1.2.4-rc.1`, etc.).
+- Tooling requirements: `yq` and `docker` (for `jnorwood/helm-docs`). No longer requires `npx semver`.
 - No explicit outputs are exposed; derive the new version from the PR title or branch name if needed.
 
 ## Examples

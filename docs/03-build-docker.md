@@ -4,18 +4,19 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 
 ## Inputs
 
-| Input             | Type    | Description                            | Required | Default |
-| ----------------- | ------- | -------------------------------------- | -------- | ------- |
-| IMAGE_NAME        | string  | Name of the image to build             | Yes      | -       |
-| IMAGE_TAG         | string  | Tag used to build image                | Yes      | -       |
-| LATEST_TAG        | boolean | Whether to tag the image with 'latest' | No       | false   |
-| IMAGE_DOCKERFILE  | string  | Path of the Dockerfile                 | Yes      | -       |
-| IMAGE_CONTEXT     | string  | Path of the build context              | Yes      | -       |
-| BUILD_AMD64       | boolean | Build for amd64                        | No       | true    |
-| BUILD_ARM64       | boolean | Build for arm64                        | No       | true    |
-| USE_QEMU          | boolean | Use QEMU emulator for arm64            | No       | false   |
-| REGISTRY_USERNAME | string  | Username used to login into registry   | No       | -       |
-| REGISTRY_PASSWORD | string  | Password used to login into registry   | No       | -       |
+| Input              | Type    | Description                                                        | Required | Default |
+| ------------------ | ------- | ------------------------------------------------------------------ | -------- | ------- |
+| IMAGE_NAME         | string  | Name of the image to build                                         | Yes      | -       |
+| IMAGE_TAG          | string  | Tag used to build image                                            | Yes      | -       |
+| LATEST_TAG         | boolean | Whether to tag the image with 'latest'                             | No       | false   |
+| TAG_MAJOR_AND_MINOR| boolean | Tag with major and minor versions (e.g. '1.2.3' -> '1.2' & '1')    | No       | false   |
+| IMAGE_DOCKERFILE   | string  | Path of the Dockerfile                                             | Yes      | -       |
+| IMAGE_CONTEXT      | string  | Path of the build context                                          | Yes      | -       |
+| BUILD_AMD64        | boolean | Build for amd64                                                    | No       | true    |
+| BUILD_ARM64        | boolean | Build for arm64                                                    | No       | true    |
+| USE_QEMU           | boolean | Use QEMU emulator for arm64                                        | No       | false   |
+| REGISTRY_USERNAME  | string  | Username used to login into registry                               | No       | -       |
+| REGISTRY_PASSWORD  | string  | Password used to login into registry                               | No       | -       |
 
 ## Permissions
 
@@ -28,9 +29,13 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 
 - Supports Ubuntu 24.04 and ARM runners for matrix builds.
 - `LATEST_TAG` input allows tagging images as `latest`.
+- `TAG_MAJOR_AND_MINOR` creates additional tags for stable releases (e.g., `1.2.3` also tags `1.2` and `1`). Only applies to non-prerelease versions.
 - Registry login logic: uses GitHub token for `ghcr.io`, otherwise uses provided credentials.
 - Digest artifacts are uploaded and merged for multi-arch images.
 - Manifest list is created and pushed after build.
+- Prerelease versions (containing `-alpha`, `-beta`, `-rc`, etc.) are detected and handled appropriately.
+- Short SHA tag is automatically added for traceability.
+- Branch-based tags exclude `main` and `develop` branches.
 
 ## Examples
 

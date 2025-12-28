@@ -4,11 +4,14 @@ Delete GitHub Actions caches related to a PR/branch and optionally delete a sing
 
 ## Inputs
 
-| Input       | Type   | Description                                                                                                                                                                          | Required | Default |
-| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------- |
-| PR_NUMBER   | number | ID number of the pull request associated with the cache                                                                                                                              | No       | -       |
-| BRANCH_NAME | string | Branch name associated with the cache                                                                                                                                                | No       | -       |
-| IMAGE       | string | Image reference to delete (optionally with registry). Non-`ghcr.io` or missing registry are treated as GHCR. Must include a tag. Examples: `ghcr.io/org/app:1.2.3`, `org/app:1.2.3`. | No       | -       |
+| Input                    | Type    | Description                                                                                                  | Required | Default |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------ | -------- | ------- |
+| PR_NUMBER                | number  | ID number of the pull request associated with the cache                                                      | No       | -       |
+| BRANCH_NAME              | string  | Branch name associated with the cache                                                                        | No       | -       |
+| IMAGE                    | string  | Image reference to delete (e.g., `ghcr.io/owner/repo/service:pr-123`)                                        | No       | -       |
+| CLEAN_GH_CACHE           | boolean | Whether to clean GitHub Actions cache                                                                        | No       | true    |
+| CLEAN_GHCR_IMAGE         | boolean | Whether to delete the specified image from ghcr.io                                                           | No       | false   |
+| CLEAN_ORPHANED_GHCR_IMAGE| boolean | Whether to delete orphaned SHA-only images from ghcr.io                                                      | No       | false   |
 
 ## Permissions
 
@@ -21,14 +24,16 @@ Delete GitHub Actions caches related to a PR/branch and optionally delete a sing
 ## Notes
 
 - Cache deletion logic picks `BRANCH_NAME` if provided; otherwise derives a PR ref from `PR_NUMBER`.
-- Image deletion job (`cleanup-image`) only runs when `IMAGE` is supplied.
-- If `IMAGE` contains a registry different from `ghcr.io`, a warning is emitted and it is processed as if it were `ghcr.io`.
-- If no registry is provided it is assumed to be `ghcr.io`.
-- `IMAGE` must include a tag (e.g. `my-org/my-image:latest`); images are deleted via the GitHub Packages API.
+- Use `CLEAN_GH_CACHE`, `CLEAN_GHCR_IMAGE`, and `CLEAN_ORPHANED_GHCR_IMAGE` to control which cleanup operations run.
+- Image deletion job (`cleanup-image`) only runs when `CLEAN_GHCR_IMAGE: true` and `IMAGE` is supplied.
+- Orphaned image cleanup (`cleanup-orphaned-image`) deletes SHA-only tagged images (7-character hex digests) when `CLEAN_ORPHANED_GHCR_IMAGE: true`.
+- Multi-arch manifest cleanup is handled automatically when deleting images.
+- Uses GitHub CLI (`gh`) for improved API interactions and error handling.
+- `IMAGE` must include a tag (e.g. `ghcr.io/my-org/my-image:pr-123`); images are deleted via the GitHub Packages API.
 
 ## Examples
 
-### Simple example
+### Clean cache and delete specific image
 
 ```yaml
 jobs:
@@ -36,5 +41,19 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@main
     with:
       PR_NUMBER: 123
-      IMAGE: this-is-tobi/tools/debug:pr-123
+      IMAGE: ghcr.io/this-is-tobi/tools/debug:pr-123
+      CLEAN_GH_CACHE: true
+      CLEAN_GHCR_IMAGE: true
+```
+
+### Clean orphaned SHA-only images
+
+```yaml
+jobs:
+  cleanup-orphans:
+    uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@main
+    with:
+      IMAGE: ghcr.io/this-is-tobi/tools/debug
+      CLEAN_GH_CACHE: false
+      CLEAN_ORPHANED_GHCR_IMAGE: true
 ```

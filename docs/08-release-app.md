@@ -29,6 +29,7 @@ Create releases using `release-please`, optionally tag major/minor versions, and
 | Output          | Description                               |
 | --------------- | ----------------------------------------- |
 | release-created | Whether a release was created in this run |
+| version         | Full semver value (e.g., `1.2.3`)         |
 | major-tag       | Major version tag (e.g., `1`)             |
 | minor-tag       | Minor version tag (e.g., `2`)             |
 | patch-tag       | Patch version tag (e.g., `3`)             |
