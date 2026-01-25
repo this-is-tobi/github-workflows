@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   test-charts:
-    name: Lint charts
+    name: Test charts
     runs-on: ubuntu-latest
     steps:
     - name: Checks-out repository

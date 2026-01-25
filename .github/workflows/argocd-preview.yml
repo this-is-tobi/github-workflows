@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       APP_URL_TEMPLATE:
-        description: ID number of the pull request assiocited with the cache
+        description: Template for the preview app URL (can include `<pr_number>` placeholder)
         required: true
         type: string
       PR_NUMBER:
