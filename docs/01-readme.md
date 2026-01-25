@@ -39,6 +39,7 @@ For more details, see:
 - [Build docker images and push it to a registry (`build-docker.yml`)](../.github/workflows/build-docker.yml)
 - [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](../.github/workflows/clean-cache.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](../.github/workflows/label-pr.yml)
+- [Validate commit messages follow Conventional Commits (`lint-commits.yml`)](../.github/workflows/lint-commits.yml)
 - [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](../.github/workflows/lint-helm.yml)
 - [Lint JavaScript, JSON, Markdown and YAML files using ESLint (`lint-js.yml`)](../.github/workflows/lint-js.yml)
 - [Release Apps using release-please and optional automerge (`release-app.yml`)](../.github/workflows/release-app.yml)

@@ -39,6 +39,7 @@ For more details, see:
 - [Build docker images and push it to a registry (`build-docker.yml`)](./.github/workflows/build-docker.yml)
 - [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](./.github/workflows/clean-cache.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
+- [Validate commit messages follow Conventional Commits (`lint-commits.yml`)](./.github/workflows/lint-commits.yml)
 - [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](./.github/workflows/lint-helm.yml)
 - [Lint JavaScript, JSON, Markdown and YAML files using ESLint (`lint-js.yml`)](./.github/workflows/lint-js.yml)
 - [Release Apps using release-please and optional automerge (`release-app.yml`)](./.github/workflows/release-app.yml)
@@ -59,6 +60,7 @@ For more details, see:
 - [Build Docker](./docs/03-build-docker.md) *- Docker image building and registry pushing*
 - [Clean Cache](./docs/04-clean-cache.md) *- GitHub Actions cache and GHCR image cleanup*
 - [Label PR](./docs/05-labeler-pr.md) *- Automatic pull request labeling*
+- [Lint Commits](./docs/16-lint-commits.md) *- Conventional commits validation*
 - [Lint Helm](./docs/06-lint-helm.md) *- Helm chart linting and documentation validation*
 - [Lint JavaScript](./docs/07-lint-js.md) *- JavaScript/TypeScript linting with ESLint*
 - [Release App](./docs/08-release-app.md) *- Application releases using release-please*
