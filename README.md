@@ -56,7 +56,7 @@ For more details, see:
 
 **Table of Contents** *- md sources*:
 - [ArgoCD Preview](./docs/02-argocd-preview.md) *- Preview environment deployment with ArgoCD*
-- [Build Docker](./docs/03-build-docker.md.md) *- Docker image building and registry pushing*
+- [Build Docker](./docs/03-build-docker.md) *- Docker image building and registry pushing*
 - [Clean Cache](./docs/04-clean-cache.md) *- GitHub Actions cache and GHCR image cleanup*
 - [Label PR](./docs/05-labeler-pr.md) *- Automatic pull request labeling*
 - [Lint Helm](./docs/06-lint-helm.md) *- Helm chart linting and documentation validation*

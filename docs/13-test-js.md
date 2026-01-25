@@ -11,6 +11,7 @@ Comprehensive JavaScript/TypeScript test execution using Vitest with automatic r
 | RUNTIME                | string  | JavaScript runtime to use (node, bun)               | No       | "node"              |
 | WORKING_DIRECTORY      | string  | Working directory for the project                   | No       | "."                 |
 | TEST_COMMAND           | string  | Custom test command to run (defaults to vitest run) | No       | ""                  |
+| TEST_PRECOMMAND        | string  | Custom command to run before tests (e.g. build)     | No       | ""                  |
 | COVERAGE               | boolean | Whether to collect test coverage                    | No       | false               |
 | COVERAGE_REPORTER      | string  | Coverage reporter to use (text, lcov, html, json)   | No       | "text"              |
 | COVERAGE_ARTIFACT_NAME | string  | Name of the coverage artifact                       | No       | unit-tests-coverage |

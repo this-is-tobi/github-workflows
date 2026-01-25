@@ -4,13 +4,13 @@ Comment on PRs with preview URLs and optionally trigger an ArgoCD redeploy for p
 
 ## Inputs
 
-| Input                        | Type   | Description                                          | Required | Default |
-| ---------------------------- | ------ | ---------------------------------------------------- | -------- | ------- |
-| APP_URL_TEMPLATE             | string | Template that can include `<pr_number>`              | Yes      | -       |
-| PR_NUMBER                    | number | Pull request number                                  | Yes      | -       |
-| ARGOCD_APP_NAME_TEMPLATE     | string | ArgoCD app name template (may include `<pr_number>`) | Yes      | -       |
-| ARGOCD_SYNC_PAYLOAD_TEMPLATE | string | ArgoCD sync payload template                         | Yes      | -       |
-| ARGOCD_URL                   | string | URL of the Argo-CD server                            | Yes      | -       |
+| Input                        | Type   | Description                                                              | Required | Default |
+| ---------------------------- | ------ | ------------------------------------------------------------------------ | -------- | ------- |
+| APP_URL_TEMPLATE             | string | Template for the preview app URL (can include `<pr_number>` placeholder) | Yes      | -       |
+| PR_NUMBER                    | number | Pull request number                                                      | Yes      | -       |
+| ARGOCD_APP_NAME_TEMPLATE     | string | ArgoCD app name template (may include `<pr_number>`)                     | Yes      | -       |
+| ARGOCD_SYNC_PAYLOAD_TEMPLATE | string | ArgoCD sync payload template                                             | Yes      | -       |
+| ARGOCD_URL                   | string | URL of the Argo-CD server                                                | Yes      | -       |
 
 ## Secrets
 
