@@ -1,14 +1,42 @@
 name: CD
 
 on:
-  # push:
-  #   branches:
-  #   - main
+  push:
+    branches:
+    - main
   workflow_dispatch:
 
 jobs:
+  path-filter:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@v6
+
+    - name: Check updated files paths
+      uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        # 'every' is required for negation patterns (!) to work correctly.
+        # With the default 'some', a file matching any positive rule wins,
+        # so '!ci.yml' exclusions are silently ignored.
+        predicate-quantifier: 'every'
+        filters: |
+          workflows:
+            - '.github/workflows/**'
+            - '!.github/workflows/ci.yml'
+            - '!.github/workflows/cd.yml'
+
   release:
     uses: ./.github/workflows/release-app.yml
+    if: ${{ needs.path-filter.outputs.workflows == 'true' }}
+    needs:
+    - path-filter
     permissions:
       issues: write
       pull-requests: write
@@ -16,5 +44,5 @@ jobs:
     with:
       TAG_MAJOR_AND_MINOR: true
       AUTOMERGE_RELEASE: false
-    # secrets:
+    secrets: {}
     #   GH_PAT: ${{ secrets.GH_PAT }}
