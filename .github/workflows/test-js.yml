@@ -7,7 +7,7 @@ on:
         description: Runtime version to use (Node.js or Bun version)
         type: string
         required: false
-        default: "22"
+        default: "24"
       PACKAGE_MANAGER:
         description: Package manager to use (npm, pnpm, yarn, bun)
         type: string
@@ -80,7 +80,7 @@ jobs:
       test-command: ${{ steps.detect.outputs.test-command }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Detect project configuration
       id: detect
@@ -115,7 +115,7 @@ jobs:
         # Check for package.json
         if [ -f "package.json" ]; then
           echo "package-file=package.json" >> $GITHUB_OUTPUT
-          
+
           # Check if vitest is in dependencies
           HAS_VITEST="false"
           if grep -q '"vitest"' package.json; then
@@ -123,7 +123,7 @@ jobs:
           fi
           echo "Vitest found in package.json: $HAS_VITEST"
           echo "has-vitest=${HAS_VITEST}" >> $GITHUB_OUTPUT
-          
+
           # Check for test script in package.json
           if grep -q '"test"' package.json; then
             echo "Test script found in package.json"
@@ -155,11 +155,11 @@ jobs:
     if: ${{ needs.detect-setup.outputs.has-tests == 'true' && needs.detect-setup.outputs.has-vitest == 'true' }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.RUNTIME_VERSION }}
 
@@ -219,15 +219,15 @@ jobs:
         else
           # Use vitest directly
           VITEST_ARGS="run --reporter=verbose"
-          
+
           # Add coverage if requested
           if [ "${{ inputs.COVERAGE }}" = "true" ]; then
             VITEST_ARGS="$VITEST_ARGS --coverage --coverage.reporter=${{ inputs.COVERAGE_REPORTER }}"
           fi
-          
+
           # Add timeout
           VITEST_ARGS="$VITEST_ARGS --testTimeout=${{ inputs.TIMEOUT }}"
-          
+
           case "${{ needs.detect-setup.outputs.package-manager }}" in
             npm)
               TEST_CMD="npx vitest $VITEST_ARGS"
@@ -249,7 +249,7 @@ jobs:
           echo "Running pre-command: ${{ inputs.TEST_PRECOMMAND }}"
           ${{ inputs.TEST_PRECOMMAND }}
         fi
-        
+
         # Run tests and capture exit code
         echo "Running test command: $TEST_CMD"
         EXIT_CODE=0
@@ -270,7 +270,7 @@ jobs:
 
     - name: Upload coverage reports
       if: ${{ inputs.COVERAGE == true && inputs.COVERAGE_REPORTER == 'lcov' }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.COVERAGE_ARTIFACT_NAME }}
         path: ${{ inputs.COVERAGE_ARTIFACT_PATH }}

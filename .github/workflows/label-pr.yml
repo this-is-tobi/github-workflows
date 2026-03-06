@@ -18,9 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Add pull request label
-      uses: actions/labeler@v5
+      uses: actions/labeler@v6
       with:
         configuration-path: ${{ inputs.CONF_PATH }}
