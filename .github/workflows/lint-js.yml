@@ -7,7 +7,7 @@ on:
         description: Runtime version to use (Node.js, Deno, or Bun version)
         type: string
         required: false
-        default: "22"
+        default: "24"
       PACKAGE_MANAGER:
         description: Package manager to use (npm, pnpm, yarn, bun)
         type: string
@@ -58,7 +58,7 @@ jobs:
       package-file: ${{ steps.detect.outputs.package-file }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Detect project configuration
       id: detect
@@ -113,11 +113,11 @@ jobs:
     needs: detect-setup
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.RUNTIME_VERSION }}
 

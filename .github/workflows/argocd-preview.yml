@@ -15,7 +15,7 @@ on:
         description: Template for the Argo-CD application name
         required: true
         type: string
-      ARGOCD_SYNC_PAYLOAD_TEMPLATE: 
+      ARGOCD_SYNC_PAYLOAD_TEMPLATE:
         description: Template
         required: true
         type: string
@@ -44,7 +44,7 @@ jobs:
         echo "APP_URL=$(echo "${{ inputs.APP_URL_TEMPLATE }}" | sed 's|<pr_number>|${{ inputs.PR_NUMBER }}|g')" >> $GITHUB_OUTPUT
 
     - name: Comment PR
-      uses: thollander/actions-comment-pull-request@v2
+      uses: thollander/actions-comment-pull-request@v3
       with:
         message: |
           🤖 Hey !
@@ -52,7 +52,7 @@ jobs:
           A preview of the application is available at: ${{ steps.generate-url.outputs.APP_URL }}
 
           *Please be patient, deployment may take a few minutes.*
-        comment_tag: preview
+        comment-tag: preview
 
   preview-sync:
     name: Redeploy preview app
