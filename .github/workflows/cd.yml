@@ -4,7 +4,6 @@ on:
   push:
     branches:
     - main
-  workflow_dispatch:
 
 jobs:
   path-filter:
@@ -37,7 +36,7 @@ jobs:
 
   release:
     uses: ./.github/workflows/release-app.yml
-    if: ${{ (needs.path-filter.outputs.workflows == 'true' || needs.path-filter.outputs.release == 'true') || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.path-filter.outputs.workflows == 'true' || needs.path-filter.outputs.release == 'true' }}
     needs:
     - path-filter
     permissions:
