@@ -35,17 +35,39 @@ For more details, see:
 
 ## Available workflows
 
-- [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](../.github/workflows/argocd-preview.yml)
-- [Build docker images and push it to a registry (`build-docker.yml`)](../.github/workflows/build-docker.yml)
-- [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](../.github/workflows/clean-cache.yml)
-- [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](../.github/workflows/label-pr.yml)
+**Lint**
+
 - [Validate commit messages follow Conventional Commits (`lint-commits.yml`)](../.github/workflows/lint-commits.yml)
 - [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](../.github/workflows/lint-helm.yml)
+- [Validate Helm chart values against a JSON schema (`lint-helm-schema.yml`)](../.github/workflows/lint-helm-schema.yml)
 - [Lint JavaScript, JSON, Markdown and YAML files using ESLint (`lint-js.yml`)](../.github/workflows/lint-js.yml)
-- [Release Apps using release-please and optional automerge (`release-app.yml`)](../.github/workflows/release-app.yml)
-- [Release Helm charts using chart-releaser (`release-helm.yml`)](../.github/workflows/release-helm.yml)
-- [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](../.github/workflows/scan-sonarqube.yml)
-- [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](../.github/workflows/scan-trivy.yml)
+- [Lint YAML files using yamllint (`lint-yaml.yml`)](../.github/workflows/lint-yaml.yml)
+
+**Test**
+
 - [Test Helm charts installation with chart-testing (`test-helm.yml`)](../.github/workflows/test-helm.yml)
 - [Test JavaScript/Typescript codebase using Vitest (`test-js.yml`)](../.github/workflows/test-js.yml)
+
+**Build**
+
+- [Build docker images and push it to a registry (`build-docker.yml`)](../.github/workflows/build-docker.yml)
+
+**Scan**
+
+- [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](../.github/workflows/scan-sonarqube.yml)
+- [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](../.github/workflows/scan-trivy.yml)
+
+**Release**
+
+- [Release Apps using release-please and optional automerge (`release-app.yml`)](../.github/workflows/release-app.yml)
+- [Release Helm charts using chart-releaser (`release-helm.yml`)](../.github/workflows/release-helm.yml)
 - [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](../.github/workflows/update-helm-chart.yml)
+
+**Deploy**
+
+- [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](../.github/workflows/argocd-preview.yml)
+
+**Utility**
+
+- [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](../.github/workflows/clean-cache.yml)
+- [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](../.github/workflows/label-pr.yml)

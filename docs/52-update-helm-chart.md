@@ -43,7 +43,11 @@ Trigger a chart update workflow in a remote Helm charts repository (caller mode)
 
 ## Examples
 
+These examples illustrate both sides of the `workflow_call` pattern: the caller workflow that triggers the chart update in another repository, and the called workflow that applies the version bump locally.
+
 ### Caller mode
+
+Dispatches the `update-app-version.yml` workflow in the remote chart repository via `gh workflow run`. The remote workflow receives `CHART_NAME`, `APP_VERSION`, `UPGRADE_TYPE`, and `PRERELEASE_IDENTIFIER` and runs in `called` mode, opening a PR that bumps the chart `version` and sets `appVersion`.
 
 ```yaml
 jobs:
@@ -62,6 +66,8 @@ jobs:
 
 ### Caller mode – prerelease bump
 
+`UPGRADE_TYPE: prerelease` increments the prerelease counter (`1.2.3-rc` → `1.2.3-rc.1` → `1.2.3-rc.2`). `APP_VERSION` is written as-is into `appVersion`; only the chart `version` field follows the prerelease bump logic.
+
 ```yaml
 jobs:
   bump-chart-prerelease:
@@ -79,6 +85,8 @@ jobs:
 ```
 
 ### Called mode
+
+Runs the version update directly in the current repository without any remote dispatch. Reads `charts/my-service/Chart.yaml`, bumps `version` by a minor increment, sets `appVersion: 1.4.0`, regenerates docs with `helm-docs`, and opens a PR with the changes.
 
 ```yaml
 jobs:

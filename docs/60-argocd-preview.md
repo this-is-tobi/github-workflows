@@ -27,11 +27,19 @@ Comment on PRs with preview URLs and optionally trigger an ArgoCD redeploy for p
 
 ## Notes
 
-- The redeploy step runs only when the PR has the `preview` label and `PR_NUMBER` is provided. `ARGOCD_TOKEN` must be set to authenticate redeploy requests. Template inputs accept the `<pr_number>` placeholder.
+- Both `preview-comment` and `preview-sync` jobs only trigger when the PR carries the `preview` label; add the label to activate preview behaviour.
+- `APP_URL_TEMPLATE`, `ARGOCD_APP_NAME_TEMPLATE`, and `ARGOCD_SYNC_PAYLOAD_TEMPLATE` all support the `<pr_number>` placeholder, which is replaced at runtime with the actual PR number.
+- `ARGOCD_TOKEN` is required to authenticate the sync API call; store it as a repository secret.
+- The sync request is sent to `<ARGOCD_URL>/api/v1/applications/<app-name>/sync` with the provided JSON payload. Non-200 responses are reported but do not fail the workflow (the step uses `continue-on-error: true`).
+- Useful pattern: pair with a path-filter job so previews are only rebuilt when relevant files change.
 
 ## Examples
 
+The first example shows a minimal static call with hardcoded values. The second demonstrates a complete pull-request workflow where the PR number is passed dynamically from the event payload.
+
 ### Simple example
+
+Minimal static call with all values hardcoded. The sync payload targets two specific Deployments in the preview namespace; update the `resources` array to match your own workloads.
 
 ```yaml
 jobs:
@@ -42,6 +50,35 @@ jobs:
       PR_NUMBER: 123
       ARGOCD_APP_NAME_TEMPLATE: app-name-pr-<pr_number>
       ARGOCD_SYNC_PAYLOAD_TEMPLATE: '{"appNamespace":"argocd","prune":true,"dryRun":false,"strategy":{"hook":{"force":true}},"resources":[{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-client"},{"group":"apps","version":"v1","kind":"Deployment","namespace":"app-name-pr-<pr_number>","name":"app-name-pr-<pr_number>-server"}],"syncOptions":{"items":["Replace=true"]}}'
+      ARGOCD_URL: https://argo-cd.example.com
+    secrets:
+      ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+```
+
+### Full PR workflow integration
+
+Typical usage inside a pull-request workflow, passing the PR number dynamically:
+
+```yaml
+on:
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - synchronize
+    - labeled
+
+jobs:
+  preview:
+    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@main
+    permissions:
+      pull-requests: write
+      contents: read
+    with:
+      APP_URL_TEMPLATE: https://my-app.pr-<pr_number>.example.com
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      ARGOCD_APP_NAME_TEMPLATE: my-app-pr-<pr_number>
+      ARGOCD_SYNC_PAYLOAD_TEMPLATE: '{"appNamespace":"argocd","prune":true,"dryRun":false,"strategy":{"hook":{"force":true}},"syncOptions":{"items":["Replace=true"]}}'
       ARGOCD_URL: https://argo-cd.example.com
     secrets:
       ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}

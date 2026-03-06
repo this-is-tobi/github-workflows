@@ -37,7 +37,11 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 
 ## Examples
 
+The following examples range from a zero-config invocation with automatic package detection to fully customised setups with alternative runtimes, custom ESLint configs, monorepo path overrides, and non-blocking mode.
+
 ### Simple example
+
+Overrides auto-detection by pinning the runtime version and package manager explicitly. When no ESLint config is found in the project, `@antfu/eslint-config` is installed automatically and a temporary `eslint.config.js` is generated.
 
 ```yaml
 jobs:
@@ -51,6 +55,8 @@ jobs:
 
 ### Bun runtime
 
+`RUNTIME: bun` and `PACKAGE_MANAGER: bun` should be set together for a consistent setup. Bun is detected automatically from lock files, but setting them explicitly avoids any ambiguity.
+
 ```yaml
 jobs:
   lint:
@@ -63,6 +69,8 @@ jobs:
 
 ### Custom ESLint config
 
+Installs `@company/eslint-config` instead of the default `@antfu/eslint-config`. The installed package is used as the base for the auto-generated `eslint.config.js`.
+
 ```yaml
 jobs:
   lint:
@@ -73,6 +81,8 @@ jobs:
 ```
 
 ### Monorepo with working directory
+
+Runs two parallel lint jobs, each scoped to a separate package. Each job installs and lints independently within its `WORKING_DIRECTORY`, so different runtimes, package managers, or `LINT_PATHS` can be configured per package.
 
 ```yaml
 jobs:
@@ -92,6 +102,8 @@ jobs:
 
 ### Non-blocking linting
 
+Reports all linting violations in the workflow summary without failing the job. Useful when gradually introducing linting rules into a project that already has pre-existing violations.
+
 ```yaml
 jobs:
   lint:
@@ -102,6 +114,8 @@ jobs:
 ```
 
 ### Custom config file
+
+Loads an existing ESLint config file from disk. When `ESLINT_CONFIG_FILE` is set, the auto-install of `ESLINT_CONFIG` is skipped and the file is used directly by the ESLint CLI.
 
 ```yaml
 jobs:

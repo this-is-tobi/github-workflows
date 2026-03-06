@@ -4,9 +4,10 @@ Test Helm charts by installing them in a Kubernetes cluster using `chart-testing
 
 ## Inputs
 
-| Input        | Type   | Description                                  | Required | Default |
-| ------------ | ------ | -------------------------------------------- | -------- | ------- |
-| CT_CONF_PATH | string | Path to the chart-testing configuration file | Yes      | -       |
+| Input        | Type   | Description                                                                              | Required | Default          |
+| ------------ | ------ | ---------------------------------------------------------------------------------------- | -------- | ---------------- |
+| CT_CONF_PATH | string | Path to the chart-testing configuration file                                             | Yes      | -                |
+| RUNS_ON      | string | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
 
 ## Permissions
 
@@ -25,7 +26,11 @@ Test Helm charts by installing them in a Kubernetes cluster using `chart-testing
 
 ## Examples
 
+The example shows the most common invocation, pointing to a custom `ct.yaml` configuration file for chart-testing settings.
+
 ### Simple example
+
+Points to a `ct.yaml` that controls which charts are installed, their dependencies, timeouts, and whether a version increment is required. A Kind cluster is created automatically for each run and torn down afterwards.
 
 ```yaml
 jobs:

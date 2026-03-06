@@ -4,12 +4,13 @@ Comprehensive Helm chart validation with two parallel jobs: chart structure lint
 
 ## Inputs
 
-| Input             | Type    | Description                                  | Required | Default |
-| ----------------- | ------- | -------------------------------------------- | -------- | ------- |
-| HELM_DOCS_VERSION | string  | Version (image tag) of `jnorwood/helm-docs`  | No       | 1.14.2  |
-| CT_CONF_PATH      | string  | Path to the chart-testing configuration file | Yes      | -       |
-| LINT_CHARTS       | boolean | Whether to run the chart linting job         | No       | true    |
-| LINT_DOCS         | boolean | Whether to run the chart docs linting job    | No       | true    |
+| Input             | Type    | Description                                                                              | Required | Default          |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------- |
+| HELM_DOCS_VERSION | string  | Version (image tag) of `jnorwood/helm-docs`                                              | No       | v1.14.2          |
+| CT_CONF_PATH      | string  | Path to the chart-testing configuration file                                             | Yes      | -                |
+| LINT_CHARTS       | boolean | Whether to run the chart linting job                                                     | No       | true             |
+| LINT_DOCS         | boolean | Whether to run the chart docs linting job                                                | No       | true             |
+| RUNS_ON           | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
 
 ## Permissions
 
@@ -38,6 +39,8 @@ Comprehensive Helm chart validation with two parallel jobs: chart structure lint
   Then review and commit the updated `README.md` under `charts/<chart-name>/`. After committing, the `lint-docs` job should pass again.
 
 ## Examples
+
+The examples illustrate the three main usage modes: running both checks together, validating Helm documentation only, and linting charts only.
 
 ### Simple example
 
@@ -68,6 +71,8 @@ chart-repos:
 
 ### Docs-only validation
 
+Skips `ct lint` entirely and only checks that `helm-docs` output matches committed documentation. Faster than the full lint pass and useful for PRs that only touch documentation.
+
 ```yaml
 jobs:
   lint-helm-docs-only:
@@ -79,6 +84,8 @@ jobs:
 ```
 
 ### Charts-only validation
+
+Runs `ct lint` for chart structure and schema validation but skips the `helm-docs` consistency check. Use this when making chart logic changes that do not affect documentation.
 
 ```yaml
 jobs:

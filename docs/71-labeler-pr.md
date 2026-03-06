@@ -14,7 +14,17 @@ Add or sync labels on pull requests using a configuration file.
 | ------------- | ------ | ------------------------- |
 | pull-requests | write  | Required to add PR labels |
 
+## Notes
+
+- Uses the official `actions/labeler` action under the hood.
+- The configuration file maps label names to file glob patterns; a label is applied whenever any of its patterns matches a changed file in the PR.
+- Labels are kept in sync on each push to the PR: labels whose patterns no longer match are removed.
+- Requires `pull-requests: write` permission on the calling workflow.
+- The configuration file must be committed to the repository before the workflow runs.
+
 ## Examples
+
+The example below shows a minimal invocation alongside a sample `labeler` configuration file that maps label names to file-path glob patterns.
 
 ### Simple example
 

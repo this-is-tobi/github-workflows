@@ -40,7 +40,11 @@ Comprehensive JavaScript/TypeScript test execution using Vitest with automatic r
 
 ## Examples
 
+The following examples range from a minimal invocation to customised setups covering coverage upload, alternative runtimes, custom test commands, monorepo paths, and non-blocking mode.
+
 ### Simple example
+
+Auto-detects Vitest and the package manager from project files. Pinning `RUNTIME_VERSION` and `PACKAGE_MANAGER` explicitly avoids detection ambiguity and makes the CI environment reproducible.
 
 ```yaml
 jobs:
@@ -52,6 +56,8 @@ jobs:
 ```
 
 ### With coverage
+
+`COVERAGE: true` runs Vitest with the `--coverage` flag and uploads the report as a GitHub Actions artifact. The default artifact name `unit-tests-coverage` matches the expected input of `scan-sonarqube.yml`, making the two workflows easy to chain.
 
 ```yaml
 jobs:
@@ -65,6 +71,8 @@ jobs:
 
 ### Bun runtime
 
+Sets the runtime and package manager to Bun for faster installs and test runs. Coverage collection remains available via `COVERAGE: true`.
+
 ```yaml
 jobs:
   test:
@@ -77,6 +85,8 @@ jobs:
 
 ### Custom test command
 
+`TEST_COMMAND` replaces the default `vitest run` invocation entirely — any shell command is accepted. `TIMEOUT` controls the per-test timeout in milliseconds passed to Vitest.
+
 ```yaml
 jobs:
   test:
@@ -87,6 +97,8 @@ jobs:
 ```
 
 ### Monorepo testing
+
+Two parallel jobs each resolve their own dependencies from `WORKING_DIRECTORY`. Different runtimes, timeouts, or coverage settings can be applied per package without interference.
 
 ```yaml
 jobs:
@@ -106,6 +118,8 @@ jobs:
 ```
 
 ### Non-blocking tests
+
+The job always succeeds even when tests fail, but coverage is still collected and uploaded. Useful when introducing a test suite into an existing project with known failures.
 
 ```yaml
 jobs:
