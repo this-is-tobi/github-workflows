@@ -49,7 +49,7 @@ Builds a multi-arch image (AMD64 + ARM64) and pushes it to GHCR. Each architectu
 ```yaml
 jobs:
   build:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3
@@ -67,7 +67,7 @@ Uses the commit SHA as the image tag for full traceability. `LATEST_TAG` is a Gi
 ```yaml
 jobs:
   build:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: ${{ github.sha }}
@@ -84,7 +84,7 @@ Disabling ARM64 removes the cross-arch build job and significantly reduces CI ti
 ```yaml
 jobs:
   build:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: pr-${{ github.event.pull_request.number }}
@@ -101,7 +101,7 @@ For registries other than `ghcr.io`, provide explicit credentials:
 ```yaml
 jobs:
   build:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     permissions:
       packages: write
       contents: read

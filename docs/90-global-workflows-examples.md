@@ -30,18 +30,18 @@ on:
 
 jobs:
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     permissions:
       contents: read
       pull-requests: read
 
   lint-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     permissions:
       contents: read
 
   test-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
     permissions:
       contents: read
     with:
@@ -49,7 +49,7 @@ jobs:
       COVERAGE_REPORTER: lcov
 
   build-docker:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     needs:
     - lint-js
     - test-js
@@ -65,7 +65,7 @@ jobs:
       BUILD_ARM64: false
 
   scan-sonarqube:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     needs:
     - test-js
     permissions:
@@ -81,7 +81,7 @@ jobs:
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
 
   scan-trivy:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
     needs:
     - build-docker
     permissions:
@@ -139,7 +139,7 @@ on:
 
 jobs:
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
     permissions:
       contents: write
       issues: write
@@ -156,7 +156,7 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 
   build-docker:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     if: ${{ needs.release.outputs.release-created == 'true' }}
     needs:
     - release
@@ -174,7 +174,7 @@ jobs:
       TAG_MAJOR_AND_MINOR: true
 
   bump-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
     if: ${{ needs.release.outputs.release-created == 'true' }}
     needs:
     - release
@@ -233,20 +233,20 @@ jobs:
       run: echo "Exposing env vars"
 
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     if: ${{ !github.event.pull_request.draft }}
     permissions:
       contents: read
       pull-requests: read
 
   lint-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     if: ${{ !github.event.pull_request.draft }}
     permissions:
       contents: read
 
   test-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
     if: ${{ !github.event.pull_request.draft }}
     permissions:
       contents: read
@@ -255,7 +255,7 @@ jobs:
       COVERAGE_REPORTER: lcov
 
   build-docker:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     needs:
     - expose-vars
     - lint-js
@@ -284,7 +284,7 @@ jobs:
       BUILD_ARM64: false
 
   scan-sonarqube:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     needs:
     - test-js
     permissions:
@@ -303,7 +303,7 @@ jobs:
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
 
   scan-trivy-conf:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
     needs:
     - build-docker
     permissions:
@@ -312,7 +312,7 @@ jobs:
       PATH: ./
 
   scan-trivy-images:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
     needs:
     - expose-vars
     - build-docker
@@ -404,7 +404,7 @@ jobs:
       run: echo "Exposing env vars"
 
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
     needs:
     - expose-vars
     permissions:
@@ -422,7 +422,7 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 
   build-docker:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     if: ${{ needs.release.outputs.release-created == 'true' }}
     needs:
     - expose-vars
@@ -453,7 +453,7 @@ jobs:
       USE_QEMU: ${{ needs.expose-vars.outputs.USE_QEMU == 'true' }}
 
   bump-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
     needs:
     - expose-vars
     - release
@@ -512,7 +512,7 @@ jobs:
       run: echo "Exposing env vars"
 
   lint-helm-docs:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@v0
     needs:
     - expose-vars
     permissions:
@@ -523,7 +523,7 @@ jobs:
       LINT_DOCS: true
 
   lint-helm-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@v0
     needs:
     - expose-vars
     permissions:
@@ -534,7 +534,7 @@ jobs:
       LINT_DOCS: false
 
   lint-helm-schema:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm-schema.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm-schema.yml@v0
     needs:
     - expose-vars
     permissions:
@@ -543,14 +543,14 @@ jobs:
       CHARTS_DIR: ./charts
 
   lint-yaml:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-yaml.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-yaml.yml@v0
     needs:
     - expose-vars
     permissions:
       contents: read
 
   test-helm-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/test-helm.yml@v0
     needs:
     - expose-vars
     - lint-helm-docs
@@ -602,7 +602,7 @@ on:
 
 jobs:
   release-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
     permissions:
       contents: write
       packages: write
@@ -682,7 +682,7 @@ on:
 
 jobs:
   bump-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
     permissions:
       issues: write
       pull-requests: write
@@ -721,20 +721,20 @@ on:
 
 jobs:
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     permissions:
       contents: read
       pull-requests: read
 
   lint-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     permissions:
       contents: read
     with:
       LINT_PATHS: "src tests"
 
   test-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
     permissions:
       contents: read
     with:
@@ -742,7 +742,7 @@ jobs:
       COVERAGE_REPORTER: lcov
 
   scan-sonarqube:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     needs:
     - test-js
     permissions:
@@ -799,7 +799,7 @@ on:
 
 jobs:
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
     permissions:
       contents: write
       issues: write

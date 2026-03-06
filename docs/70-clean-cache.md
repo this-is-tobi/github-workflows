@@ -43,7 +43,7 @@ Purges the Actions cache entries associated with PR #123 and deletes the specifi
 ```yaml
 jobs:
   cleanup:
-    uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@v0
     with:
       PR_NUMBER: 123
       IMAGE: ghcr.io/this-is-tobi/tools/debug:pr-123
@@ -58,7 +58,7 @@ Removes all GHCR image versions tagged only with a 7-character hex SHA — lefto
 ```yaml
 jobs:
   cleanup-orphans:
-    uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@v0
     with:
       IMAGE: ghcr.io/this-is-tobi/tools/debug
       CLEAN_GH_CACHE: false

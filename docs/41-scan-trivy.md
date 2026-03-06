@@ -44,7 +44,7 @@ Runs both an image scan and a configuration path scan in parallel. Results are p
 ```yaml
 jobs:
   vuln-scan:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
     with:
       IMAGE: ghcr.io/my-org/my-image:1.2.3
       PATH: ./apps/api
@@ -59,7 +59,7 @@ jobs:
 ```yaml
 jobs:
   vuln-scan:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
     with:
       IMAGE: ghcr.io/my-org/my-image:1.2.3
       PATH: ./apps/api

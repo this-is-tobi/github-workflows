@@ -13,7 +13,7 @@ __Example:__
 ```yaml
 jobs:
   example:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     with:
       SONAR_URL: 'https://sonarqube.example.com'
     secrets:

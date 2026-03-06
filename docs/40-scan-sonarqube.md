@@ -49,7 +49,7 @@ Full monorepo setup with per-package coverage. `COVERAGE_IMPORT: true` downloads
 ```yaml
 jobs:
   scan-sonarqube:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     with:
       SONAR_URL: https://sonarqube.example.com
       COVERAGE_IMPORT: true
@@ -69,7 +69,7 @@ For a simpler scan where coverage is not available:
 ```yaml
 jobs:
   scan-sonarqube:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     with:
       SONAR_URL: https://sonarqube.example.com
       SOURCES_PATH: src
@@ -85,7 +85,7 @@ To run the scan as an informational step without blocking the pipeline:
 ```yaml
 jobs:
   scan-sonarqube:
-    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     with:
       SONAR_URL: https://sonarqube.example.com
       SOURCES_PATH: src

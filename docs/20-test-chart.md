@@ -35,7 +35,7 @@ Points to a `ct.yaml` that controls which charts are installed, their dependenci
 ```yaml
 jobs:
   test-helm-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/test-helm.yml@v0
     with:
       CT_CONF_PATH: .github/ct.yaml
 ```

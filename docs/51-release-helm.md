@@ -42,7 +42,7 @@ The examples show releasing to the default GitHub Packages (ghcr.io) OCI registr
 ```yaml
 jobs:
   release-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
     with:
       CHARTS_DIR: ./charts
       HELM_REPOS: "bitnami=https://charts.bitnami.com/bitnami,jetstack=https://charts.jetstack.io"
@@ -55,7 +55,7 @@ To push charts to a registry other than `ghcr.io`, supply credentials explicitly
 ```yaml
 jobs:
   release-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
     with:
       CHARTS_DIR: ./charts
       REGISTRY: registry.example.com
@@ -71,7 +71,7 @@ When all defaults are acceptable (ghcr.io, charts in `./charts`, no external rep
 ```yaml
 jobs:
   release-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
     permissions:
       contents: write
       packages: write

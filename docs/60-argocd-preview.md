@@ -44,7 +44,7 @@ Minimal static call with all values hardcoded. The sync payload targets two spec
 ```yaml
 jobs:
   preview:
-    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@v0
     with:
       APP_URL_TEMPLATE: https://app-name.pr-<pr_number>.example.com
       PR_NUMBER: 123
@@ -70,7 +70,7 @@ on:
 
 jobs:
   preview:
-    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/argocd-preview.yml@v0
     permissions:
       pull-requests: write
       contents: read
