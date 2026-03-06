@@ -1,6 +1,8 @@
 # `release-app.yml`
 
-Create releases using `release-please`, optionally tag major/minor versions, and support automerge of generated PRs.
+Create releases using [`release-please`](https://github.com/googleapis/release-please), optionally tag major/minor versions, and support automerge of generated PRs.
+
+> **References:** [googleapis/release-please-action](https://github.com/googleapis/release-please-action) · [googleapis/release-please](https://github.com/googleapis/release-please)
 
 ## Inputs
 
@@ -54,6 +56,72 @@ Create releases using `release-please`, optionally tag major/minor versions, and
 - If `AUTOMERGE_*` is enabled and a PAT is provided, attempts to automerge the release PR.
 - Optionally rebases `PRERELEASE_BRANCH` onto `RELEASE_BRANCH` after a release when `REBASE_PRERELEASE_BRANCH: true` (only when `ENABLE_PRERELEASE: true`).
 
+## Configuration
+
+Release-please requires a config file and a manifest file in the repository root. The manifest tracks the current version and is updated automatically on each release.
+
+### Release config (`release-please-config.json`)
+
+Minimal config for a single-package repository using the `node` release type (adjusts `package.json` version). See the [release-please docs](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md) for all available options and release types.
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "initial-version": "0.0.1",
+      "include-component-in-tag": false,
+      "versioning": "prerelease",
+      "prerelease": false,
+      "prerelease-type": "",
+      "extra-files": []
+    }
+  }
+}
+```
+
+### Release manifest (`.release-please-manifest.json`)
+
+Tracks the current version for each package path. Release-please updates this file automatically — set the initial version to your current release.
+
+```json
+{
+  ".": "0.0.1"
+}
+```
+
+### Prerelease config (`release-please-config-rc.json`)
+
+Used when `ENABLE_PRERELEASE: true`. Identical structure to the release config but adds `prerelease-type` to control the prerelease identifier appended to the version.
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "prerelease-type": "rc",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "initial-version": "0.0.1",
+      "include-component-in-tag": false,
+      "versioning": "prerelease",
+      "prerelease": true,
+      "prerelease-type": "rc",
+      "extra-files": []
+    }
+  }
+}
+```
+
+### Prerelease manifest (`.release-please-manifest-rc.json`)
+
+```json
+{
+  ".": "0.0.1"
+}
+```
+
 ## Examples
 
 The examples cover the main release scenarios: a full setup with prerelease support, a release-only flow, and a build that attaches compiled binaries to the GitHub Release.
@@ -65,7 +133,7 @@ Full two-branch setup with `develop` for prereleases and `main` for stable relea
 ```yaml
 jobs:
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
     with:
       ENABLE_PRERELEASE: true
       TAG_MAJOR_AND_MINOR: true
@@ -86,7 +154,7 @@ Single-branch workflow targeting only `main`. No prerelease config files are req
 ```yaml
 jobs:
   release:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
     with:
       ENABLE_PRERELEASE: false
       TAG_MAJOR_AND_MINOR: true
@@ -107,14 +175,14 @@ jobs:
     - uses: actions/checkout@v6
     - name: Build
       run: make build
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: release-artifacts
         path: dist/
 
   release:
     needs: build
-    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
     with:
       ENABLE_PRERELEASE: false
       ADDITIONAL_RELEASE_ARTIFACTS: "dist/my-app-linux-amd64,dist/my-app-darwin-amd64"

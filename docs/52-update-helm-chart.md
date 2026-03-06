@@ -9,10 +9,12 @@ Trigger a chart update workflow in a remote Helm charts repository (caller mode)
 | RUN_MODE              | string | Execution mode `caller` (trigger remote repo workflow) or `called` (update chart in current repo) | Yes      | -                      |
 | WORKFLOW_NAME         | string | Workflow file name in chart repo to trigger (caller mode)                                         | No       | update-app-version.yml |
 | CHART_REPO            | string | Target chart repository (`owner/repo`) when in caller mode                                        | No       | -                      |
-| CHART_NAME            | string | Name of the chart directory under `charts/`                                                       | Yes      | -                      |
+| CHART_DIR             | string | Directory containing the Helm charts                                                              | No       | charts                 |
+| CHART_NAME            | string | Name of the chart directory under `CHART_DIR`                                                     | Yes      | -                      |
 | APP_VERSION           | string | Application version to set in `Chart.yaml` (appVersion)                                           | Yes      | -                      |
 | UPGRADE_TYPE          | string | Which SemVer part to increment: `major`, `minor`, `patch`, or `prerelease`                        | No       | patch                  |
 | PRERELEASE_IDENTIFIER | string | Identifier used when `UPGRADE_TYPE=prerelease` (e.g. `rc`)                                        | No       | rc                     |
+| RUNS_ON               | string | Runner labels as JSON array                                                                       | No       | ["ubuntu-24.04"]       |
 
 ## Secrets
 
@@ -52,7 +54,7 @@ Dispatches the `update-app-version.yml` workflow in the remote chart repository 
 ```yaml
 jobs:
   trigger-chart-update:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
     with:
       RUN_MODE: caller
       WORKFLOW_NAME: update-app-version.yml
@@ -71,7 +73,7 @@ jobs:
 ```yaml
 jobs:
   bump-chart-prerelease:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
     with:
       RUN_MODE: caller
       WORKFLOW_NAME: update-app-version.yml
@@ -91,7 +93,7 @@ Runs the version update directly in the current repository without any remote di
 ```yaml
 jobs:
   bump-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
     with:
       RUN_MODE: called
       CHART_NAME: my-service

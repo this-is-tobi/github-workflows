@@ -31,7 +31,7 @@ The example below shows a minimal invocation alongside a sample `labeler` config
 ```yaml
 jobs:
   label:
-    uses: this-is-tobi/github-workflows/.github/workflows/label-pr.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/label-pr.yml@v0
     with:
       CONF_PATH: .github/labeler-conf.yml
 ```

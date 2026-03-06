@@ -6,7 +6,7 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 
 | Input              | Type    | Description                                     | Required | Default                |
 | ------------------ | ------- | ----------------------------------------------- | -------- | ---------------------- |
-| RUNTIME_VERSION    | string  | Runtime version to use (Node.js or Bun version) | No       | "22"                   |
+| RUNTIME_VERSION    | string  | Runtime version to use (Node.js or Bun version) | No       | "24"                   |
 | PACKAGE_MANAGER    | string  | Package manager to use (npm, pnpm, yarn, bun)   | No       | "npm"                  |
 | RUNTIME            | string  | JavaScript runtime to use (node, bun)           | No       | "node"                 |
 | ESLINT_CONFIG      | string  | ESLint config package to use                    | No       | "@antfu/eslint-config" |
@@ -46,7 +46,7 @@ Overrides auto-detection by pinning the runtime version and package manager expl
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     with:
       RUNTIME_VERSION: "18"
       PACKAGE_MANAGER: "pnpm"
@@ -60,7 +60,7 @@ jobs:
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     with:
       RUNTIME: "bun"
       PACKAGE_MANAGER: "bun"
@@ -74,7 +74,7 @@ Installs `@company/eslint-config` instead of the default `@antfu/eslint-config`.
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     with:
       ESLINT_CONFIG: "@company/eslint-config"
       LINT_PATHS: "apps packages"
@@ -87,13 +87,13 @@ Runs two parallel lint jobs, each scoped to a separate package. Each job install
 ```yaml
 jobs:
   lint-frontend:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     with:
       WORKING_DIRECTORY: "packages/frontend"
       LINT_PATHS: "src components"
       
   lint-backend:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     with:
       WORKING_DIRECTORY: "packages/backend"
       PACKAGE_MANAGER: "pnpm"
@@ -107,7 +107,7 @@ Reports all linting violations in the workflow summary without failing the job. 
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     with:
       FAIL_ON_ERROR: false
       LINT_PATHS: "src tests docs"
@@ -120,7 +120,7 @@ Loads an existing ESLint config file from disk. When `ESLINT_CONFIG_FILE` is set
 ```yaml
 jobs:
   lint:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     with:
       ESLINT_CONFIG_FILE: ".eslintrc.custom.js"
       LINT_PATHS: "apps,packages,tools"

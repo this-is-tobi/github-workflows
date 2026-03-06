@@ -44,7 +44,7 @@ Lints all PR commits against the default Conventional Commits ruleset with no ex
 ```yaml
 jobs:
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
 ```
 
 ### Require scope
@@ -54,7 +54,7 @@ jobs:
 ```yaml
 jobs:
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     with:
       REQUIRE_SCOPE: true
 ```
@@ -66,7 +66,7 @@ Restricts the accepted types to a minimal set and lowers the subject line limit 
 ```yaml
 jobs:
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     with:
       ALLOWED_TYPES: "feat,fix,docs,chore"
       MAX_SUBJECT_LENGTH: 72
@@ -79,7 +79,7 @@ Loads the full commitlint configuration from `.commitlintrc.js`. All inline inpu
 ```yaml
 jobs:
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     with:
       CONFIG_FILE: ".commitlintrc.js"
 ```
@@ -91,7 +91,7 @@ Violations appear in the workflow summary table without failing the job. Useful 
 ```yaml
 jobs:
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     with:
       FAIL_ON_ERROR: false
 ```
@@ -109,7 +109,7 @@ on:
 
 jobs:
   lint-commits:
-    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@main
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     with:
       COMMITS_SOURCE: push
 ```
