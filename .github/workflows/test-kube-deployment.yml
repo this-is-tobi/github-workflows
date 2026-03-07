@@ -1,0 +1,211 @@
+name: Test Kind
+
+on:
+  workflow_call:
+    inputs:
+      KIND_VERSION:
+        description: Kind version to install
+        required: false
+        type: string
+        default: "0.27.0"
+      KIND_CONFIG:
+        description: Path to Kind cluster configuration file (relative to repo root)
+        required: false
+        type: string
+      IMAGES:
+        description: >-
+          Newline-separated container images to pull from registry and load
+          into the Kind cluster. GHCR images are authenticated automatically.
+        required: false
+        type: string
+      HELM_PREREQS:
+        description: >-
+          Newline-separated prerequisite Helm charts to install before the app.
+          Format per line: 'namespace release chart [helm_flags...]'.
+          Use native Helm flags such as --repo, --values, --set, --version.
+        required: false
+        type: string
+      HELM_CHART:
+        description: >-
+          Path to the Helm chart directory to deploy. If not set and
+          DEPLOY_COMMAND is not set, only cluster creation and image loading
+          are performed.
+        required: false
+        type: string
+      HELM_RELEASE:
+        description: Helm release name for the application
+        required: false
+        type: string
+        default: "app"
+      HELM_VALUES:
+        description: Path to Helm values file for the application deployment
+        required: false
+        type: string
+      HELM_ARGS:
+        description: Additional arguments passed to 'helm upgrade --install'
+        required: false
+        type: string
+      DEPLOY_COMMAND:
+        description: >-
+          Custom deploy command to run instead of Helm deploy. Runs after
+          image loading and Helm prerequisites. Mutually exclusive with
+          HELM_CHART.
+        required: false
+        type: string
+      DEPLOY_TIMEOUT:
+        description: Timeout for deployment rollout wait
+        required: false
+        type: string
+        default: "300s"
+      PRE_COMMAND:
+        description: Shell command to run after checkout but before cluster creation
+        required: false
+        type: string
+      TEST_COMMAND:
+        description: Shell command to run after deployment for validation
+        required: false
+        type: string
+      FAIL_ON_ERROR:
+        description: Whether to fail the workflow on test command errors
+        required: false
+        type: boolean
+        default: true
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+
+permissions:
+  packages: read
+  contents: read
+
+jobs:
+  test-kind:
+    name: Test Kind deployment
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@v6
+
+    - name: Run pre-command
+      if: ${{ inputs.PRE_COMMAND != '' }}
+      run: ${{ inputs.PRE_COMMAND }}
+
+    - name: Create Kind cluster
+      uses: helm/kind-action@v1.9.0
+      with:
+        version: v${{ inputs.KIND_VERSION }}
+        config: ${{ inputs.KIND_CONFIG }}
+        wait: 120s
+
+    - name: Login to GHCR
+      if: ${{ inputs.IMAGES != '' }}
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+        logout: true
+
+    - name: Pull and load images into Kind
+      if: ${{ inputs.IMAGES != '' }}
+      run: |
+        echo "$IMAGES" | while IFS= read -r image; do
+          image=$(echo "$image" | xargs)
+          [ -z "$image" ] && continue
+          echo "Pulling $image..."
+          docker pull "$image"
+        done
+
+        echo "$IMAGES" | while IFS= read -r image; do
+          image=$(echo "$image" | xargs)
+          [ -z "$image" ] && continue
+          echo "Loading $image into Kind..."
+          kind load docker-image "$image"
+        done
+      env:
+        IMAGES: ${{ inputs.IMAGES }}
+
+    - name: Install Helm prerequisites
+      if: ${{ inputs.HELM_PREREQS != '' }}
+      run: |
+        echo "$HELM_PREREQS" | while IFS= read -r line; do
+          line=$(echo "$line" | xargs)
+          [ -z "$line" ] && continue
+
+          read -r namespace release chart extra <<< "$line"
+
+          echo "Installing $release ($chart) in namespace $namespace..."
+          helm upgrade --install --wait \
+            --namespace "$namespace" \
+            --create-namespace \
+            $extra \
+            "$release" "$chart"
+        done
+      env:
+        HELM_PREREQS: ${{ inputs.HELM_PREREQS }}
+
+    - name: Deploy application (Helm)
+      if: ${{ inputs.HELM_CHART != '' }}
+      run: |
+        helm dependency build "$HELM_CHART"
+
+        HELM_CMD="helm upgrade --install --wait"
+        if [ -n "$HELM_VALUES" ]; then
+          HELM_CMD="$HELM_CMD --values $HELM_VALUES"
+        fi
+        $HELM_CMD $HELM_ARGS "$HELM_RELEASE" "$HELM_CHART"
+      env:
+        HELM_CHART: ${{ inputs.HELM_CHART }}
+        HELM_VALUES: ${{ inputs.HELM_VALUES }}
+        HELM_ARGS: ${{ inputs.HELM_ARGS }}
+        HELM_RELEASE: ${{ inputs.HELM_RELEASE }}
+
+    - name: Deploy application (custom)
+      if: ${{ inputs.HELM_CHART == '' && inputs.DEPLOY_COMMAND != '' }}
+      run: ${{ inputs.DEPLOY_COMMAND }}
+
+    - name: Wait for rollout
+      if: ${{ inputs.HELM_CHART != '' || inputs.DEPLOY_COMMAND != '' }}
+      run: |
+        for deploy in $(kubectl get deploy -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+          ns="${deploy%%/*}"
+          name="${deploy##*/}"
+          echo "Waiting for $ns/$name..."
+          kubectl rollout status "deploy/$name" -n "$ns" -w --timeout="$DEPLOY_TIMEOUT"
+        done
+      env:
+        DEPLOY_TIMEOUT: ${{ inputs.DEPLOY_TIMEOUT }}
+
+    - name: Show cluster status
+      if: ${{ inputs.HELM_CHART != '' || inputs.DEPLOY_COMMAND != '' }}
+      run: |
+        echo "=== Pods ==="
+        kubectl get pods -A
+        echo ""
+        echo "=== Services ==="
+        kubectl get svc -A
+        echo ""
+        echo "=== Deployments ==="
+        kubectl get deploy -A
+
+    - name: Run test command
+      if: ${{ inputs.TEST_COMMAND != '' }}
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
+      run: ${{ inputs.TEST_COMMAND }}
+
+    - name: Show logs on failure
+      if: ${{ failure() }}
+      run: |
+        echo "=== Failed Pod Logs ==="
+        for pod in $(kubectl get pods -A -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+          ns="${pod%%/*}"
+          name="${pod##*/}"
+          echo "--- $ns/$name ---"
+          kubectl logs -n "$ns" "$name" --all-containers --tail=50 2>/dev/null || true
+        done
+
+    - name: Cleanup Kind cluster
+      if: ${{ always() }}
+      run: kind delete cluster
