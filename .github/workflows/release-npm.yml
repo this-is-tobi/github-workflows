@@ -1,0 +1,234 @@
+name: Release NPM
+
+on:
+  workflow_call:
+    inputs:
+      RUNTIME:
+        description: JavaScript runtime to use (node or bun)
+        required: false
+        type: string
+        default: "node"
+      RUNTIME_VERSION:
+        description: Runtime version to install
+        required: false
+        type: string
+        default: "24"
+      PACKAGE_MANAGER:
+        description: Package manager to use (npm, yarn, pnpm, bun)
+        required: false
+        type: string
+        default: "npm"
+      WORKING_DIRECTORY:
+        description: Working directory for build and publish commands
+        required: false
+        type: string
+        default: "."
+      REGISTRY_URL:
+        description: NPM registry URL (e.g., https://registry.npmjs.org or https://npm.pkg.github.com)
+        required: false
+        type: string
+        default: "https://registry.npmjs.org"
+      SCOPE:
+        description: Scope for the NPM registry (e.g., @my-org). Leave empty for unscoped packages.
+        required: false
+        type: string
+      PRE_COMMAND:
+        description: Shell command to run at repo root before build/publish (e.g., build shared deps)
+        required: false
+        type: string
+      BUILD_COMMAND:
+        description: Shell command to build the package (runs in WORKING_DIRECTORY)
+        required: false
+        type: string
+      PUBLISH_COMMAND:
+        description: >-
+          Custom publish command (overrides the default auto-detected publish).
+          Runs in WORKING_DIRECTORY with NODE_AUTH_TOKEN set.
+        required: false
+        type: string
+      TAG:
+        description: NPM dist-tag for the published version (e.g., latest, beta, next)
+        required: false
+        type: string
+        default: "latest"
+      ACCESS:
+        description: Package access level (public or restricted)
+        required: false
+        type: string
+        default: "public"
+      DRY_RUN:
+        description: Perform a dry-run publish (validate without uploading)
+        required: false
+        type: boolean
+        default: false
+      FAIL_ON_ERROR:
+        description: Whether to fail the workflow on publish errors
+        required: false
+        type: boolean
+        default: true
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+    secrets:
+      NPM_TOKEN:
+        description: Authentication token for the NPM registry
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to NPM
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@v6
+
+    - name: Setup Node.js
+      if: ${{ inputs.RUNTIME == 'node' }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.RUNTIME_VERSION }}
+        registry-url: ${{ inputs.REGISTRY_URL }}
+        scope: ${{ inputs.SCOPE }}
+
+    - name: Setup Bun
+      if: ${{ inputs.RUNTIME == 'bun' }}
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.RUNTIME_VERSION }}
+
+    - name: Setup pnpm
+      if: ${{ inputs.PACKAGE_MANAGER == 'pnpm' }}
+      uses: pnpm/action-setup@v4
+
+    - name: Configure registry for Bun
+      if: ${{ inputs.RUNTIME == 'bun' }}
+      run: |
+        REGISTRY_HOST=$(echo "$REGISTRY_URL" | sed 's|https://||g' | sed 's|http://||g' | sed 's|/$||')
+        npm config set registry "$REGISTRY_URL"
+        npm config set "//${REGISTRY_HOST}/:_authToken" "${NODE_AUTH_TOKEN}"
+        if [ -n "$SCOPE" ]; then
+          npm config set "${SCOPE}:registry" "$REGISTRY_URL"
+        fi
+      env:
+        REGISTRY_URL: ${{ inputs.REGISTRY_URL }}
+        SCOPE: ${{ inputs.SCOPE }}
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Get cache directory
+      id: cache-dir
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        case "${{ inputs.PACKAGE_MANAGER }}" in
+          npm)  echo "CACHE_DIR=$(npm config get cache)" >> "$GITHUB_OUTPUT" ;;
+          yarn) echo "CACHE_DIR=$(yarn cache dir)" >> "$GITHUB_OUTPUT" ;;
+          pnpm) echo "CACHE_DIR=$(pnpm store path)" >> "$GITHUB_OUTPUT" ;;
+          bun)  echo "CACHE_DIR=$(bun pm cache)" >> "$GITHUB_OUTPUT" ;;
+        esac
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.cache-dir.outputs.CACHE_DIR }}
+        key: ${{ inputs.PACKAGE_MANAGER }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml', '**/bun.lock') }}
+        restore-keys: |
+          ${{ inputs.PACKAGE_MANAGER }}-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Install dependencies
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        case "${{ inputs.PACKAGE_MANAGER }}" in
+          npm)  npm ci ;;
+          yarn) yarn install --frozen-lockfile ;;
+          pnpm) pnpm install --frozen-lockfile ;;
+          bun)  bun install --frozen-lockfile ;;
+        esac
+
+    - name: Run pre-command
+      if: ${{ inputs.PRE_COMMAND != '' }}
+      run: ${{ inputs.PRE_COMMAND }}
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Build package
+      if: ${{ inputs.BUILD_COMMAND != '' }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: ${{ inputs.BUILD_COMMAND }}
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Publish package (custom command)
+      if: ${{ inputs.PUBLISH_COMMAND != '' }}
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: ${{ inputs.PUBLISH_COMMAND }}
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Publish package (npm)
+      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'npm' }}
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        ARGS="--tag $TAG --access $ACCESS"
+        if [ "$DRY_RUN" = "true" ]; then
+          ARGS="$ARGS --dry-run"
+        fi
+        npm publish $ARGS
+      env:
+        TAG: ${{ inputs.TAG }}
+        ACCESS: ${{ inputs.ACCESS }}
+        DRY_RUN: ${{ inputs.DRY_RUN }}
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Publish package (yarn)
+      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'yarn' }}
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        ARGS="--tag $TAG --access $ACCESS"
+        if [ "$DRY_RUN" = "true" ]; then
+          ARGS="$ARGS --dry-run"
+        fi
+        yarn npm publish $ARGS
+      env:
+        TAG: ${{ inputs.TAG }}
+        ACCESS: ${{ inputs.ACCESS }}
+        DRY_RUN: ${{ inputs.DRY_RUN }}
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Publish package (pnpm)
+      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'pnpm' }}
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        ARGS="--tag $TAG --access $ACCESS --no-git-checks"
+        if [ "$DRY_RUN" = "true" ]; then
+          ARGS="$ARGS --dry-run"
+        fi
+        pnpm publish $ARGS
+      env:
+        TAG: ${{ inputs.TAG }}
+        ACCESS: ${{ inputs.ACCESS }}
+        DRY_RUN: ${{ inputs.DRY_RUN }}
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Publish package (bun)
+      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'bun' }}
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        ARGS="--tag $TAG --access $ACCESS"
+        if [ "$DRY_RUN" = "true" ]; then
+          ARGS="$ARGS --dry-run"
+        fi
+        bun publish $ARGS
+      env:
+        TAG: ${{ inputs.TAG }}
+        ACCESS: ${{ inputs.ACCESS }}
+        DRY_RUN: ${{ inputs.DRY_RUN }}
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
