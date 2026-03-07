@@ -24,6 +24,10 @@ on:
         description: Path of the context to build image
         required: true
         type: string
+      IMAGE_TARGET:
+        description: Target stage to build in the Dockerfile (optional, builds the last stage if not set)
+        required: false
+        type: string
       TAG_MAJOR_AND_MINOR:
         description: Whether to tag with only major and minor tags (e.g. '1.2.3' -> '1.2' & '1')
         required: false
@@ -44,6 +48,25 @@ on:
         required: false
         default: false
         type: boolean
+      BUILD_ARGS:
+        description: Newline-separated list of Docker build args (e.g. 'MY_ARG=value')
+        required: false
+        type: string
+      PROVENANCE:
+        description: Generate provenance attestation for the image
+        required: false
+        default: false
+        type: boolean
+      SBOM:
+        description: Generate SBOM attestation for the image
+        required: false
+        default: false
+        type: boolean
+      CACHE:
+        description: Enable Docker build cache (uses GitHub Actions cache backend)
+        required: false
+        default: false
+        type: boolean
       REGISTRY_USERNAME:
         description: Username used to login into registry
         required: false
@@ -61,6 +84,8 @@ on:
 permissions:
   packages: write
   contents: read
+  id-token: write
+  attestations: write
 
 jobs:
   infos:
@@ -82,21 +107,26 @@ jobs:
 
     - name: Get infos
       id: infos
+      env:
+        INPUT_IMAGE_NAME: ${{ inputs.IMAGE_NAME }}
+        INPUT_IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+        INPUT_HEAD_REF: ${{ github.head_ref || github.ref_name }}
       run: |
         # Normalize image name: lowercase and replace _ with -
-        NORMALIZED_IMAGE=$(echo '${{ inputs.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')
+        NORMALIZED_IMAGE=$(echo "$INPUT_IMAGE_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')
         echo "NORMALIZED_IMAGE=$NORMALIZED_IMAGE" >> $GITHUB_OUTPUT
-        echo "REGISTRY=$(echo '${{ inputs.IMAGE_NAME }}' | cut -d "/" -f 1 | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-        echo "LOWER_IMAGE=$(echo '${{ inputs.IMAGE_NAME }}' | cut -d "/" -f 2- | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
-        if [[ "${{ inputs.IMAGE_TAG }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-          echo "VERSION_TAG=$(echo '${{ inputs.IMAGE_TAG }}' | sed 's/-.*$//')" >> $GITHUB_OUTPUT
-          echo "PRERELEASE_TAG=$(echo '${{ inputs.IMAGE_TAG }}' | sed -n 's/^[0-9.]*-\(.*\)$/\1/p')" >> $GITHUB_OUTPUT
+        echo "REGISTRY=$(echo "$INPUT_IMAGE_NAME" | cut -d "/" -f 1 | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        echo "LOWER_IMAGE=$(echo "$INPUT_IMAGE_NAME" | cut -d "/" -f 2- | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
+        if [[ "$INPUT_IMAGE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+          VERSION_TAG=$(echo "$INPUT_IMAGE_TAG" | sed 's/-.*$//')
+          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_OUTPUT
+          echo "PRERELEASE_TAG=$(echo "$INPUT_IMAGE_TAG" | sed -n 's/^[0-9.]*-\(.*\)$/\1/p')" >> $GITHUB_OUTPUT
           echo "MAJOR_TAG=$(echo $VERSION_TAG | cut -d "." -f 1)" >> $GITHUB_OUTPUT
           echo "MINOR_TAG=$(echo $VERSION_TAG | cut -d "." -f 2)" >> $GITHUB_OUTPUT
           echo "PATCH_TAG=$(echo $VERSION_TAG | cut -d "." -f 3)" >> $GITHUB_OUTPUT
         fi
         echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-        echo "LOWER_BRANCH=$(echo '${{ github.head_ref || github.ref_name }}' | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        echo "LOWER_BRANCH=$(echo "$INPUT_HEAD_REF" | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
   build:
     name: Build application
@@ -131,11 +161,15 @@ jobs:
       with:
         context: ${{ inputs.IMAGE_CONTEXT }}
         file: ${{ inputs.IMAGE_DOCKERFILE }}
+        target: ${{ inputs.IMAGE_TARGET || '' }}
         provenance: false
+        sbom: false
         platforms: ${{ (inputs.BUILD_AMD64 && inputs.BUILD_ARM64 && inputs.USE_QEMU && 'linux/amd64,linux/arm64') || (inputs.BUILD_ARM64 && 'linux/arm64') || (inputs.BUILD_AMD64 && 'linux/amd64') }}
         outputs: type=image,name=${{ needs.infos.outputs.normalized-image }},push-by-digest=true,name-canonical=true,push=true
+        cache-from: ${{ inputs.CACHE && format('type=gha,scope={0}', needs.infos.outputs.lower-image) || '' }}
+        cache-to: ${{ inputs.CACHE && format('type=gha,mode=max,scope={0}', needs.infos.outputs.lower-image) || '' }}
         build-args: |
-          APP_VERSION=${{ inputs.IMAGE_TAG || needs.infos.outputs.short-sha }}
+          ${{ inputs.BUILD_ARGS }}
 
     - name: Export digest
       run: |
@@ -157,6 +191,8 @@ jobs:
     needs:
     - infos
     - build
+    outputs:
+      digest: ${{ steps.digest.outputs.value }}
     steps:
     - name: Download artifact
       uses: actions/download-artifact@v8
@@ -195,6 +231,55 @@ jobs:
         docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
           $(printf '${{ needs.infos.outputs.normalized-image }}@sha256:%s ' *)
 
+    - name: Get image digest
+      id: digest
+      run: |
+        DIGEST=$(docker buildx imagetools inspect --raw \
+          "${{ needs.infos.outputs.normalized-image }}:${{ steps.meta.outputs.version }}" \
+          | sha256sum | cut -d' ' -f1)
+        echo "value=sha256:${DIGEST}" >> $GITHUB_OUTPUT
+
     - name: Inspect image
       run: |
         docker buildx imagetools inspect ${{ needs.infos.outputs.normalized-image }}:${{ steps.meta.outputs.version }}
+
+  attest:
+    name: Attest image
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    needs:
+    - infos
+    - merge
+    if: ${{ inputs.PROVENANCE || inputs.SBOM }}
+    steps:
+    - name: Login to registry
+      uses: docker/login-action@v4
+      with:
+        registry: ${{ needs.infos.outputs.registry }}
+        username: ${{ needs.infos.outputs.registry == 'ghcr.io' && github.actor || inputs.REGISTRY_USERNAME }}
+        password: ${{ needs.infos.outputs.registry == 'ghcr.io' && github.token || inputs.REGISTRY_PASSWORD }}
+        logout: true
+
+    - name: Generate SBOM with Trivy
+      if: ${{ inputs.SBOM }}
+      uses: aquasecurity/trivy-action@0.35.0
+      with:
+        image-ref: ${{ needs.infos.outputs.normalized-image }}@${{ needs.merge.outputs.digest }}
+        format: spdx-json
+        output: sbom.spdx.json
+
+    - name: Attest SBOM
+      if: ${{ inputs.SBOM }}
+      uses: actions/attest-sbom@v4
+      with:
+        subject-name: ${{ needs.infos.outputs.normalized-image }}
+        subject-digest: ${{ needs.merge.outputs.digest }}
+        sbom-path: sbom.spdx.json
+        push-to-registry: true
+
+    - name: Attest build provenance
+      if: ${{ inputs.PROVENANCE }}
+      uses: actions/attest-build-provenance@v4
+      with:
+        subject-name: ${{ needs.infos.outputs.normalized-image }}
+        subject-digest: ${{ needs.merge.outputs.digest }}
+        push-to-registry: true
