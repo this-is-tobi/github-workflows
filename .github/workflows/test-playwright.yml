@@ -1,0 +1,173 @@
+name: Test E2E Playwright
+
+on:
+  workflow_call:
+    inputs:
+      BROWSERS:
+        description: Comma-separated browsers to test (chrome, firefox, edge, electron)
+        required: false
+        type: string
+        default: "chrome"
+      RUNTIME:
+        description: JavaScript runtime to use (node or bun)
+        required: false
+        type: string
+        default: "node"
+      RUNTIME_VERSION:
+        description: Runtime version to install
+        required: false
+        type: string
+        default: "24"
+      PACKAGE_MANAGER:
+        description: Package manager to use (npm, yarn, pnpm, bun)
+        required: false
+        type: string
+        default: "npm"
+      WORKING_DIRECTORY:
+        description: Working directory for running commands
+        required: false
+        type: string
+        default: "."
+      PRE_COMMAND:
+        description: Shell command to run before tests (e.g., env setup, build)
+        required: false
+        type: string
+      TEST_COMMAND:
+        description: >-
+          Shell command for running Playwright tests.
+          The $BROWSER env var contains the current browser from the matrix.
+        required: false
+        type: string
+        default: "npx playwright test --project=$BROWSER"
+      ARTIFACT_PATH:
+        description: Path to upload as artifact on failure (e.g., test-results/, screenshots/)
+        required: false
+        type: string
+      ARTIFACT_RETENTION:
+        description: Number of days to keep failure artifacts
+        required: false
+        type: number
+        default: 14
+      FAIL_ON_ERROR:
+        description: Whether to fail the workflow on test errors
+        required: false
+        type: boolean
+        default: true
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+
+permissions:
+  contents: read
+
+jobs:
+  infos:
+    name: Get test infos
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    outputs:
+      browsers: ${{ steps.matrix.outputs.BROWSERS }}
+    steps:
+    - name: Generate browser matrix
+      id: matrix
+      run: |
+        BROWSERS=$(echo "$INPUT_BROWSERS" | jq -Rc 'split(",")')
+        echo "BROWSERS=$BROWSERS" >> "$GITHUB_OUTPUT"
+      env:
+        INPUT_BROWSERS: ${{ inputs.BROWSERS }}
+
+  e2e-tests:
+    name: E2E tests (${{ matrix.browser }})
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    needs:
+    - infos
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: ${{ fromJSON(needs.infos.outputs.browsers) }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@v6
+
+    - name: Setup Node.js
+      if: ${{ inputs.RUNTIME == 'node' }}
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.RUNTIME_VERSION }}
+
+    - name: Setup pnpm
+      if: ${{ inputs.PACKAGE_MANAGER == 'pnpm' }}
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Bun
+      if: ${{ inputs.RUNTIME == 'bun' }}
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.RUNTIME_VERSION }}
+
+    - name: Setup Firefox
+      if: ${{ matrix.browser == 'firefox' }}
+      uses: browser-actions/setup-firefox@v1
+
+    - name: Setup Chrome
+      if: ${{ matrix.browser == 'chrome' }}
+      uses: browser-actions/setup-chrome@v1
+
+    - name: Setup Edge
+      if: ${{ matrix.browser == 'edge' }}
+      uses: browser-actions/setup-edge@v1
+
+    - name: Get cache directory
+      id: cache-dir
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        case "$PKG_MANAGER" in
+          npm)  echo "CACHE_DIR=$(npm config get cache)" >> $GITHUB_OUTPUT ;;
+          yarn) echo "CACHE_DIR=$(yarn cache dir)" >> $GITHUB_OUTPUT ;;
+          pnpm) echo "CACHE_DIR=$(pnpm store path)" >> $GITHUB_OUTPUT ;;
+          bun)  echo "CACHE_DIR=$(bun pm cache)" >> $GITHUB_OUTPUT ;;
+        esac
+      env:
+        PKG_MANAGER: ${{ inputs.PACKAGE_MANAGER }}
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.cache-dir.outputs.CACHE_DIR }}
+        key: ${{ inputs.PACKAGE_MANAGER }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml', '**/bun.lock') }}
+        restore-keys: |
+          ${{ inputs.PACKAGE_MANAGER }}-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Install dependencies
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        case "$PKG_MANAGER" in
+          npm)  npm ci ;;
+          yarn) yarn install --frozen-lockfile ;;
+          pnpm) pnpm install --frozen-lockfile ;;
+          bun)  bun install --frozen-lockfile ;;
+        esac
+      env:
+        PKG_MANAGER: ${{ inputs.PACKAGE_MANAGER }}
+
+    - name: Run pre-command
+      if: ${{ inputs.PRE_COMMAND != '' }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: ${{ inputs.PRE_COMMAND }}
+
+    - name: Run Playwright tests
+      id: playwright-run
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      run: ${{ inputs.TEST_COMMAND }}
+      env:
+        BROWSER: ${{ matrix.browser }}
+
+    - name: Upload test artifacts
+      if: ${{ always() && steps.playwright-run.outcome == 'failure' && inputs.ARTIFACT_PATH != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report-${{ matrix.browser }}
+        path: ${{ inputs.ARTIFACT_PATH }}
+        retention-days: ${{ inputs.ARTIFACT_RETENTION }}
