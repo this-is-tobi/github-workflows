@@ -1,4 +1,4 @@
-# `test-js.yml`
+# `test-vitest.yml`
 
 Comprehensive JavaScript/TypeScript test execution using Vitest with automatic runtime and package manager detection. Supports Node.js and Bun runtimes with npm, pnpm, yarn, and bun package managers. Automatically installs Vitest if not present in dependencies and test files are detected.
 
@@ -49,7 +49,7 @@ Auto-detects Vitest and the package manager from project files. Pinning `RUNTIME
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     with:
       RUNTIME_VERSION: "20"
       PACKAGE_MANAGER: "pnpm"
@@ -62,7 +62,7 @@ jobs:
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     with:
       COVERAGE: true
       COVERAGE_REPORTER: "lcov"
@@ -76,7 +76,7 @@ Sets the runtime and package manager to Bun for faster installs and test runs. C
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     with:
       RUNTIME: "bun"
       PACKAGE_MANAGER: "bun"
@@ -90,7 +90,7 @@ jobs:
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     with:
       TEST_COMMAND: "npm run test:unit"
       TIMEOUT: "120000"
@@ -103,14 +103,14 @@ Two parallel jobs each resolve their own dependencies from `WORKING_DIRECTORY`. 
 ```yaml
 jobs:
   test-frontend:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     with:
       WORKING_DIRECTORY: "packages/frontend"
       COVERAGE: true
       COVERAGE_REPORTER: "text"
       
   test-backend:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     with:
       WORKING_DIRECTORY: "packages/backend"
       PACKAGE_MANAGER: "pnpm"
@@ -124,7 +124,7 @@ The job always succeeds even when tests fail, but coverage is still collected an
 ```yaml
 jobs:
   test:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     with:
       FAIL_ON_ERROR: false
       COVERAGE: true

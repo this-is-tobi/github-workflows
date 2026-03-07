@@ -46,7 +46,7 @@ For more details, see:
 **Test**
 
 - [Test Helm charts installation with chart-testing (`test-helm.yml`)](../.github/workflows/test-helm.yml)
-- [Test JavaScript/Typescript codebase using Vitest (`test-js.yml`)](../.github/workflows/test-js.yml)
+- [Test JavaScript/Typescript codebase using Vitest (`test-vitest.yml`)](../.github/workflows/test-vitest.yml)
 
 **Build**
 

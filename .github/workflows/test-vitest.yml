@@ -1,4 +1,4 @@
-name: Test JavaScript files
+name: Test Vitest
 
 on:
   workflow_call:
