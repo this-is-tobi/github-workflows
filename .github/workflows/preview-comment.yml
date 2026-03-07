@@ -1,0 +1,89 @@
+name: Preview comment
+
+on:
+  workflow_call:
+    inputs:
+      SERVICES:
+        description: >-
+          JSON object mapping service names to URL templates.
+          Use <pr_number> as placeholder for the PR number.
+          Example: '{"API": "https://api-pr-<pr_number>.example.com"}'
+        required: true
+        type: string
+      PR_NUMBER:
+        description: Pull request number (used to replace <pr_number> placeholder)
+        required: true
+        type: number
+      LABEL:
+        description: >-
+          PR label that must be present to post the comment.
+          Leave empty to always post.
+        required: false
+        type: string
+      MESSAGE_HEADER:
+        description: Custom markdown header for the comment
+        required: false
+        type: string
+        default: "🤖 Hey !"
+      MESSAGE_FOOTER:
+        description: Custom markdown footer for the comment
+        required: false
+        type: string
+        default: |
+          Please be patient, deployment may take a few minutes.
+
+          *This application will be destroyed if you remove the label or if the PR is merged or closed.*
+      COMMENT_TAG:
+        description: Unique tag to identify and update this comment across edits
+        required: false
+        type: string
+        default: "preview"
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+
+permissions:
+  pull-requests: write
+
+jobs:
+  preview-comment:
+    name: Post preview comment
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    if: ${{ inputs.LABEL == '' || contains(github.event.pull_request.labels.*.name, inputs.LABEL) }}
+    steps:
+    - name: Generate comment body
+      id: comment
+      env:
+        INPUT_PR_NUMBER: ${{ inputs.PR_NUMBER }}
+        INPUT_SERVICES: ${{ inputs.SERVICES }}
+        INPUT_MESSAGE_HEADER: ${{ inputs.MESSAGE_HEADER }}
+        INPUT_MESSAGE_FOOTER: ${{ inputs.MESSAGE_FOOTER }}
+      run: |
+        # Generate table rows from SERVICES JSON
+        TABLE_HEADER="| Service | URL |"
+        TABLE_SEPARATOR="| ------- | --- |"
+        TABLE_ROWS=$(echo "$INPUT_SERVICES" \
+          | sed "s/<pr_number>/${INPUT_PR_NUMBER}/g" \
+          | jq -r 'to_entries | .[] | "| \(.key) | \(.value) |"')
+
+        # Write comment body to file (brace grouping avoids indentation in the markdown output)
+        {
+          printf '%s\n' "${INPUT_MESSAGE_HEADER}"
+          echo ""
+          echo "A preview of the application is available at the following addresses :"
+          echo ""
+          echo "${TABLE_HEADER}"
+          echo "${TABLE_SEPARATOR}"
+          printf '%s\n' "${TABLE_ROWS}"
+          echo ""
+          printf '%s\n' "${INPUT_MESSAGE_FOOTER}"
+        } > /tmp/comment-body.md
+
+    - name: Comment PR
+      uses: thollander/actions-comment-pull-request@v3
+      with:
+        file-path: /tmp/comment-body.md
+        comment-tag: ${{ inputs.COMMENT_TAG }}
+        pr-number: ${{ inputs.PR_NUMBER }}

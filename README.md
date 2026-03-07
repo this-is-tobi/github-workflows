@@ -67,6 +67,7 @@ For more details, see:
 **Deploy**
 
 - [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](./.github/workflows/argocd-preview.yml)
+- [Post or update a PR comment with preview environment URLs (`preview-comment.yml`)](./.github/workflows/preview-comment.yml)
 
 **Utility**
 
@@ -94,6 +95,7 @@ For more details, see:
 - [Update Helm Chart](./docs/52-update-helm-chart.md) *- Helm chart version bumping*
 - [Release NPM](./docs/53-release-npm.md) *- NPM package publishing with multi-runtime and multi-registry support*
 - [ArgoCD Preview](./docs/60-argocd-preview.md) *- Preview environment deployment with ArgoCD*
+- [Preview Comment](./docs/61-preview-comment.md) *- Post or update PR comments with preview environment URLs*
 - [Clean Cache](./docs/70-clean-cache.md) *- GitHub Actions cache and GHCR image cleanup*
 - [Label PR](./docs/71-labeler-pr.md) *- Automatic pull request labeling*
 - [CI/CD Examples](./docs/90-global-workflows-examples.md) *- Complete CI/CD pipeline examples*
