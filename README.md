@@ -47,6 +47,7 @@ For more details, see:
 
 - [Test Helm charts installation with chart-testing (`test-helm.yml`)](./.github/workflows/test-helm.yml)
 - [Test JavaScript/Typescript codebase using Vitest (`test-js.yml`)](./.github/workflows/test-js.yml)
+- [Test Kubernetes deployments in an ephemeral Kind cluster (`test-kube-deployment.yml`)](./.github/workflows/test-kube-deployment.yml)
 
 **Build**
 
@@ -87,6 +88,7 @@ For more details, see:
 - [Lint YAML](./docs/14-lint-yaml.md) *- YAML linting with yamllint*
 - [Test Helm Charts](./docs/20-test-chart.md) *- Helm chart installation testing*
 - [Test JavaScript](./docs/21-test-js.md) *- JavaScript/TypeScript testing with Vitest*
+- [Test Kube Deployment](./docs/22-test-kube-deployment.md) *- Kubernetes deployment testing with Kind*
 - [Build Docker](./docs/30-build-docker.md) *- Docker image building and registry pushing*
 - [Scan SonarQube](./docs/40-scan-sonarqube.md) *- Code quality analysis with SonarQube*
 - [Scan Trivy](./docs/41-scan-trivy.md) *- Vulnerability scanning for images and configs*
