@@ -61,6 +61,7 @@ For more details, see:
 
 - [Release Apps using release-please and optional automerge (`release-app.yml`)](./.github/workflows/release-app.yml)
 - [Release Helm charts using chart-releaser (`release-helm.yml`)](./.github/workflows/release-helm.yml)
+- [Publish packages to any NPM-compatible registry (`release-npm.yml`)](./.github/workflows/release-npm.yml)
 - [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
 
 **Deploy**
@@ -91,6 +92,7 @@ For more details, see:
 - [Release App](./docs/50-release-app.md) *- Application releases using release-please*
 - [Release Helm](./docs/51-release-helm.md) *- Helm chart releases with chart-releaser*
 - [Update Helm Chart](./docs/52-update-helm-chart.md) *- Helm chart version bumping*
+- [Release NPM](./docs/53-release-npm.md) *- NPM package publishing with multi-runtime and multi-registry support*
 - [ArgoCD Preview](./docs/60-argocd-preview.md) *- Preview environment deployment with ArgoCD*
 - [Clean Cache](./docs/70-clean-cache.md) *- GitHub Actions cache and GHCR image cleanup*
 - [Label PR](./docs/71-labeler-pr.md) *- Automatic pull request labeling*
