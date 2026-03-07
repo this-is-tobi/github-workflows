@@ -40,8 +40,8 @@ jobs:
     permissions:
       contents: read
 
-  test-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+  test-vitest:
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     permissions:
       contents: read
     with:
@@ -52,7 +52,7 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
     needs:
     - lint-js
-    - test-js
+    - test-vitest
     permissions:
       packages: write
       contents: read
@@ -67,7 +67,7 @@ jobs:
   scan-sonarqube:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     needs:
-    - test-js
+    - test-vitest
     permissions:
       contents: read
       issues: write
@@ -102,7 +102,7 @@ jobs:
     needs:
     - lint-commits
     - lint-js
-    - test-js
+    - test-vitest
     - build-docker
     - scan-sonarqube
     - scan-trivy
@@ -245,8 +245,8 @@ jobs:
     permissions:
       contents: read
 
-  test-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+  test-vitest:
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     if: ${{ !github.event.pull_request.draft }}
     permissions:
       contents: read
@@ -259,7 +259,7 @@ jobs:
     needs:
     - expose-vars
     - lint-js
-    - test-js
+    - test-vitest
     permissions:
       packages: write
       contents: read
@@ -286,7 +286,7 @@ jobs:
   scan-sonarqube:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     needs:
-    - test-js
+    - test-vitest
     permissions:
       contents: read
       issues: write
@@ -337,7 +337,7 @@ jobs:
     needs:
     - lint-commits
     - lint-js
-    - test-js
+    - test-vitest
     - build-docker
     - scan-sonarqube
     - scan-trivy-conf
@@ -733,8 +733,8 @@ jobs:
     with:
       LINT_PATHS: "src tests"
 
-  test-js:
-    uses: this-is-tobi/github-workflows/.github/workflows/test-js.yml@v0
+  test-vitest:
+    uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     permissions:
       contents: read
     with:
@@ -744,7 +744,7 @@ jobs:
   scan-sonarqube:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     needs:
-    - test-js
+    - test-vitest
     permissions:
       contents: read
       issues: write
@@ -764,7 +764,7 @@ jobs:
     needs:
     - lint-commits
     - lint-js
-    - test-js
+    - test-vitest
     - scan-sonarqube
     steps:
     - name: Check status of all required jobs

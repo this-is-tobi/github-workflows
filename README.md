@@ -46,7 +46,7 @@ For more details, see:
 **Test**
 
 - [Test Helm charts installation with chart-testing (`test-helm.yml`)](./.github/workflows/test-helm.yml)
-- [Test JavaScript/Typescript codebase using Vitest (`test-js.yml`)](./.github/workflows/test-js.yml)
+- [Test JavaScript/Typescript codebase using Vitest (`test-vitest.yml`)](./.github/workflows/test-vitest.yml)
 - [Test Kubernetes deployments in an ephemeral Kind cluster (`test-kube-deployment.yml`)](./.github/workflows/test-kube-deployment.yml)
 - [Run end-to-end Playwright tests across a browser matrix (`test-playwright.yml`)](./.github/workflows/test-playwright.yml)
 
@@ -88,7 +88,7 @@ For more details, see:
 - [Lint JavaScript](./docs/13-lint-js.md) *- JavaScript/TypeScript linting with ESLint*
 - [Lint YAML](./docs/14-lint-yaml.md) *- YAML linting with yamllint*
 - [Test Helm Charts](./docs/20-test-chart.md) *- Helm chart installation testing*
-- [Test JavaScript](./docs/21-test-js.md) *- JavaScript/TypeScript testing with Vitest*
+- [Test JavaScript](./docs/21-test-vitest.md) *- JavaScript/TypeScript testing with Vitest*
 - [Test Kube Deployment](./docs/22-test-kube-deployment.md) *- Kubernetes deployment testing with Kind*
 - [Test Playwright](./docs/23-test-playwright.md) *- End-to-end Playwright testing across browsers*
 - [Build Docker](./docs/30-build-docker.md) *- Docker image building and registry pushing*
