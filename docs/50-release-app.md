@@ -6,21 +6,22 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 
 ## Inputs
 
-| Input                        | Type    | Description                                                                                                       | Required | Default                          |
-| ---------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------- |
-| ENABLE_PRERELEASE            | boolean | Enable prerelease functionality                                                                                   | No       | false                            |
-| TAG_MAJOR_AND_MINOR          | boolean | Tag major and minor versions                                                                                      | No       | false                            |
-| AUTOMERGE_PRERELEASE         | boolean | Automatically merge the prerelease PR                                                                             | No       | false                            |
-| AUTOMERGE_RELEASE            | boolean | Automatically merge the release PR                                                                                | No       | false                            |
-| PRERELEASE_BRANCH            | string  | Branch to create the prerelease on                                                                                | No       | develop                          |
-| RELEASE_BRANCH               | string  | Branch to create the release on                                                                                   | No       | main                             |
-| REBASE_PRERELEASE_BRANCH     | boolean | Rebase prerelease branch on release after release                                                                 | No       | false                            |
-| RELEASE_CONFIG_FILE          | string  | Release-please config file for release branch                                                                     | No       | release-please-config.json       |
-| RELEASE_MANIFEST_FILE        | string  | Release-please manifest file for release branch                                                                   | No       | .release-please-manifest.json    |
-| PRERELEASE_CONFIG_FILE       | string  | Release-please config file for prerelease branch                                                                  | No       | release-please-config-rc.json    |
-| PRERELEASE_MANIFEST_FILE     | string  | Release-please manifest file for prerelease branch                                                                | No       | .release-please-manifest-rc.json |
-| ADDITIONAL_RELEASE_ARTIFACTS | string  | Comma-separated list of additional release artifacts to upload (e.g., `artifact/build.zip,artifact/other.tar.gz`) | No       | -                                |
-| RUNS_ON                      | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                          | No       | ["ubuntu-24.04"]                 |
+| Input                    | Type    | Description                                                                                                                                                                                      | Required | Default                          |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | -------------------------------- |
+| ENABLE_PRERELEASE        | boolean | Enable prerelease functionality                                                                                                                                                                  | No       | false                            |
+| TAG_MAJOR_AND_MINOR      | boolean | Tag major and minor versions                                                                                                                                                                     | No       | false                            |
+| AUTOMERGE_PRERELEASE     | boolean | Automatically merge the prerelease PR                                                                                                                                                            | No       | false                            |
+| AUTOMERGE_RELEASE        | boolean | Automatically merge the release PR                                                                                                                                                               | No       | false                            |
+| PRERELEASE_BRANCH        | string  | Branch to create the prerelease on                                                                                                                                                               | No       | develop                          |
+| RELEASE_BRANCH           | string  | Branch to create the release on                                                                                                                                                                  | No       | main                             |
+| REBASE_PRERELEASE_BRANCH | boolean | Rebase prerelease branch on release after release                                                                                                                                                | No       | false                            |
+| RELEASE_CONFIG_FILE      | string  | Release-please config file for release branch                                                                                                                                                    | No       | release-please-config.json       |
+| RELEASE_MANIFEST_FILE    | string  | Release-please manifest file for release branch                                                                                                                                                  | No       | .release-please-manifest.json    |
+| PRERELEASE_CONFIG_FILE   | string  | Release-please config file for prerelease branch                                                                                                                                                 | No       | release-please-config-rc.json    |
+| PRERELEASE_MANIFEST_FILE | string  | Release-please manifest file for prerelease branch                                                                                                                                               | No       | .release-please-manifest-rc.json |
+| RELEASE_ASSET_PATHS      | string  | Comma-separated list of local file paths to upload as release assets (e.g., `dist/app-linux-amd64,dist/app-darwin-amd64`)                                                                        | No       | -                                |
+| RELEASE_ARTIFACT_NAMES   | string  | Artifact name or glob pattern matching one or more artifacts (uploaded by previous jobs via `actions/upload-artifact`) to download and attach to the release (e.g., `my-binaries` or `my-app-*`) | No       | -                                |
+| RUNS_ON                  | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                                                                                         | No       | ["ubuntu-24.04"]                 |
 
 ## Secrets
 
@@ -55,6 +56,7 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 - If `TAG_MAJOR_AND_MINOR: true`, tags `v<major>` and `v<major>.<minor>` after a release is created.
 - If `AUTOMERGE_*` is enabled and a PAT is provided, attempts to automerge the release PR.
 - Optionally rebases `PRERELEASE_BRANCH` onto `RELEASE_BRANCH` after a release when `REBASE_PRERELEASE_BRANCH: true` (only when `ENABLE_PRERELEASE: true`).
+- `RELEASE_ASSET_PATHS` uploads files that are already present on the runner filesystem. `RELEASE_ARTIFACT_NAMES` accepts a name or glob pattern — the matching artifacts are downloaded via `actions/download-artifact` before being attached to the release; both inputs can be used together.
 
 ## Configuration
 
@@ -165,7 +167,22 @@ jobs:
 
 ### Attach build artifacts to the release
 
-Use `ADDITIONAL_RELEASE_ARTIFACTS` to upload extra files (binaries, archives, etc.) to the GitHub Release after it is created:
+Two options are available depending on where the artifacts live.
+
+**Option 1 — files on the runner filesystem** (`RELEASE_ASSET_PATHS`): use this when the files are produced in the same job (or already present on the runner).
+
+```yaml
+jobs:
+  release:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    with:
+      ENABLE_PRERELEASE: false
+      RELEASE_ASSET_PATHS: "dist/my-app-linux-amd64,dist/my-app-darwin-amd64"
+    secrets:
+      GH_PAT: ${{ secrets.GH_PAT }}
+```
+
+**Option 2 — artifacts from a previous job** (`RELEASE_ARTIFACT_NAMES`): accepts a name or glob pattern — matching artifacts uploaded via `actions/upload-artifact` in the same run are downloaded automatically before being attached to the release.
 
 ```yaml
 jobs:
@@ -177,7 +194,7 @@ jobs:
       run: make build
     - uses: actions/upload-artifact@v7
       with:
-        name: release-artifacts
+        name: my-app-binaries
         path: dist/
 
   release:
@@ -185,7 +202,9 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
     with:
       ENABLE_PRERELEASE: false
-      ADDITIONAL_RELEASE_ARTIFACTS: "dist/my-app-linux-amd64,dist/my-app-darwin-amd64"
+      RELEASE_ARTIFACT_NAMES: "my-app-binaries"  # or a glob like "my-app-*"
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
 ```
+
+Both inputs can be combined when some files are local and others come from previous jobs.

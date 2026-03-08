@@ -13,8 +13,12 @@ on:
         type: boolean
         required: false
         default: false
-      ADDITIONAL_RELEASE_ARTIFACTS:
-        description: Comma-separated list of additional release artifacts to upload (e.g., 'artifact/some-build-artifact.zip,artifact/another-artifact.tar.gz')
+      RELEASE_ASSET_PATHS:
+        description: Comma-separated list of local file paths to upload as release assets (e.g., 'dist/app-linux-amd64,dist/app-darwin-amd64')
+        type: string
+        required: false
+      RELEASE_ARTIFACT_NAMES:
+        description: Artifact name or glob pattern matching one or more artifacts (uploaded by previous jobs via actions/upload-artifact) to download and attach to the release (e.g., 'my-binaries' or 'my-app-*')
         type: string
         required: false
       AUTOMERGE_PRERELEASE:
@@ -116,11 +120,37 @@ jobs:
         config-file: ${{ (github.ref_name == inputs.RELEASE_BRANCH && inputs.RELEASE_CONFIG_FILE) || (inputs.ENABLE_PRERELEASE && github.ref_name == inputs.PRERELEASE_BRANCH && inputs.PRERELEASE_CONFIG_FILE) || inputs.RELEASE_CONFIG_FILE }}
         manifest-file: ${{ (github.ref_name == inputs.RELEASE_BRANCH && inputs.RELEASE_MANIFEST_FILE) || (inputs.ENABLE_PRERELEASE && github.ref_name == inputs.PRERELEASE_BRANCH && inputs.PRERELEASE_MANIFEST_FILE) || inputs.RELEASE_MANIFEST_FILE }}
 
+    - name: Download release artifacts
+      if: ${{ steps.release.outputs.release_created && inputs.RELEASE_ARTIFACT_NAMES != '' }}
+      uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+      with:
+        name: ${{ inputs.RELEASE_ARTIFACT_NAMES }}
+        path: /tmp/release-artifacts/
+        merge-multiple: true
+
     - name: Upload Additional Release Artifacts
-      if: ${{ steps.release.outputs.release_created && inputs.ADDITIONAL_RELEASE_ARTIFACTS != '' }}
+      if: ${{ steps.release.outputs.release_created && (inputs.RELEASE_ASSET_PATHS != '' || inputs.RELEASE_ARTIFACT_NAMES != '') }}
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release upload ${{ steps.release.outputs.tag_name }} $(echo ${{ inputs.ADDITIONAL_RELEASE_ARTIFACTS }} | tr ',' ' ')
+        TAG_NAME: ${{ steps.release.outputs.tag_name }}
+        ARTIFACT_PATHS: ${{ inputs.RELEASE_ASSET_PATHS }}
+      run: |
+        FILES=()
+        if [[ -n "$ARTIFACT_PATHS" ]]; then
+          ARTIFACT_PATHS="${ARTIFACT_PATHS//[[:space:]]/}"
+          IFS=',' read -ra PATHS <<< "$ARTIFACT_PATHS"
+          for p in "${PATHS[@]}"; do
+            [[ -z "$p" ]] && continue
+            FILES+=("$p")
+          done
+        fi
+        if [[ -d /tmp/release-artifacts ]]; then
+          mapfile -d '' -t DOWNLOADED < <(find /tmp/release-artifacts -type f -print0)
+          FILES+=("${DOWNLOADED[@]}")
+        fi
+        if [[ ${#FILES[@]} -gt 0 ]]; then
+          gh release upload "$TAG_NAME" "${FILES[@]}"
+        fi
 
     - name: Tag major and minor versions
       if: ${{ steps.release.outputs.release_created && inputs.TAG_MAJOR_AND_MINOR }}
