@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.0](https://github.com/this-is-tobi/github-workflows/compare/v0.1.0...v0.2.0) (2026-03-08)
+
+
+### Features
+
+* **build-docker:** handle target, attestation, sbom and cache ([a047915](https://github.com/this-is-tobi/github-workflows/commit/a0479152f80a2a0a7b034e3bfa3384b0789959d1))
+* **preview-comment:** add workflow to comment the PR with preview app infos ([ecb6f14](https://github.com/this-is-tobi/github-workflows/commit/ecb6f14d8f254d7dca91b0eb33e435fb5c0b9b51))
+* **release-npm:** add new workflow to publish npm packages ([80310a9](https://github.com/this-is-tobi/github-workflows/commit/80310a9e518dc6550ffbf44e4d9c15d0be4540a2))
+* **test-kube-deployment:** add workflow to test deployment in kubernetes ([eb306c0](https://github.com/this-is-tobi/github-workflows/commit/eb306c0af34a5179783ff9b6e7831017a14c562c))
+* **test-playwright:** add workflow to wrap playwright tests ([5f2f641](https://github.com/this-is-tobi/github-workflows/commit/5f2f6414ec43064e66cbc9575c62aa3d78384323))
+
+
+### Code Refactoring
+
+* improve security accross all workflows ([3851339](https://github.com/this-is-tobi/github-workflows/commit/3851339ffb5abb203195c59ad78491efb3d785e3))
+* **test-vitest:** rename test-js workflow into test-vitest ([a0b90c7](https://github.com/this-is-tobi/github-workflows/commit/a0b90c77a87df22ac7884ae31acd4acfb5f41ad4))
+
 ## [0.1.0](https://github.com/this-is-tobi/github-workflows/compare/v0.0.1...v0.1.0) (2026-03-06)
 
 
