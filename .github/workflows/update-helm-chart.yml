@@ -22,7 +22,7 @@ on:
         type: string
         default: charts
       CHART_NAME:
-        description: Name of the folder containing the chart (in CHART_DIR)
+        description: Name of the chart to update (in CHART_DIR)
         required: true
         type: string
       APP_VERSION:
