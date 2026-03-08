@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/this-is-tobi/github-workflows/compare/v0.2.0...v0.3.0) (2026-03-08)
+
+
+### Features
+
+* **release-app:** handle additional release artifacts from previous upload ([392f77d](https://github.com/this-is-tobi/github-workflows/commit/392f77d301c93495f1887ef9f53e9fc2616d72ce))
+
 ## [0.2.0](https://github.com/this-is-tobi/github-workflows/compare/v0.1.0...v0.2.0) (2026-03-08)
 
 
