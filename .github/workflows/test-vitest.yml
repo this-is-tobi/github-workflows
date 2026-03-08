@@ -80,7 +80,7 @@ jobs:
       test-command: ${{ steps.detect.outputs.test-command }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
     - name: Detect project configuration
       id: detect
@@ -155,23 +155,23 @@ jobs:
     if: ${{ needs.detect-setup.outputs.has-tests == 'true' && needs.detect-setup.outputs.has-vitest == 'true' }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
       with:
         node-version: ${{ inputs.RUNTIME_VERSION }}
 
     - name: Setup Bun
       if: ${{ needs.detect-setup.outputs.runtime == 'bun' }}
-      uses: oven-sh/setup-bun@v2
+      uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
       with:
         bun-version: ${{ inputs.RUNTIME_VERSION }}
 
     - name: Setup pnpm
       if: ${{ needs.detect-setup.outputs.package-manager == 'pnpm' }}
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
       with:
         version: latest
 
@@ -270,7 +270,7 @@ jobs:
 
     - name: Upload coverage reports
       if: ${{ inputs.COVERAGE == true && inputs.COVERAGE_REPORTER == 'lcov' }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: ${{ inputs.COVERAGE_ARTIFACT_NAME }}
         path: ${{ inputs.COVERAGE_ARTIFACT_PATH }}
