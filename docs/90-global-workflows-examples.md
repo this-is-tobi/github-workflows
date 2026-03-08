@@ -540,7 +540,7 @@ jobs:
     permissions:
       contents: read
     with:
-      CHARTS_DIR: ./charts
+      CHART_PATH: ./charts
 
   lint-yaml:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-yaml.yml@v0

@@ -82,7 +82,7 @@ jobs:
         } > /tmp/comment-body.md
 
     - name: Comment PR
-      uses: thollander/actions-comment-pull-request@v3
+      uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b # v3.0.1
       with:
         file-path: /tmp/comment-body.md
         comment-tag: ${{ inputs.COMMENT_TAG }}
