@@ -9,8 +9,8 @@ Trigger a chart update workflow in a remote Helm charts repository (caller mode)
 | RUN_MODE              | string | Execution mode `caller` (trigger remote repo workflow) or `called` (update chart in current repo) | Yes      | -                      |
 | WORKFLOW_NAME         | string | Workflow file name in chart repo to trigger (caller mode)                                         | No       | update-app-version.yml |
 | CHART_REPO            | string | Target chart repository (`owner/repo`) when in caller mode                                        | No       | -                      |
-| CHART_DIR             | string | Directory containing the Helm charts                                                              | No       | charts                 |
-| CHART_NAME            | string | Name of the chart directory under `CHART_DIR`                                                     | Yes      | -                      |
+| CHART_DIR             | string | Directory containing the Helm charts (in `CHART_REPO`)                                            | No       | charts                 |
+| CHART_NAME            | string | Name of the chart to update (in `CHART_DIR`)                                                      | Yes      | -                      |
 | APP_VERSION           | string | Application version to set in `Chart.yaml` (appVersion)                                           | Yes      | -                      |
 | UPGRADE_TYPE          | string | Which SemVer part to increment: `major`, `minor`, `patch`, or `prerelease`                        | No       | patch                  |
 | PRERELEASE_IDENTIFIER | string | Identifier used when `UPGRADE_TYPE=prerelease` (e.g. `rc`)                                        | No       | rc                     |
