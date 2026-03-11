@@ -36,6 +36,8 @@ Scans all YAML files in the repository root with yamllint's built-in default rul
 jobs:
   lint-yaml:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-yaml.yml@v0
+    permissions:
+      contents: read
 ```
 
 ### Custom scan path with strict mode
@@ -46,6 +48,8 @@ jobs:
 jobs:
   lint-yaml:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-yaml.yml@v0
+    permissions:
+      contents: read
     with:
       SCAN_PATH: "./charts"
       STRICT: true
@@ -59,6 +63,8 @@ Loads project-specific yamllint rules (e.g. indentation width, line length). `ST
 jobs:
   lint-yaml:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-yaml.yml@v0
+    permissions:
+      contents: read
     with:
       CONFIG_FILE: ".yamllint.yml"
       SCAN_PATH: "."

@@ -136,6 +136,10 @@ Full two-branch setup with `develop` for prereleases and `main` for stable relea
 jobs:
   release:
     uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     with:
       ENABLE_PRERELEASE: true
       TAG_MAJOR_AND_MINOR: true
@@ -157,6 +161,10 @@ Single-branch workflow targeting only `main`. No prerelease config files are req
 jobs:
   release:
     uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     with:
       ENABLE_PRERELEASE: false
       TAG_MAJOR_AND_MINOR: true
@@ -175,6 +183,10 @@ Two options are available depending on where the artifacts live.
 jobs:
   release:
     uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     with:
       ENABLE_PRERELEASE: false
       RELEASE_ASSET_PATHS: "dist/my-app-linux-amd64,dist/my-app-darwin-amd64"
@@ -200,6 +212,10 @@ jobs:
   release:
     needs: build
     uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     with:
       ENABLE_PRERELEASE: false
       RELEASE_ARTIFACT_NAMES: "my-app-binaries"  # or a glob like "my-app-*"

@@ -63,6 +63,8 @@ Runs Playwright tests against Chrome using the default Node.js runtime. No artif
 ```yaml
 jobs:
   e2e-tests:
+    permissions:
+      contents: read
     uses: this-is-tobi/github-workflows/.github/workflows/test-playwright.yml@v0
 ```
 
@@ -73,6 +75,8 @@ Tests against Chrome and Firefox in parallel. On failure, Playwright reports are
 ```yaml
 jobs:
   e2e-tests:
+    permissions:
+      contents: read
     uses: this-is-tobi/github-workflows/.github/workflows/test-playwright.yml@v0
     with:
       BROWSERS: "chrome,firefox"
@@ -87,6 +91,8 @@ Uses Bun as both the runtime and package manager. The `$BROWSER` variable is inj
 ```yaml
 jobs:
   e2e-tests:
+    permissions:
+      contents: read
     uses: this-is-tobi/github-workflows/.github/workflows/test-playwright.yml@v0
     with:
       RUNTIME: bun
@@ -105,6 +111,8 @@ Restrict execution to a sub-package via `WORKING_DIRECTORY`. Combine with a buil
 ```yaml
 jobs:
   e2e-tests:
+    permissions:
+      contents: read
     uses: this-is-tobi/github-workflows/.github/workflows/test-playwright.yml@v0
     with:
       RUNTIME: bun
@@ -123,6 +131,8 @@ Run E2E tests without gating the pipeline. Failures are visible in the Actions U
 ```yaml
 jobs:
   e2e-tests:
+    permissions:
+      contents: read
     uses: this-is-tobi/github-workflows/.github/workflows/test-playwright.yml@v0
     with:
       BROWSERS: "chrome,firefox"

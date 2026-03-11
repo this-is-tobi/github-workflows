@@ -7,14 +7,6 @@ on:
         description: Image used to perform scan (eg. docker.io/debian:latest)
         required: false
         type: string
-      REGISTRY_USERNAME:
-        description: Username used to login into registry
-        required: false
-        type: string
-      REGISTRY_PASSWORD:
-        description: Password used to login into registry
-        required: false
-        type: string
 
       PATH:
         description: Path used to perform scan
@@ -39,18 +31,23 @@ on:
         required: false
         type: string
         default: '["ubuntu-24.04"]'
-
-permissions:
-  contents: read
-  security-events: write
-  pull-requests: write
-  packages: read
+    secrets:
+      REGISTRY_USERNAME:
+        description: Username used to login into registry
+        required: false
+      REGISTRY_PASSWORD:
+        description: Password used to login into registry
+        required: false
 
 jobs:
   images-scan:
     name: Scan images vulnerabilities
     if: ${{ inputs.IMAGE != '' }}
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
     steps:
     - name: Checks-out repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -65,8 +62,8 @@ jobs:
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
         github-pat: ${{ github.token }}
       env:
-        TRIVY_USERNAME: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.actor || inputs.REGISTRY_USERNAME }}
-        TRIVY_PASSWORD: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.token || inputs.REGISTRY_PASSWORD }}
+        TRIVY_USERNAME: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.actor || secrets.REGISTRY_USERNAME }}
+        TRIVY_PASSWORD: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.token || secrets.REGISTRY_PASSWORD }}
       continue-on-error: true
 
     - name: Print Trivy scan results
@@ -94,6 +91,9 @@ jobs:
     name: Scan config files vulnerabilities
     if: ${{ inputs.PATH != '' }}
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+      security-events: write
     steps:
     - name: Checks-out repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -134,6 +134,8 @@ jobs:
   scan-notif:
     name: Notify users
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     if: ${{ always() && (needs.images-scan.result == 'success' || needs.config-scan.result == 'success') }}
     needs:
     - images-scan

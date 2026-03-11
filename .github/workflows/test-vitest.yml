@@ -64,13 +64,12 @@ on:
         required: false
         default: "60000"
 
-permissions:
-  contents: read
-
 jobs:
   detect-setup:
     name: Detect project setup
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       package-manager: ${{ steps.detect.outputs.package-manager }}
       runtime: ${{ steps.detect.outputs.runtime }}
@@ -152,6 +151,8 @@ jobs:
     name: Run tests
     runs-on: ubuntu-latest
     needs: detect-setup
+    permissions:
+      contents: read
     if: ${{ needs.detect-setup.outputs.has-tests == 'true' && needs.detect-setup.outputs.has-vitest == 'true' }}
     steps:
     - name: Checks-out repository
@@ -279,6 +280,7 @@ jobs:
     name: No tests found
     runs-on: ubuntu-latest
     needs: detect-setup
+    permissions: {}
     if: ${{ needs.detect-setup.outputs.has-tests == 'false' }}
     steps:
     - name: Skip tests
@@ -291,6 +293,7 @@ jobs:
     name: Vitest not found
     runs-on: ubuntu-latest
     needs: detect-setup
+    permissions: {}
     if: ${{ needs.detect-setup.outputs.has-vitest == 'false' }}
     steps:
     - name: Skip tests

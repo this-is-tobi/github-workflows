@@ -4,15 +4,20 @@ Release Helm charts using `chart-releaser-action`. Automatically creates GitHub 
 
 ## Inputs
 
-| Input             | Type   | Description                                                                                | Required | Default          |
-| ----------------- | ------ | ------------------------------------------------------------------------------------------ | -------- | ---------------- |
-| CHARTS_DIR        | string | Directory containing the Helm charts                                                       | No       | ./charts         |
-| HELM_REPOS        | string | Helm repositories to add (name=url, comma-separated)                                       | No       | -                |
-| REGISTRY          | string | OCI registry to push charts to (e.g. `ghcr.io`, `registry.gitlab.com`)                     | No       | ghcr.io          |
-| REPOSITORY        | string | Repository path in the OCI registry (defaults to `github.repository`)                      | No       | -                |
-| REGISTRY_USERNAME | string | Username for OCI registry authentication (uses `github.actor` automatically for `ghcr.io`) | No       | -                |
-| REGISTRY_PASSWORD | string | Password for OCI registry authentication (uses `GITHUB_TOKEN` automatically for `ghcr.io`) | No       | -                |
-| RUNS_ON           | string | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)   | No       | ["ubuntu-24.04"] |
+| Input      | Type   | Description                                                                              | Required | Default          |
+| ---------- | ------ | ---------------------------------------------------------------------------------------- | -------- | ---------------- |
+| CHARTS_DIR | string | Directory containing the Helm charts                                                     | No       | ./charts         |
+| HELM_REPOS | string | Helm repositories to add (name=url, comma-separated)                                     | No       | -                |
+| REGISTRY   | string | OCI registry to push charts to (e.g. `ghcr.io`, `registry.gitlab.com`)                   | No       | ghcr.io          |
+| REPOSITORY | string | Repository path in the OCI registry (defaults to `github.repository`)                    | No       | -                |
+| RUNS_ON    | string | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
+
+## Secrets
+
+| Secret            | Description                                                                                | Required |
+| ----------------- | ------------------------------------------------------------------------------------------ | -------- |
+| REGISTRY_USERNAME | Username for OCI registry authentication (uses `github.actor` automatically for `ghcr.io`) | No       |
+| REGISTRY_PASSWORD | Password for OCI registry authentication (uses `GITHUB_TOKEN` automatically for `ghcr.io`) | No       |
 
 ## Permissions
 
@@ -43,6 +48,9 @@ The examples show releasing to the default GitHub Packages (ghcr.io) OCI registr
 jobs:
   release-charts:
     uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    permissions:
+      contents: write
+      packages: write
     with:
       CHARTS_DIR: ./charts
       HELM_REPOS: "bitnami=https://charts.bitnami.com/bitnami,jetstack=https://charts.jetstack.io"
@@ -50,17 +58,21 @@ jobs:
 
 #### Custom OCI registry
 
-To push charts to a registry other than `ghcr.io`, supply credentials explicitly:
+To push charts to a registry other than `ghcr.io`, supply credentials as secrets:
 
 ```yaml
 jobs:
   release-charts:
     uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    permissions:
+      contents: write
+      packages: write
     with:
       CHARTS_DIR: ./charts
       REGISTRY: registry.example.com
       REPOSITORY: my-org/helm-charts
-      REGISTRY_USERNAME: ${{ vars.REGISTRY_USERNAME }}
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 ```
 

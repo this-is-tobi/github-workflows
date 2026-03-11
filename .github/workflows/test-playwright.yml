@@ -59,13 +59,12 @@ on:
         type: string
         default: '["ubuntu-24.04"]'
 
-permissions:
-  contents: read
-
 jobs:
   infos:
     name: Get test infos
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
     outputs:
       browsers: ${{ steps.matrix.outputs.BROWSERS }}
     steps:
@@ -80,6 +79,8 @@ jobs:
   e2e-tests:
     name: E2E tests (${{ matrix.browser }})
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
     needs:
     - infos
     strategy:

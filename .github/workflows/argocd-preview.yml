@@ -28,15 +28,13 @@ on:
         description: Token used to re-deploy Argo-CD preview app
         required: true
 
-permissions:
-  pull-requests: write
-  contents: read
-
 jobs:
   preview-comment:
     name: Add comment with preview infos
     if: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
     - name: Generate app url
       id: generate-url
@@ -61,6 +59,7 @@ jobs:
     name: Redeploy preview app
     if: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
     - name: Replace template fields
       id: feed-template

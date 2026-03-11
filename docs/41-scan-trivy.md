@@ -7,13 +7,18 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 | Input               | Type    | Description                                                                              | Required | Default          |
 | ------------------- | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------- |
 | IMAGE               | string  | Image used to perform scan (e.g., docker.io/debian:latest)                               | No       | -                |
-| REGISTRY_USERNAME   | string  | Username used to login into registry                                                     | No       | -                |
-| REGISTRY_PASSWORD   | string  | Password used to login into registry                                                     | No       | -                |
 | PATH                | string  | Path used to perform config scan                                                         | No       | -                |
 | FORMAT              | string  | Format of the report (sarif, table, json, ...)                                           | No       | table            |
 | PR_NUMBER           | string  | PR number for comment posting                                                            | No       | -                |
 | GITHUB_SECURITY_TAB | boolean | Whether to upload SARIF to GitHub Security Tab                                           | No       | false            |
 | RUNS_ON             | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
+
+## Secrets
+
+| Secret            | Description                                                     | Required |
+| ----------------- | --------------------------------------------------------------- | -------- |
+| REGISTRY_USERNAME | Username used to login into registry (not needed for `ghcr.io`) | No       |
+| REGISTRY_PASSWORD | Password used to login into registry (not needed for `ghcr.io`) | No       |
 
 ## Permissions
 
@@ -45,6 +50,11 @@ Runs both an image scan and a configuration path scan in parallel. Results are p
 jobs:
   vuln-scan:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+      packages: read
     with:
       IMAGE: ghcr.io/my-org/my-image:1.2.3
       PATH: ./apps/api
@@ -60,10 +70,36 @@ jobs:
 jobs:
   vuln-scan:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+      packages: read
     with:
       IMAGE: ghcr.io/my-org/my-image:1.2.3
       PATH: ./apps/api
       FORMAT: sarif
       GITHUB_SECURITY_TAB: true
       PR_NUMBER: ${{ github.event.pull_request.number }}
+```
+
+### Custom (non-GHCR) registry
+
+For images hosted outside `ghcr.io`, provide explicit credentials as secrets:
+
+```yaml
+jobs:
+  vuln-scan:
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    with:
+      IMAGE: registry.example.com/my-org/my-image:1.2.3
+      FORMAT: table
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 ```
