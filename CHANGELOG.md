@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/this-is-tobi/github-workflows/compare/v0.3.0...v0.4.0) (2026-03-11)
+
+
+### Features
+
+* **build-docker:** split image attestation in a dedicated workflow ([1e37dba](https://github.com/this-is-tobi/github-workflows/commit/1e37dba454842255187672c72388a855dfb77f45))
+
+
+### Code Refactoring
+
+* improve security with secret input and scope permissions ([4a8d5fb](https://github.com/this-is-tobi/github-workflows/commit/4a8d5fbf0ab5aae96bc705c1d393ed0378ee9982))
+
 ## [0.3.0](https://github.com/this-is-tobi/github-workflows/compare/v0.2.0...v0.3.0) (2026-03-08)
 
 
