@@ -13,6 +13,10 @@ __Example:__
 ```yaml
 jobs:
   example:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     with:
       SONAR_URL: 'https://sonarqube.example.com'
@@ -48,9 +52,10 @@ For more details, see:
 - [Test Helm charts installation with chart-testing (`test-helm.yml`)](../.github/workflows/test-helm.yml)
 - [Test JavaScript/Typescript codebase using Vitest (`test-vitest.yml`)](../.github/workflows/test-vitest.yml)
 
-**Build**
+**Build & Attest**
 
 - [Build docker images and push it to a registry (`build-docker.yml`)](../.github/workflows/build-docker.yml)
+- [Attest a container image with SLSA provenance and/or SBOM (`attest-docker.yml`)](../.github/workflows/attest-docker.yml)
 
 **Scan**
 

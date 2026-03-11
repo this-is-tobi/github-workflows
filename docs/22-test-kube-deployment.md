@@ -114,6 +114,9 @@ Use raw `kubectl apply` instead of Helm, then wait for pods to become ready.
 ```yaml
 jobs:
   deploy-test:
+    permissions:
+      packages: read
+      contents: read
     uses: this-is-tobi/github-workflows/.github/workflows/test-kube-deployment.yml@v0
     with:
       DEPLOY_COMMAND: "kubectl apply -f ./k8s/"

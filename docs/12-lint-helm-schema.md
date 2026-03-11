@@ -37,6 +37,8 @@ Validates `values.yaml` against `values.schema.json` in `charts/my-chart`. Fails
 jobs:
   lint-helm-schema:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-helm-schema.yml@v0
+    permissions:
+      contents: read
     with:
       CHART_PATH: charts/my-chart
 ```
@@ -49,6 +51,8 @@ Validates three values files in a single run — useful for projects with per-en
 jobs:
   lint-helm-schema:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-helm-schema.yml@v0
+    permissions:
+      contents: read
     with:
       CHART_PATH: charts/my-chart
       VALUES_FILES: "values.yaml,values/dev.yaml,values/prod.yaml"
@@ -62,6 +66,8 @@ Uses `custom-schema.json` instead of the default `values.schema.json`. Useful wh
 jobs:
   lint-helm-schema:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-helm-schema.yml@v0
+    permissions:
+      contents: read
     with:
       CHART_PATH: charts/my-chart
       SCHEMA_FILE: custom-schema.json

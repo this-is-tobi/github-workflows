@@ -44,13 +44,12 @@ on:
         type: string
         default: '["ubuntu-24.04"]'
 
-permissions:
-  pull-requests: write
-
 jobs:
   preview-comment:
     name: Post preview comment
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      pull-requests: write
     if: ${{ inputs.LABEL == '' || contains(github.event.pull_request.labels.*.name, inputs.LABEL) }}
     steps:
     - name: Generate comment body

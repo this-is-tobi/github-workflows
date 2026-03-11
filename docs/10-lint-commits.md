@@ -45,6 +45,9 @@ Lints all PR commits against the default Conventional Commits ruleset with no ex
 jobs:
   lint-commits:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
+    permissions:
+      contents: read
+      pull-requests: read
 ```
 
 ### Require scope
@@ -55,6 +58,9 @@ jobs:
 jobs:
   lint-commits:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
+    permissions:
+      contents: read
+      pull-requests: read
     with:
       REQUIRE_SCOPE: true
 ```
@@ -67,6 +73,9 @@ Restricts the accepted types to a minimal set and lowers the subject line limit 
 jobs:
   lint-commits:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
+    permissions:
+      contents: read
+      pull-requests: read
     with:
       ALLOWED_TYPES: "feat,fix,docs,chore"
       MAX_SUBJECT_LENGTH: 72
@@ -80,6 +89,9 @@ Loads the full commitlint configuration from `.commitlintrc.js`. All inline inpu
 jobs:
   lint-commits:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
+    permissions:
+      contents: read
+      pull-requests: read
     with:
       CONFIG_FILE: ".commitlintrc.js"
 ```
@@ -92,6 +104,9 @@ Violations appear in the workflow summary table without failing the job. Useful 
 jobs:
   lint-commits:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
+    permissions:
+      contents: read
+      pull-requests: read
     with:
       FAIL_ON_ERROR: false
 ```
@@ -110,6 +125,8 @@ on:
 jobs:
   lint-commits:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
+    permissions:
+      contents: read
     with:
       COMMITS_SOURCE: push
 ```

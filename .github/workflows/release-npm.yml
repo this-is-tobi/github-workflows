@@ -76,13 +76,12 @@ on:
         description: Authentication token for the NPM registry
         required: true
 
-permissions:
-  contents: read
-
 jobs:
   publish:
     name: Publish to NPM
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
     steps:
     - name: Checks-out repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

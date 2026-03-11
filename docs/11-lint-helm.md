@@ -48,6 +48,8 @@ The examples illustrate the three main usage modes: running both checks together
 jobs:
   lint-helm:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@v0
+    permissions:
+      contents: read
     with:
       HELM_DOCS_VERSION: 1.14.2
       CT_CONF_PATH: .github/ct.yaml
@@ -77,6 +79,8 @@ Skips `ct lint` entirely and only checks that `helm-docs` output matches committ
 jobs:
   lint-helm-docs-only:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@v0
+    permissions:
+      contents: read
     with:
       CT_CONF_PATH: .github/ct.yaml
       LINT_CHARTS: false
@@ -91,6 +95,8 @@ Runs `ct lint` for chart structure and schema validation but skips the `helm-doc
 jobs:
   lint-helm-charts-only:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@v0
+    permissions:
+      contents: read
     with:
       CT_CONF_PATH: .github/ct.yaml
       LINT_CHARTS: true

@@ -8,14 +8,13 @@ on:
         required: true
         type: string
 
-permissions:
-  pull-requests: write
-  contents: read
-
 jobs:
   label:
     name: Add labels on PR
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
     - name: Checks-out repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

@@ -55,6 +55,7 @@ Dispatches the `update-app-version.yml` workflow in the remote chart repository 
 jobs:
   trigger-chart-update:
     uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
+    permissions: {}
     with:
       RUN_MODE: caller
       WORKFLOW_NAME: update-app-version.yml
@@ -74,6 +75,7 @@ jobs:
 jobs:
   bump-chart-prerelease:
     uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
+    permissions: {}
     with:
       RUN_MODE: caller
       WORKFLOW_NAME: update-app-version.yml
@@ -94,6 +96,9 @@ Runs the version update directly in the current repository without any remote di
 jobs:
   bump-chart:
     uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
+    permissions:
+      contents: write
+      pull-requests: write
     with:
       RUN_MODE: called
       CHART_NAME: my-service

@@ -50,6 +50,8 @@ Auto-detects Vitest and the package manager from project files. Pinning `RUNTIME
 jobs:
   test:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
+    permissions:
+      contents: read
     with:
       RUNTIME_VERSION: "20"
       PACKAGE_MANAGER: "pnpm"
@@ -63,6 +65,8 @@ jobs:
 jobs:
   test:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
+    permissions:
+      contents: read
     with:
       COVERAGE: true
       COVERAGE_REPORTER: "lcov"
@@ -77,6 +81,8 @@ Sets the runtime and package manager to Bun for faster installs and test runs. C
 jobs:
   test:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
+    permissions:
+      contents: read
     with:
       RUNTIME: "bun"
       PACKAGE_MANAGER: "bun"
@@ -91,6 +97,8 @@ jobs:
 jobs:
   test:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
+    permissions:
+      contents: read
     with:
       TEST_COMMAND: "npm run test:unit"
       TIMEOUT: "120000"
@@ -104,6 +112,8 @@ Two parallel jobs each resolve their own dependencies from `WORKING_DIRECTORY`. 
 jobs:
   test-frontend:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
+    permissions:
+      contents: read
     with:
       WORKING_DIRECTORY: "packages/frontend"
       COVERAGE: true
@@ -111,6 +121,8 @@ jobs:
       
   test-backend:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
+    permissions:
+      contents: read
     with:
       WORKING_DIRECTORY: "packages/backend"
       PACKAGE_MANAGER: "pnpm"
@@ -125,6 +137,8 @@ The job always succeeds even when tests fail, but coverage is still collected an
 jobs:
   test:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
+    permissions:
+      contents: read
     with:
       FAIL_ON_ERROR: false
       COVERAGE: true

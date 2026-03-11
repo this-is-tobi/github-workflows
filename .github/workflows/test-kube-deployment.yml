@@ -76,14 +76,13 @@ on:
         type: string
         default: '["ubuntu-24.04"]'
 
-permissions:
-  packages: read
-  contents: read
-
 jobs:
   test-kind:
     name: Test Kind deployment
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      packages: read
+      contents: read
     steps:
     - name: Checks-out repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
