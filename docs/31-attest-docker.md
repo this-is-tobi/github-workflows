@@ -1,6 +1,6 @@
 # `attest-docker.yml`
 
-Generate and attach security attestations (SLSA provenance and/or SBOM) to an already-built Docker image. Designed to run **after** [`build-docker.yml`](./30-build-docker.md).
+Generate and attach security attestations (SLSA provenance and/or SBOM) to an already-built Docker image. Designed to run **after** `build-docker.yml`.
 
 ## Inputs
 

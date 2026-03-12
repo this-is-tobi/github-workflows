@@ -49,14 +49,14 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 - Registry login logic: uses GitHub token for `ghcr.io`, otherwise uses provided credentials via secrets.
 - Digest artifacts are uploaded and merged for multi-arch images.
 - Manifest list is created and pushed after build.
-- The workflow exposes two outputs: `digest` (the SHA256 digest of the pushed manifest) and `image` (the normalized image name). These are designed to be consumed by [`attest-docker.yml`](./31-attest-docker.md) for provenance and SBOM attestations.
+- The workflow exposes two outputs: `digest` (the SHA256 digest of the pushed manifest) and `image` (the normalized image name). These are designed to be consumed by `attest-docker.yml` for provenance and SBOM attestations.
 - Prerelease versions (containing `-alpha`, `-beta`, `-rc`, etc.) are detected and handled appropriately.
 - Short SHA tag is automatically added for traceability.
 - Branch-based tags exclude `main` and `develop` branches.
 - `IMAGE_TARGET` allows targeting a specific stage in a multi-stage Dockerfile; if omitted, the last stage is built.
 - `BUILD_ARGS` accepts a newline-separated list of `KEY=value` pairs passed as Docker build arguments.
 - `CACHE` enables the GitHub Actions cache backend (`type=gha`) to speed up repeated builds, scoped per image name.
-- For **SLSA provenance** and **SBOM attestation**, use the dedicated [`attest-docker.yml`](./31-attest-docker.md) workflow after building. It accepts the `digest` and `image` outputs of this workflow.
+- For **SLSA provenance** and **SBOM attestation**, use the dedicated `attest-docker.yml` workflow after building. It accepts the `digest` and `image` outputs of this workflow.
 
 ## Examples
 
@@ -146,7 +146,7 @@ jobs:
 
 ### Provenance and SBOM attestations
 
-Attestation is now handled by the dedicated [`attest-docker.yml`](./31-attest-docker.md) workflow, called **after** the build. It consumes the `digest` and `image` outputs of `build-docker.yml`. The attestation job scans the final merged image digest with Trivy (SPDX SBOM) and generates SLSA provenance — both signed keylessly via Sigstore and pushed to the registry as OCI referrers. Attestations can be inspected with `docker buildx imagetools inspect <image>` or verified with `gh attestation verify`.
+Attestation is now handled by the dedicated `attest-docker.yml` workflow, called **after** the build. It consumes the `digest` and `image` outputs of `build-docker.yml`. The attestation job scans the final merged image digest with Trivy (SPDX SBOM) and generates SLSA provenance — both signed keylessly via Sigstore and pushed to the registry as OCI referrers. Attestations can be inspected with `docker buildx imagetools inspect <image>` or verified with `gh attestation verify`.
 
 ```yaml
 jobs:
