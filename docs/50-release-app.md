@@ -27,7 +27,7 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 
 | Secret | Description                                           | Required | Default |
 | ------ | ----------------------------------------------------- | -------- | ------- |
-| GH_PAT | GitHub Personal Access Token (required for automerge) | No       | -       |
+| GH_PAT | GitHub Personal Access Token (required for automerge, see [Token setup](#token-setup)) | No       | -       |
 
 ## Outputs
 
@@ -46,6 +46,35 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 | contents      | write  | Create tags/commits and update manifest files     |
 | issues        | write  | Create or update issues opened by release tooling |
 | pull-requests | write  | Create, update, and optionally merge release PRs  |
+
+## Token setup
+
+The `GH_PAT` secret is only required when `AUTOMERGE_PRERELEASE` or `AUTOMERGE_RELEASE` is enabled. It must be a GitHub **Personal Access Token** stored as a repository secret named `GH_PAT` in the repository that runs this workflow.
+
+The automerge step uses `gh pr merge --rebase` with either `--auto` or `--admin`:
+
+- If the repository has **Settings > General > Allow auto-merge** enabled, the workflow uses `--auto` (the PR merges automatically once all required status checks pass).
+- Otherwise, it falls back to `--admin` which force-merges immediately, bypassing branch protection rules.
+
+### Fine-grained PAT (recommended)
+
+Create a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) scoped to the **current repository** with the following permissions:
+
+| Permission    | Access       | Reason                                            |
+| ------------- | ------------ | ------------------------------------------------- |
+| Contents      | Read & Write | Push commits (manifest sync, rebase branch)       |
+| Pull requests | Read & Write | Enable auto-merge on release PRs                  |
+
+> If the repository does **not** have "Allow auto-merge" enabled, the PAT owner must be a **repository admin** for the `--admin` merge to succeed.
+
+### Classic PAT
+
+Alternatively, create a [classic token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic) with the **`repo`** scope.
+
+### Where to store it
+
+Add the token as a **repository secret** named `GH_PAT`:  
+**Settings > Secrets and variables > Actions > New repository secret**
 
 ## Notes
 
