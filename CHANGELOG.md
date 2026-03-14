@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/this-is-tobi/github-workflows/compare/v0.4.0...v0.5.0) (2026-03-14)
+
+
+### Features
+
+* **update-helm-chart:** handle auto-merge in called mode ([eb30659](https://github.com/this-is-tobi/github-workflows/commit/eb30659c176f0c22d0524a4269fdfc9753a0e528))
+
 ## [0.4.0](https://github.com/this-is-tobi/github-workflows/compare/v0.3.0...v0.4.0) (2026-03-11)
 
 
