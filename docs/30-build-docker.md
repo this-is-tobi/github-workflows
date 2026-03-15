@@ -15,6 +15,8 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | IMAGE_TARGET        | string  | Target stage to build in the Dockerfile (builds the last stage if not set)               | No       | -                |
 | BUILD_ARGS          | string  | Newline-separated list of Docker build args (e.g. `MY_ARG=value`)                        | No       | -                |
 | CACHE               | boolean | Enable Docker build cache (uses GitHub Actions cache backend)                            | No       | false            |
+| PROVENANCE          | boolean | Generate SLSA provenance attestation for the image                                       | No       | false            |
+| SBOM                | boolean | Generate SBOM attestation for the image                                                  | No       | false            |
 | BUILD_AMD64         | boolean | Build for amd64                                                                          | No       | true             |
 | BUILD_ARM64         | boolean | Build for arm64                                                                          | No       | true             |
 | USE_QEMU            | boolean | Use QEMU emulator for arm64                                                              | No       | false            |
@@ -36,10 +38,12 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 
 ## Permissions
 
-| Scope    | Access | Description                         |
-| -------- | ------ | ----------------------------------- |
-| packages | write  | Push images to GHCR when applicable |
-| contents | read   | Read repository to build context    |
+| Scope        | Access | Description                                                      |
+| ------------ | ------ | ---------------------------------------------------------------- |
+| packages     | write  | Push images to GHCR when applicable                              |
+| contents     | read   | Read repository to build context                                 |
+| id-token     | write  | Required to sign attestations via OIDC (only if attesting)       |
+| attestations | write  | Required to create GitHub attestations (only if attesting)       |
 
 ## Notes 
 
@@ -56,7 +60,8 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 - `IMAGE_TARGET` allows targeting a specific stage in a multi-stage Dockerfile; if omitted, the last stage is built.
 - `BUILD_ARGS` accepts a newline-separated list of `KEY=value` pairs passed as Docker build arguments.
 - `CACHE` enables the GitHub Actions cache backend (`type=gha`) to speed up repeated builds, scoped per image name.
-- For **SLSA provenance** and **SBOM attestation**, use the dedicated `attest-docker.yml` workflow after building. It accepts the `digest` and `image` outputs of this workflow.
+- When `PROVENANCE` or `SBOM` is enabled, attestation runs as an additional job after the image is built and merged. Internally, this delegates to the `attest-docker.yml` reusable workflow so that attestation logic is maintained in a single place. This is especially useful when using `build-docker.yml` in a **matrix strategy**, where outputs from individual matrix jobs cannot easily be passed to a separate `attest-docker.yml` call. By attesting within the same workflow, each matrix combination attests its own image automatically.
+- The dedicated `attest-docker.yml` workflow can also be called separately after building — this is useful when you need more control over the attestation step or when not using a matrix.
 
 ## Examples
 
@@ -146,7 +151,57 @@ jobs:
 
 ### Provenance and SBOM attestations
 
-Attestation is now handled by the dedicated `attest-docker.yml` workflow, called **after** the build. It consumes the `digest` and `image` outputs of `build-docker.yml`. The attestation job scans the final merged image digest with Trivy (SPDX SBOM) and generates SLSA provenance — both signed keylessly via Sigstore and pushed to the registry as OCI referrers. Attestations can be inspected with `docker buildx imagetools inspect <image>` or verified with `gh attestation verify`.
+Attestation can be enabled directly in the build workflow by setting `PROVENANCE` and/or `SBOM` to `true`. This is particularly convenient when building **multiple images in a matrix**, as each matrix job attests its own image without needing to wire outputs to a separate workflow. Note that the caller must grant the additional `id-token: write` and `attestations: write` permissions.
+
+```yaml
+jobs:
+  build:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ghcr.io/my-org/my-app
+      IMAGE_TAG: ${{ needs.release.outputs.version }}
+      IMAGE_CONTEXT: ./
+      IMAGE_DOCKERFILE: ./Dockerfile
+      LATEST_TAG: true
+      PROVENANCE: true
+      SBOM: true
+```
+
+### Matrix build with built-in attestation
+
+When building multiple images in a matrix, outputs from individual matrix jobs cannot be forwarded to a separate `attest-docker.yml` call. Enabling attestation directly solves this:
+
+```yaml
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+        - image: ghcr.io/my-org/frontend
+          context: ./apps/frontend
+          dockerfile: ./apps/frontend/Dockerfile
+        - image: ghcr.io/my-org/backend
+          context: ./apps/backend
+          dockerfile: ./apps/backend/Dockerfile
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ${{ matrix.image }}
+      IMAGE_TAG: 1.2.3
+      IMAGE_CONTEXT: ${{ matrix.context }}
+      IMAGE_DOCKERFILE: ${{ matrix.dockerfile }}
+      PROVENANCE: true
+      SBOM: true
+```
 
 ```yaml
 jobs:

@@ -57,6 +57,16 @@ on:
         required: false
         default: false
         type: boolean
+      PROVENANCE:
+        description: Generate SLSA provenance attestation for the image
+        required: false
+        default: false
+        type: boolean
+      SBOM:
+        description: Generate SBOM attestation for the image
+        required: false
+        default: false
+        type: boolean
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
@@ -239,3 +249,23 @@ jobs:
     - name: Inspect image
       run: |
         docker buildx imagetools inspect ${{ needs.infos.outputs.normalized-image }}:${{ steps.meta.outputs.version }}
+
+  attest:
+    if: ${{ inputs.PROVENANCE || inputs.SBOM }}
+    needs:
+    - infos
+    - merge
+    uses: this-is-tobi/github-workflows/.github/workflows/attest-docker.yml@v0
+    permissions:
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ${{ needs.infos.outputs.normalized-image }}
+      DIGEST: ${{ needs.merge.outputs.digest }}
+      PROVENANCE: ${{ inputs.PROVENANCE }}
+      SBOM: ${{ inputs.SBOM }}
+      RUNS_ON: ${{ inputs.RUNS_ON }}
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
