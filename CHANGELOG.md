@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/this-is-tobi/github-workflows/compare/v0.5.0...v0.6.0) (2026-03-15)
+
+
+### Features
+
+* **build-docker:** optionally attest images during build ([f6530d4](https://github.com/this-is-tobi/github-workflows/commit/f6530d4b8be66444cc8a9c790f5c9b0f3da88601))
+
 ## [0.5.0](https://github.com/this-is-tobi/github-workflows/compare/v0.4.0...v0.5.0) (2026-03-14)
 
 
