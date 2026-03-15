@@ -53,6 +53,7 @@ For more details, see:
 **Build**
 
 - [Build docker images and push it to a registry (`build-docker.yml`)](./.github/workflows/build-docker.yml)
+- [Generate and attach security attestations to a Docker image (`attest-docker.yml`)](./.github/workflows/attest-docker.yml)
 
 **Scan**
 
@@ -92,6 +93,7 @@ For more details, see:
 - [Test Kube Deployment](./docs/22-test-kube-deployment.md) *- Kubernetes deployment testing with Kind*
 - [Test Playwright](./docs/23-test-playwright.md) *- End-to-end Playwright testing across browsers*
 - [Build Docker](./docs/30-build-docker.md) *- Docker image building and registry pushing*
+- [Attest Docker](./docs/31-attest-docker.md) *- SLSA provenance and SBOM attestations for Docker images*
 - [Scan SonarQube](./docs/40-scan-sonarqube.md) *- Code quality analysis with SonarQube*
 - [Scan Trivy](./docs/41-scan-trivy.md) *- Vulnerability scanning for images and configs*
 - [Release App](./docs/50-release-app.md) *- Application releases using release-please*
