@@ -35,6 +35,7 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) to an al
 - **SBOM**: generates an SPDX SBOM via Trivy, then attests and attaches it to the image in the registry.
 - The image name is automatically normalized (lowercase, `_` replaced with `-`) for OCI registry compatibility.
 - For `ghcr.io`, authentication uses `github.token` automatically; for other registries, provide `REGISTRY_USERNAME` and `REGISTRY_PASSWORD` as secrets.
+- **Alternative**: when using `build-docker.yml` in a **matrix strategy**, outputs from individual matrix jobs cannot be easily forwarded to this workflow. In that case, prefer enabling `PROVENANCE` and/or `SBOM` directly in `build-docker.yml` instead — each matrix job will attest its own image automatically.
 
 ## Examples
 
