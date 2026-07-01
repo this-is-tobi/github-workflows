@@ -8,7 +8,7 @@ Run end-to-end Playwright tests across a dynamic matrix of browsers. Handles Jav
 | ------------------ | ------- | ------------------------------------------------------------------------------------------------ | -------- | ---------------------------------------- |
 | BROWSERS           | string  | Comma-separated browsers to test (`chrome`, `firefox`, `edge`, `electron`)                       | No       | `chrome`                                 |
 | RUNTIME            | string  | JavaScript runtime to use (`node` or `bun`)                                                      | No       | `node`                                   |
-| RUNTIME_VERSION    | string  | Runtime version to install                                                                       | No       | `24`                                     |
+| RUNTIME_VERSION    | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest)         | No       | -                                         |
 | PACKAGE_MANAGER    | string  | Package manager to use (`npm`, `yarn`, `pnpm`, `bun`)                                            | No       | `npm`                                    |
 | WORKING_DIRECTORY  | string  | Working directory for running commands                                                           | No       | `.`                                      |
 | PRE_COMMAND        | string  | Shell command to run before tests (e.g., env setup, build)                                       | No       | -                                        |
@@ -48,7 +48,7 @@ Run end-to-end Playwright tests across a dynamic matrix of browsers. Handles Jav
 
 - **Artifacts** are uploaded **only on failure** to avoid storage waste. Set `ARTIFACT_PATH` to the directory Playwright writes reports/screenshots to. Each browser gets its own artifact named `playwright-report-<browser>`.
 
-- **`pnpm` support** — if `PACKAGE_MANAGER` is `pnpm`, the `pnpm/action-setup` action is run automatically before dependency installation.
+- **`pnpm`/`yarn` support** — if `PACKAGE_MANAGER` is `pnpm` or `yarn`, Corepack is installed and enabled automatically before dependency installation, so the version pinned in `package.json`'s `packageManager` field (if any) is used.
 
 - **PRE_COMMAND** runs after dependency installation and before tests. Use it for build steps, environment setup scripts, or `npx playwright install --with-deps` for bundled browsers.
 

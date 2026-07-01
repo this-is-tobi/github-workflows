@@ -14,10 +14,10 @@ on:
         type: string
         default: "node"
       RUNTIME_VERSION:
-        description: Runtime version to install
+        description: Runtime version to use. Defaults to a sensible version per runtime when left empty (Node.js 24, Bun latest)
         required: false
         type: string
-        default: "24"
+        default: ""
       PACKAGE_MANAGER:
         description: Package manager to use (npm, yarn, pnpm, bun)
         required: false
@@ -67,6 +67,7 @@ jobs:
       contents: read
     outputs:
       browsers: ${{ steps.matrix.outputs.BROWSERS }}
+      runtime-version: ${{ steps.runtime-version.outputs.value }}
     steps:
     - name: Generate browser matrix
       id: matrix
@@ -75,6 +76,23 @@ jobs:
         echo "BROWSERS=$BROWSERS" >> "$GITHUB_OUTPUT"
       env:
         INPUT_BROWSERS: ${{ inputs.BROWSERS }}
+
+    - name: Resolve runtime version
+      id: runtime-version
+      run: |
+        # Use the explicit input if set, otherwise a per-runtime default
+        # (avoids e.g. defaulting Bun to "24", a Node version, when
+        # RUNTIME_VERSION is left unset)
+        if [ -n "${{ inputs.RUNTIME_VERSION }}" ]; then
+          RESOLVED_VERSION="${{ inputs.RUNTIME_VERSION }}"
+        else
+          case "${{ inputs.RUNTIME }}" in
+            bun) RESOLVED_VERSION="latest" ;;
+            *) RESOLVED_VERSION="24" ;;
+          esac
+        fi
+        echo "Resolved runtime version: $RESOLVED_VERSION"
+        echo "value=${RESOLVED_VERSION}" >> $GITHUB_OUTPUT
 
   e2e-tests:
     name: E2E tests (${{ matrix.browser }})
@@ -95,7 +113,7 @@ jobs:
       if: ${{ inputs.RUNTIME == 'node' || inputs.PACKAGE_MANAGER != 'bun' }}
       uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
       with:
-        node-version: ${{ inputs.RUNTIME_VERSION }}
+        node-version: ${{ inputs.RUNTIME == 'node' && needs.infos.outputs.runtime-version || '24' }}
 
     - name: Setup Corepack
       if: ${{ inputs.PACKAGE_MANAGER == 'pnpm' || inputs.PACKAGE_MANAGER == 'yarn' }}
@@ -107,7 +125,7 @@ jobs:
       if: ${{ inputs.RUNTIME == 'bun' }}
       uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
       with:
-        bun-version: ${{ inputs.RUNTIME_VERSION }}
+        bun-version: ${{ needs.infos.outputs.runtime-version }}
 
     - name: Setup Firefox
       if: ${{ matrix.browser == 'firefox' }}

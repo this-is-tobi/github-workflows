@@ -6,7 +6,7 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 
 | Input              | Type    | Description                                     | Required | Default                |
 | ------------------ | ------- | ----------------------------------------------- | -------- | ---------------------- |
-| RUNTIME_VERSION    | string  | Runtime version to use (Node.js or Bun version) | No       | "24"                   |
+| RUNTIME_VERSION    | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest) | No       | ""                   |
 | PACKAGE_MANAGER    | string  | Package manager to use (npm, pnpm, yarn, bun)   | No       | "npm"                  |
 | RUNTIME            | string  | JavaScript runtime to use (node, bun)           | No       | "node"                 |
 | ESLINT_CONFIG      | string  | ESLint config package to use                    | No       | "@antfu/eslint-config" |

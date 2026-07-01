@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       RUNTIME_VERSION:
-        description: Runtime version to use (Node.js or Bun version)
+        description: Runtime version to use. Defaults to a sensible version per runtime when left empty (Node.js 24, Bun latest)
         type: string
         required: false
-        default: "24"
+        default: ""
       PACKAGE_MANAGER:
         description: Package manager to use (npm, pnpm, yarn, bun)
         type: string
@@ -73,6 +73,7 @@ jobs:
     outputs:
       package-manager: ${{ steps.detect.outputs.package-manager }}
       runtime: ${{ steps.detect.outputs.runtime }}
+      runtime-version: ${{ steps.detect.outputs.runtime-version }}
       has-vitest: ${{ steps.detect.outputs.has-vitest }}
       has-tests: ${{ steps.detect.outputs.has-tests }}
       package-file: ${{ steps.detect.outputs.package-file }}
@@ -110,6 +111,20 @@ jobs:
         fi
         echo "Runtime detected: $DETECTED_RUNTIME"
         echo "runtime=${DETECTED_RUNTIME}" >> $GITHUB_OUTPUT
+
+        # Resolve runtime version: use the explicit input if set, otherwise a
+        # per-runtime default (avoids e.g. defaulting Bun to "24", a Node
+        # version, when RUNTIME_VERSION is left unset)
+        if [ -n "${{ inputs.RUNTIME_VERSION }}" ]; then
+          RESOLVED_VERSION="${{ inputs.RUNTIME_VERSION }}"
+        else
+          case "$DETECTED_RUNTIME" in
+            bun) RESOLVED_VERSION="latest" ;;
+            *) RESOLVED_VERSION="24" ;;
+          esac
+        fi
+        echo "Resolved runtime version: $RESOLVED_VERSION"
+        echo "runtime-version=${RESOLVED_VERSION}" >> $GITHUB_OUTPUT
 
         # Check for package.json
         if [ -f "package.json" ]; then
@@ -162,13 +177,13 @@ jobs:
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
       uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
       with:
-        node-version: ${{ inputs.RUNTIME_VERSION }}
+        node-version: ${{ needs.detect-setup.outputs.runtime == 'node' && needs.detect-setup.outputs.runtime-version || '24' }}
 
     - name: Setup Bun
       if: ${{ needs.detect-setup.outputs.runtime == 'bun' }}
       uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
       with:
-        bun-version: ${{ inputs.RUNTIME_VERSION }}
+        bun-version: ${{ needs.detect-setup.outputs.runtime-version }}
 
     - name: Setup Corepack
       if: ${{ needs.detect-setup.outputs.package-manager == 'pnpm' || needs.detect-setup.outputs.package-manager == 'yarn' }}
