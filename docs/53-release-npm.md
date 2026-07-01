@@ -9,7 +9,7 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 | Input             | Type    | Description                                                                                   | Required | Default                      |
 | ----------------- | ------- | --------------------------------------------------------------------------------------------- | -------- | ---------------------------- |
 | RUNTIME           | string  | JavaScript runtime to use (`node` or `bun`)                                                   | No       | `node`                       |
-| RUNTIME_VERSION   | string  | Runtime version to install                                                                    | No       | `24`                         |
+| RUNTIME_VERSION   | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest)      | No       | -                            |
 | PACKAGE_MANAGER   | string  | Package manager to use (`npm`, `yarn`, `pnpm`, `bun`)                                         | No       | `npm`                        |
 | WORKING_DIRECTORY | string  | Working directory for install, build and publish commands                                     | No       | `.`                          |
 | REGISTRY_URL      | string  | NPM registry URL                                                                              | No       | `https://registry.npmjs.org` |
@@ -41,7 +41,7 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 - Authentication uses the `NODE_AUTH_TOKEN` environment variable, set from `NPM_TOKEN`, which is the standard mechanism understood by npm, yarn, pnpm and bun.
 - For the **Node.js** runtime, `actions/setup-node` creates the `.npmrc` auth entry automatically based on `REGISTRY_URL` and `SCOPE`.
 - For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries.
-- **pnpm** is set up automatically via `pnpm/action-setup` when `PACKAGE_MANAGER: pnpm`; no manual install is needed.
+- **pnpm/yarn** are set up automatically via Corepack when `PACKAGE_MANAGER` is `pnpm` or `yarn`; no manual install is needed, and the version pinned in `package.json`'s `packageManager` field (if any) is used.
 - The `yarn` publish step uses `yarn npm publish` (Yarn Berry / v2+).
 - `pnpm publish` is called with `--no-git-checks` to avoid requiring a clean git state in CI.
 - `PRE_COMMAND` runs at the **repo root** with `NODE_AUTH_TOKEN` set — useful for building shared workspace packages before publishing. `BUILD_COMMAND` runs inside `WORKING_DIRECTORY`.
