@@ -42,8 +42,10 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | ------------ | ------ | ---------------------------------------------------------------- |
 | packages     | write  | Push images to GHCR when applicable                              |
 | contents     | read   | Read repository to build context                                 |
-| id-token     | write  | Required to sign attestations via OIDC (only if attesting)       |
-| attestations | write  | Required to create GitHub attestations (only if attesting)       |
+| id-token     | write  | Required to sign attestations via OIDC                           |
+| attestations | write  | Required to create GitHub attestations                           |
+
+> GitHub statically validates permissions against every job declared in a called reusable workflow, including the `attest` job — even when it's skipped at runtime because `PROVENANCE`/`SBOM` are both `false`. Callers must always grant `id-token: write` and `attestations: write`, or the workflow fails to even start with `Error calling workflow ... is only allowed 'attestations: none, id-token: none'`.
 
 ## Notes 
 
@@ -78,6 +80,8 @@ jobs:
     permissions:
       packages: write
       contents: read
+      id-token: write
+      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3
@@ -99,6 +103,8 @@ jobs:
     permissions:
       packages: write
       contents: read
+      id-token: write
+      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: ${{ github.sha }}
@@ -119,6 +125,8 @@ jobs:
     permissions:
       packages: write
       contents: read
+      id-token: write
+      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: pr-${{ github.event.pull_request.number }}
@@ -139,6 +147,8 @@ jobs:
     permissions:
       packages: write
       contents: read
+      id-token: write
+      attestations: write
     with:
       IMAGE_NAME: registry.example.com/my-org/my-image
       IMAGE_TAG: 1.2.3
@@ -210,6 +220,8 @@ jobs:
     permissions:
       packages: write
       contents: read
+      id-token: write
+      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3
