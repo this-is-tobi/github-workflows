@@ -24,10 +24,11 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 
 ## Secrets
 
-| Secret            | Description                                                     | Required |
-| ----------------- | --------------------------------------------------------------- | -------- |
-| REGISTRY_USERNAME | Username used to login into registry (not needed for `ghcr.io`) | No       |
-| REGISTRY_PASSWORD | Password used to login into registry (not needed for `ghcr.io`) | No       |
+| Secret            | Description                                                                                                    | Required |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------| -------- |
+| REGISTRY_USERNAME | Username used to login into registry (not needed for `ghcr.io`)                                                | No       |
+| REGISTRY_PASSWORD | Password used to login into registry (not needed for `ghcr.io`)                                                | No       |
+| BUILD_SECRETS     | Newline-separated `KEY=VALUE` build secrets, exposed to the Dockerfile via BuildKit secret mounts (not ARGs)   | No       |
 
 ## Outputs
 
@@ -61,6 +62,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 - Branch-based tags exclude `main` and `develop` branches.
 - `IMAGE_TARGET` allows targeting a specific stage in a multi-stage Dockerfile; if omitted, the last stage is built.
 - `BUILD_ARGS` accepts a newline-separated list of `KEY=value` pairs passed as Docker build arguments.
+- `BUILD_SECRETS` accepts a newline-separated list of `KEY=value` pairs forwarded to `docker/build-push-action`'s `secrets` input. Unlike `BUILD_ARGS`, these are mounted as files via BuildKit (`RUN --mount=type=secret,id=KEY cat /run/secrets/KEY`) and never persisted in image layers or history — use this instead of `BUILD_ARGS` for tokens/credentials needed only during the build.
 - `CACHE` enables the GitHub Actions cache backend (`type=gha`) to speed up repeated builds, scoped per image name.
 - When `PROVENANCE` or `SBOM` is enabled, attestation runs as an additional job after the image is built and merged. Internally, this delegates to the `attest-docker.yml` reusable workflow so that attestation logic is maintained in a single place. This is especially useful when using `build-docker.yml` in a **matrix strategy**, where outputs from individual matrix jobs cannot easily be passed to a separate `attest-docker.yml` call. By attesting within the same workflow, each matrix combination attests its own image automatically.
 - The dedicated `attest-docker.yml` workflow can also be called separately after building — this is useful when you need more control over the attestation step or when not using a matrix.
@@ -157,6 +159,35 @@ jobs:
     secrets:
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+```
+
+### Passing a build-time secret
+
+For a Dockerfile step that needs a credential only during the build (e.g. fetching private content via a token), use `BUILD_SECRETS` and consume it with a BuildKit secret mount so it never lands in image layers:
+
+```yaml
+jobs:
+  build:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ghcr.io/my-org/my-image
+      IMAGE_TAG: 1.2.3
+      IMAGE_CONTEXT: ./
+      IMAGE_DOCKERFILE: ./Dockerfile
+    secrets:
+      BUILD_SECRETS: |
+        GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+```
+
+```dockerfile
+# In the Dockerfile:
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    my-tool --token "$(cat /run/secrets/GITHUB_TOKEN)"
 ```
 
 ### Provenance and SBOM attestations
