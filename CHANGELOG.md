@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/this-is-tobi/github-workflows/compare/v0.8.0...v0.9.0) (2026-07-02)
+
+
+### Features
+
+* **build-docker:** add BUILD_SECRETS for BuildKit secret mounts ([1588e62](https://github.com/this-is-tobi/github-workflows/commit/1588e6204d68c8a4bab8a6962aada00905538881))
+
 ## [0.8.0](https://github.com/this-is-tobi/github-workflows/compare/v0.7.0...v0.8.0) (2026-07-02)
 
 
