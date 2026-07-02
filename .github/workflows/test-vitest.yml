@@ -80,7 +80,7 @@ jobs:
       test-command: ${{ steps.detect.outputs.test-command }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
     - name: Detect project configuration
       id: detect
@@ -171,17 +171,17 @@ jobs:
     if: ${{ needs.detect-setup.outputs.has-tests == 'true' && needs.detect-setup.outputs.has-vitest == 'true' }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
-      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
         node-version: ${{ needs.detect-setup.outputs.runtime == 'node' && needs.detect-setup.outputs.runtime-version || '24' }}
 
     - name: Setup Bun
       if: ${{ needs.detect-setup.outputs.runtime == 'bun' }}
-      uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version: ${{ needs.detect-setup.outputs.runtime-version }}
 
@@ -286,7 +286,7 @@ jobs:
 
     - name: Upload coverage reports
       if: ${{ inputs.COVERAGE == true && inputs.COVERAGE_REPORTER == 'lcov' }}
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ${{ inputs.COVERAGE_ARTIFACT_NAME }}
         path: ${{ inputs.COVERAGE_ARTIFACT_PATH }}
