@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/this-is-tobi/github-workflows/compare/v0.6.0...v0.7.0) (2026-07-02)
+
+
+### Features
+
+* resolve RUNTIME_VERSION default per-runtime instead of a shared literal ([de22c90](https://github.com/this-is-tobi/github-workflows/commit/de22c90b210aa533618dbb762f64a05c971d4672))
+
+
+### Bug Fixes
+
+* replace pnpm/action-setup with Corepack to avoid version conflicts ([99fd130](https://github.com/this-is-tobi/github-workflows/commit/99fd13006a4e26b0def4c68ec5db54570d7013cc))
+
 ## [0.6.0](https://github.com/this-is-tobi/github-workflows/compare/v0.5.0...v0.6.0) (2026-03-15)
 
 
