@@ -25,22 +25,23 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 
 ## Secrets
 
-| Secret    | Description                               | Required |
-| --------- | ----------------------------------------- | -------- |
-| NPM_TOKEN | Authentication token for the NPM registry | Yes      |
+| Secret    | Description                                                                                       | Required |
+| --------- | -------------------------------------------------------------------------------------------------- | -------- |
+| NPM_TOKEN | Authentication token for the NPM registry. Optional if the registry has trusted publishing (OIDC) configured for the calling workflow - see [Trusted publishing](#trusted-publishing-oidc) below. | No       |
 
 ## Permissions
 
-| Scope    | Access | Description                                      |
-| -------- | ------ | ------------------------------------------------ |
-| contents | read   | Check out the repository                         |
-| packages | write  | Required only when publishing to GitHub Packages |
+| Scope    | Access | Description                                                     |
+| -------- | ------ | ----------------------------------------------------------------|
+| contents | read   | Check out the repository                                        |
+| id-token | write  | Mint the OIDC token used for trusted publishing (npm, pnpm)     |
+| packages | write  | Required only when publishing to GitHub Packages                |
 
 ## Notes
 
 - Authentication uses the `NODE_AUTH_TOKEN` environment variable, set from `NPM_TOKEN`, which is the standard mechanism understood by npm, yarn, pnpm and bun.
 - For the **Node.js** runtime, `actions/setup-node` creates the `.npmrc` auth entry automatically based on `REGISTRY_URL` and `SCOPE`.
-- For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries.
+- For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries. Bun has no OIDC/trusted-publishing support, so `NPM_TOKEN` is required with `RUNTIME: bun`.
 - **pnpm/yarn** are set up automatically via Corepack when `PACKAGE_MANAGER` is `pnpm` or `yarn`; no manual install is needed, and the version pinned in `package.json`'s `packageManager` field (if any) is used.
 - The `yarn` publish step uses `yarn npm publish` (Yarn Berry / v2+).
 - `pnpm publish` is called with `--no-git-checks` to avoid requiring a clean git state in CI.
@@ -49,6 +50,17 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 - `DRY_RUN` appends `--dry-run` to the publish command (all package managers support this flag) to validate packaging without uploading.
 - `FAIL_ON_ERROR: false` sets `continue-on-error: true` on the publish step, useful when some packages in a matrix may already be published.
 - Dependency caches are keyed by package manager, OS, architecture, and the combined hash of all lock files.
+
+### Trusted publishing (OIDC)
+
+npm and pnpm support [trusted publishing](https://docs.npmjs.com/trusted-publishers/): publishing via a short-lived OIDC token instead of a long-lived `NPM_TOKEN`. To use it:
+
+1. On npmjs.com, configure a trusted publisher for the package pointing at your repository and **the entry-point workflow file that GitHub actually triggers** (e.g. `.github/workflows/cd.yml`) — not this reusable `release-npm.yml` file. npm validates the caller workflow that started the run, not any reusable workflow it calls into.
+2. Grant `id-token: write` on the calling job (in your `cd.yml`) — this workflow already requests it internally, but both are required since permissions must be explicit at every level of a reusable-workflow call chain.
+3. Omit the `NPM_TOKEN` secret, or keep passing it as a fallback — npm's CLI (≥ 11.5.1, bundled with Node.js 24+) tries OIDC first and only falls back to a static token if OIDC isn't available.
+4. pnpm's OIDC support is newer and has had regressions in some releases (see [pnpm#11513](https://github.com/pnpm/pnpm/issues/11513)) — pin a known-good `packageManager` version and verify a real publish before relying on it exclusively.
+
+If you switch an existing package from a token-based setup to trusted publishing, remember to update the trusted publisher's registered workflow path whenever you change which file is the actual entry point (e.g. after moving CI/CD to reusable workflows).
 
 ## Examples
 
@@ -62,10 +74,26 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/release-npm.yml@v0
     permissions:
       contents: read
+      id-token: write
     with:
       WORKING_DIRECTORY: .
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+### Trusted publishing (no token)
+
+Once a trusted publisher is configured on npmjs.com for this exact repo and calling workflow file (see [Trusted publishing](#trusted-publishing-oidc)), the `NPM_TOKEN` secret can be dropped entirely — `id-token: write` is all that's needed.
+
+```yaml
+jobs:
+  release-npm:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-npm.yml@v0
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      WORKING_DIRECTORY: .
 ```
 
 ### Monorepo: build shared deps then publish
@@ -78,6 +106,7 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/release-npm.yml@v0
     permissions:
       contents: read
+      id-token: write
     with:
       RUNTIME: bun
       RUNTIME_VERSION: "1.3.10"
@@ -119,6 +148,7 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/release-npm.yml@v0
     permissions:
       contents: read
+      id-token: write
     with:
       TAG: beta
       DRY_RUN: true
@@ -137,6 +167,7 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/release-npm.yml@v0
     permissions:
       contents: read
+      id-token: write
     with:
       PUBLISH_COMMAND: "npx turbo publish --filter=./packages/*"
     secrets:
