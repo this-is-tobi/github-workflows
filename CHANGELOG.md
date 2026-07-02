@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/this-is-tobi/github-workflows/compare/v0.7.0...v0.8.0) (2026-07-02)
+
+
+### Features
+
+* **release-npm:** support OIDC trusted publishing, make NPM_TOKEN optional ([182b3c4](https://github.com/this-is-tobi/github-workflows/commit/182b3c48ab1029d104f15d45be286c51fc28bea5))
+
 ## [0.7.0](https://github.com/this-is-tobi/github-workflows/compare/v0.6.0...v0.7.0) (2026-07-02)
 
 
