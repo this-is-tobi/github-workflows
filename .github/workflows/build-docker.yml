@@ -86,6 +86,12 @@ on:
       REGISTRY_PASSWORD:
         description: Password used to login into registry
         required: false
+      BUILD_SECRETS:
+        description: >-
+          Newline-separated list of build secrets in KEY=VALUE form, exposed to
+          the Dockerfile via BuildKit secret mounts (e.g. RUN --mount=type=secret,id=KEY).
+          Unlike BUILD_ARGS, these are never written to image layers/history.
+        required: false
 
 jobs:
   infos:
@@ -175,6 +181,7 @@ jobs:
         cache-to: ${{ inputs.CACHE && format('type=gha,mode=max,scope={0}', needs.infos.outputs.lower-image) || '' }}
         build-args: |
           ${{ inputs.BUILD_ARGS }}
+        secrets: ${{ secrets.BUILD_SECRETS }}
 
     - name: Export digest
       run: |
