@@ -175,10 +175,10 @@ jobs:
         target: ${{ inputs.IMAGE_TARGET || '' }}
         provenance: false
         sbom: false
-        platforms: ${{ (inputs.BUILD_AMD64 && inputs.BUILD_ARM64 && inputs.USE_QEMU && 'linux/amd64,linux/arm64') || (inputs.BUILD_ARM64 && 'linux/arm64') || (inputs.BUILD_AMD64 && 'linux/amd64') }}
+        platforms: ${{ (inputs.USE_QEMU && ((inputs.BUILD_AMD64 && inputs.BUILD_ARM64 && 'linux/amd64,linux/arm64') || (inputs.BUILD_ARM64 && 'linux/arm64') || 'linux/amd64')) || (matrix.runners == 'ubuntu-24.04-arm' && 'linux/arm64') || 'linux/amd64' }}
         outputs: type=image,name=${{ needs.infos.outputs.normalized-image }},push-by-digest=true,name-canonical=true,push=true
-        cache-from: ${{ inputs.CACHE && format('type=gha,scope={0}', needs.infos.outputs.lower-image) || '' }}
-        cache-to: ${{ inputs.CACHE && format('type=gha,mode=max,scope={0}', needs.infos.outputs.lower-image) || '' }}
+        cache-from: ${{ inputs.CACHE && format('type=gha,scope={0}-{1}', needs.infos.outputs.lower-image, matrix.runners) || '' }}
+        cache-to: ${{ inputs.CACHE && format('type=gha,mode=max,scope={0}-{1}', needs.infos.outputs.lower-image, matrix.runners) || '' }}
         build-args: |
           ${{ inputs.BUILD_ARGS }}
         secrets: ${{ secrets.BUILD_SECRETS }}
@@ -192,7 +192,7 @@ jobs:
     - name: Upload digest
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
-        name: digests-${{ needs.infos.outputs.lower-image }}-${{ (inputs.BUILD_AMD64 && inputs.BUILD_ARM64 && inputs.USE_QEMU && 'multiarch') || (inputs.BUILD_ARM64 && 'arm64') || (inputs.BUILD_AMD64 && 'amd64') }}
+        name: digests-${{ needs.infos.outputs.lower-image }}-${{ (inputs.USE_QEMU && 'multiarch') || (matrix.runners == 'ubuntu-24.04-arm' && 'arm64') || 'amd64' }}
         path: /tmp/digests/${{ needs.infos.outputs.lower-image }}/*
         if-no-files-found: error
         retention-days: 1
