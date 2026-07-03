@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/this-is-tobi/github-workflows/compare/v0.9.0...v0.9.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **build-docker:** build each arch on its native runner when QEMU is disabled ([5d1c3e3](https://github.com/this-is-tobi/github-workflows/commit/5d1c3e339e7bc43297a2cfb29641720c74f76d01))
+
 ## [0.9.0](https://github.com/this-is-tobi/github-workflows/compare/v0.8.0...v0.9.0) (2026-07-02)
 
 
