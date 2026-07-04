@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/this-is-tobi/github-workflows/compare/v0.9.1...v0.9.2) (2026-07-04)
+
+
+### Bug Fixes
+
+* **clean-cache:** catch multi-tag orphans and sweep their platform images ([2472937](https://github.com/this-is-tobi/github-workflows/commit/24729374e207681ba79d99169c4379276c8b020b))
+
 ## [0.9.1](https://github.com/this-is-tobi/github-workflows/compare/v0.9.0...v0.9.1) (2026-07-03)
 
 
