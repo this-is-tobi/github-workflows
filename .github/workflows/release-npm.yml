@@ -255,3 +255,9 @@ jobs:
         ACCESS: ${{ inputs.ACCESS }}
         DRY_RUN: ${{ inputs.DRY_RUN }}
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # bun publish does not read the '_authToken' written to .npmrc by the
+        # 'Configure registry for Bun' step above (confirmed: it works with
+        # plain 'npm publish' against the same .npmrc, but bun reports
+        # "missing authentication" regardless) - it only picks up auth from
+        # this env var (or BUN_CONFIG_TOKEN)
+        NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
