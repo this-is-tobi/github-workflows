@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/this-is-tobi/github-workflows/compare/v0.9.2...v0.9.3) (2026-07-04)
+
+
+### Bug Fixes
+
+* **release-npm:** set NPM_CONFIG_TOKEN for bun publish ([d9337ac](https://github.com/this-is-tobi/github-workflows/commit/d9337ac3113678ccaded19d3c96046275ae8a190))
+
 ## [0.9.2](https://github.com/this-is-tobi/github-workflows/compare/v0.9.1...v0.9.2) (2026-07-04)
 
 
