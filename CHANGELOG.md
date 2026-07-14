@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/this-is-tobi/github-workflows/compare/v0.9.3...v0.10.0) (2026-07-14)
+
+
+### Features
+
+* **attest-docker:** add cosign signing and custom provenance predicate support ([0b1a146](https://github.com/this-is-tobi/github-workflows/commit/0b1a146d700142b994108013905d51faa1b44b66))
+
 ## [0.9.3](https://github.com/this-is-tobi/github-workflows/compare/v0.9.2...v0.9.3) (2026-07-04)
 
 
