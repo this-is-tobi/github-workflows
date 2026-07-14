@@ -21,6 +21,25 @@ on:
         required: false
         default: false
         type: boolean
+      SIGN:
+        description: Sign the image digest with cosign keyless signing
+        required: false
+        default: false
+        type: boolean
+      PROVENANCE_PREDICATE_TYPE:
+        description: >-
+          URI identifying a custom provenance predicate type. When set together with
+          PROVENANCE_PREDICATE, replaces the default auto-generated SLSA build
+          provenance. Ignored if PROVENANCE is false.
+        required: false
+        type: string
+      PROVENANCE_PREDICATE:
+        description: >-
+          JSON content for a custom provenance predicate. When set together with
+          PROVENANCE_PREDICATE_TYPE, replaces the default auto-generated SLSA build
+          provenance. Ignored if PROVENANCE is false.
+        required: false
+        type: string
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
@@ -60,6 +79,15 @@ jobs:
         password: ${{ steps.normalize.outputs.REGISTRY == 'ghcr.io' && github.token || secrets.REGISTRY_PASSWORD }}
         logout: true
 
+    - name: Install Cosign
+      if: ${{ inputs.SIGN }}
+      uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+    - name: Sign image
+      if: ${{ inputs.SIGN }}
+      run: |
+        cosign sign --yes "${{ steps.normalize.outputs.NORMALIZED_IMAGE }}@${{ inputs.DIGEST }}"
+
     - name: Generate SBOM with Trivy
       if: ${{ inputs.SBOM }}
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
@@ -79,11 +107,22 @@ jobs:
         # Avoids requiring the extra `artifact-metadata: write` permission on callers.
         create-storage-record: false
 
+    - name: Write custom provenance predicate
+      if: ${{ inputs.PROVENANCE && inputs.PROVENANCE_PREDICATE != '' }}
+      env:
+        PREDICATE_JSON: ${{ inputs.PROVENANCE_PREDICATE }}
+      run: printf '%s' "$PREDICATE_JSON" > provenance-predicate.json
+
     - name: Attest build provenance
       if: ${{ inputs.PROVENANCE }}
       uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
       with:
         subject-name: ${{ steps.normalize.outputs.NORMALIZED_IMAGE }}
         subject-digest: ${{ inputs.DIGEST }}
+        # Custom predicate takes over when both PROVENANCE_PREDICATE_TYPE and
+        # PROVENANCE_PREDICATE are set, otherwise actions/attest auto-generates
+        # standard SLSA build provenance (both inputs empty -> Provenance mode).
+        predicate-type: ${{ inputs.PROVENANCE_PREDICATE != '' && inputs.PROVENANCE_PREDICATE_TYPE || '' }}
+        predicate-path: ${{ inputs.PROVENANCE_PREDICATE != '' && 'provenance-predicate.json' || '' }}
         push-to-registry: true
         create-storage-record: false
