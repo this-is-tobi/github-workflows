@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/this-is-tobi/github-workflows/compare/v0.10.0...v0.11.0) (2026-07-15)
+
+
+### Features
+
+* **release-npm:** fall back to npm cli for bun trusted publishing ([ccb7e44](https://github.com/this-is-tobi/github-workflows/commit/ccb7e44dbaf7bd13ffe0a99ef2a2cd77f588a4a6))
+
 ## [0.10.0](https://github.com/this-is-tobi/github-workflows/compare/v0.9.3...v0.10.0) (2026-07-14)
 
 
