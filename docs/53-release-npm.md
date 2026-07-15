@@ -41,7 +41,7 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 
 - Authentication uses the `NODE_AUTH_TOKEN` environment variable, set from `NPM_TOKEN`, which is the standard mechanism understood by npm, yarn, pnpm and bun.
 - For the **Node.js** runtime, `actions/setup-node` creates the `.npmrc` auth entry automatically based on `REGISTRY_URL` and `SCOPE`.
-- For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries. Bun has no OIDC/trusted-publishing support, so `NPM_TOKEN` is required with `RUNTIME: bun`.
+- For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries. Bun has no OIDC/trusted-publishing support ([oven-sh/bun#24855](https://github.com/oven-sh/bun/issues/24855)), so when `NPM_TOKEN` is omitted the publish step transparently falls back to the npm CLI, which handles the OIDC exchange — install and build still run with bun.
 - **pnpm/yarn** are set up automatically via Corepack when `PACKAGE_MANAGER` is `pnpm` or `yarn`; no manual install is needed, and the version pinned in `package.json`'s `packageManager` field (if any) is used.
 - The `yarn` publish step uses `yarn npm publish` (Yarn Berry / v2+).
 - `pnpm publish` is called with `--no-git-checks` to avoid requiring a clean git state in CI.
@@ -59,6 +59,7 @@ npm and pnpm support [trusted publishing](https://docs.npmjs.com/trusted-publish
 2. Grant `id-token: write` on the calling job (in your `cd.yml`) — this workflow already requests it internally, but both are required since permissions must be explicit at every level of a reusable-workflow call chain.
 3. Omit the `NPM_TOKEN` secret, or keep passing it as a fallback — npm's CLI (≥ 11.5.1, bundled with Node.js 24+) tries OIDC first and only falls back to a static token if OIDC isn't available.
 4. pnpm's OIDC support is newer and has had regressions in some releases (see [pnpm#11513](https://github.com/pnpm/pnpm/issues/11513)) — pin a known-good `packageManager` version and verify a real publish before relying on it exclusively.
+5. bun has no OIDC support ([oven-sh/bun#24855](https://github.com/oven-sh/bun/issues/24855)): with `PACKAGE_MANAGER: bun` and no `NPM_TOKEN`, this workflow publishes through the npm CLI instead of `bun publish` — no caller change needed beyond dropping the secret.
 
 If you switch an existing package from a token-based setup to trusted publishing, remember to update the trusted publisher's registered workflow path whenever you change which file is the actual entry point (e.g. after moving CI/CD to reusable workflows).
 
