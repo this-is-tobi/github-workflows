@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/this-is-tobi/github-workflows/compare/v0.11.0...v0.12.0) (2026-07-16)
+
+
+### Features
+
+* **attest-docker:** standard SLSA provenance + generic custom predicate ([9e0602f](https://github.com/this-is-tobi/github-workflows/commit/9e0602fd3191ea24b2c95093db52306f55b471b4))
+
 ## [0.11.0](https://github.com/this-is-tobi/github-workflows/compare/v0.10.0...v0.11.0) (2026-07-15)
 
 
