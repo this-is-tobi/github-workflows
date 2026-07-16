@@ -12,7 +12,9 @@ on:
         required: true
         type: string
       PROVENANCE:
-        description: Generate SLSA provenance attestation for the image
+        description: >-
+          Generate GitHub's standard SLSA build provenance attestation for the
+          image (records the calling workflow, repository and commit).
         required: false
         default: false
         type: boolean
@@ -26,18 +28,19 @@ on:
         required: false
         default: false
         type: boolean
-      PROVENANCE_PREDICATE_TYPE:
+      PREDICATE_TYPE:
         description: >-
-          URI identifying a custom provenance predicate type. When set together with
-          PROVENANCE_PREDICATE, replaces the default auto-generated SLSA build
-          provenance. Ignored if PROVENANCE is false.
+          URI identifying the type of a custom in-toto predicate to attach in
+          addition to the standard attestations (e.g. to record upstream
+          source/version for a mirrored image). Must be set together with
+          PREDICATE. Use a URI you control, not the reserved SLSA provenance
+          type 'https://slsa.dev/provenance/v1'.
         required: false
         type: string
-      PROVENANCE_PREDICATE:
+      PREDICATE:
         description: >-
-          JSON content for a custom provenance predicate. When set together with
-          PROVENANCE_PREDICATE_TYPE, replaces the default auto-generated SLSA build
-          provenance. Ignored if PROVENANCE is false.
+          JSON content for the custom in-toto predicate. Must be set together
+          with PREDICATE_TYPE.
         required: false
         type: string
       RUNS_ON:
@@ -107,22 +110,29 @@ jobs:
         # Avoids requiring the extra `artifact-metadata: write` permission on callers.
         create-storage-record: false
 
-    - name: Write custom provenance predicate
-      if: ${{ inputs.PROVENANCE && inputs.PROVENANCE_PREDICATE != '' }}
-      env:
-        PREDICATE_JSON: ${{ inputs.PROVENANCE_PREDICATE }}
-      run: printf '%s' "$PREDICATE_JSON" > provenance-predicate.json
-
     - name: Attest build provenance
       if: ${{ inputs.PROVENANCE }}
+      uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+      with:
+        subject-name: ${{ steps.normalize.outputs.NORMALIZED_IMAGE }}
+        subject-digest: ${{ inputs.DIGEST }}
+        push-to-registry: true
+        # Avoids requiring the extra `artifact-metadata: write` permission on callers.
+        create-storage-record: false
+
+    - name: Write custom predicate
+      if: ${{ inputs.PREDICATE != '' }}
+      env:
+        PREDICATE_JSON: ${{ inputs.PREDICATE }}
+      run: printf '%s' "$PREDICATE_JSON" > custom-predicate.json
+
+    - name: Attest custom predicate
+      if: ${{ inputs.PREDICATE != '' }}
       uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
       with:
         subject-name: ${{ steps.normalize.outputs.NORMALIZED_IMAGE }}
         subject-digest: ${{ inputs.DIGEST }}
-        # Custom predicate takes over when both PROVENANCE_PREDICATE_TYPE and
-        # PROVENANCE_PREDICATE are set, otherwise actions/attest auto-generates
-        # standard SLSA build provenance (both inputs empty -> Provenance mode).
-        predicate-type: ${{ inputs.PROVENANCE_PREDICATE != '' && inputs.PROVENANCE_PREDICATE_TYPE || '' }}
-        predicate-path: ${{ inputs.PROVENANCE_PREDICATE != '' && 'provenance-predicate.json' || '' }}
+        predicate-type: ${{ inputs.PREDICATE_TYPE }}
+        predicate-path: custom-predicate.json
         push-to-registry: true
         create-storage-record: false
