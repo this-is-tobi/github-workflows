@@ -8,11 +8,11 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a
 | ------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- |
 | IMAGE_NAME                | string  | Full image name including registry and path (e.g. `ghcr.io/my-org/my-image`). Normalized automatically.                                               | Yes      | -                |
 | DIGEST                    | string  | Digest of the image to attest (e.g. `sha256:abc123...`). Use the `digest` output of `build-docker.yml`.                                               | Yes      | -                |
-| PROVENANCE                | boolean | Generate a [SLSA](https://slsa.dev/) provenance attestation for the image                                                                             | No       | false            |
+| PROVENANCE                | boolean | Generate GitHub's standard [SLSA](https://slsa.dev/) build provenance attestation (calling workflow, repository and commit)                           | No       | false            |
 | SBOM                      | boolean | Generate an SBOM (Software Bill of Materials) attestation for the image                                                                               | No       | false            |
 | SIGN                      | boolean | Keyless-sign the image digest with [cosign](https://github.com/sigstore/cosign)                                                                       | No       | false            |
-| PROVENANCE_PREDICATE_TYPE | string  | URI identifying a custom provenance predicate type. Set together with `PROVENANCE_PREDICATE` to replace the default auto-generated SLSA build provenance. Ignored if `PROVENANCE` is `false`. | No       | -                |
-| PROVENANCE_PREDICATE      | string  | JSON content for a custom provenance predicate. Set together with `PROVENANCE_PREDICATE_TYPE`. Ignored if `PROVENANCE` is `false`.                    | No       | -                |
+| PREDICATE_TYPE            | string  | URI identifying the type of a custom in-toto predicate to attach **in addition** to the standard attestations. Set together with `PREDICATE`. Use a URI you control (not `https://slsa.dev/provenance/v1`). | No       | -                |
+| PREDICATE                 | string  | JSON content for the custom in-toto predicate. Set together with `PREDICATE_TYPE`.                                                                    | No       | -                |
 | RUNS_ON                   | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                                              | No       | ["ubuntu-24.04"] |
 
 ## Secrets
@@ -34,10 +34,10 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a
 
 - This workflow is designed to be called **after** `build-docker.yml`, using its `digest` and `image` outputs.
 - At least one of `PROVENANCE`, `SBOM`, or `SIGN` must be `true` for the job to perform a useful action.
-- **SLSA Provenance**: generates an attestation conforming to [SLSA level 3](https://slsa.dev/spec/v1.0/levels), attached to the image in the registry.
+- **SLSA Provenance**: `PROVENANCE: true` generates GitHub's standard auto-detected SLSA build provenance (workflow, repo, commit of the calling repository) via [`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance), attached to the image in the registry.
 - **SBOM**: generates an SPDX SBOM via Trivy, then attests and attaches it to the image in the registry.
 - **Signing**: when `SIGN` is `true`, the image digest is keyless-signed with cosign (Sigstore/Fulcio via OIDC), independent of `PROVENANCE`/`SBOM`.
-- **Custom provenance predicate**: by default, `PROVENANCE: true` generates GitHub's standard auto-detected SLSA build provenance (workflow, repo, commit of the calling repository). Set both `PROVENANCE_PREDICATE_TYPE` and `PROVENANCE_PREDICATE` to attach your own predicate instead — useful, for example, to record an upstream source/version that this build actually mirrors, which the auto-generated provenance has no field for.
+- **Custom predicate**: set both `PREDICATE_TYPE` and `PREDICATE` to attach an extra in-toto attestation **alongside** the standard provenance — useful, for example, to record an upstream source/version and architectures that this build mirrors, which the auto-generated provenance has no field for. Use a predicate type URI you control; do **not** reuse the reserved `https://slsa.dev/provenance/v1` type, as GitHub validates its `buildType` against a fixed allowlist and rejects custom values.
 - The image name is automatically normalized (lowercase, `_` replaced with `-`) for OCI registry compatibility.
 - For `ghcr.io`, authentication uses `github.token` automatically; for other registries, provide `REGISTRY_USERNAME` and `REGISTRY_PASSWORD` as secrets.
 - **Alternative**: when using `build-docker.yml` in a **matrix strategy**, outputs from individual matrix jobs cannot be easily forwarded to this workflow. In that case, prefer enabling `PROVENANCE` and/or `SBOM` directly in `build-docker.yml` instead — each matrix job will attest its own image automatically.
@@ -93,7 +93,7 @@ jobs:
       PROVENANCE: true
 ```
 
-### Signing plus a custom provenance predicate
+### Standard provenance plus a custom predicate (e.g. mirror metadata)
 
 ```yaml
 jobs:
@@ -111,8 +111,8 @@ jobs:
       SIGN: true
       SBOM: true
       PROVENANCE: true
-      PROVENANCE_PREDICATE_TYPE: https://slsa.dev/provenance/v1
-      PROVENANCE_PREDICATE: '{"buildDefinition":{"buildType":"https://example.com/mirror","externalParameters":{"upstreamVersion":"1.2.3"},"resolvedDependencies":[{"uri":"git+https://github.com/upstream-org/upstream-repo","digest":{"gitCommit":"v1.2.3"}}]},"runDetails":{"builder":{"id":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}}}'
+      PREDICATE_TYPE: https://my-org.github.io/my-repo/mirror/v1
+      PREDICATE: '{"upstream":{"repository":"upstream-org/upstream-repo","source":"https://github.com/upstream-org/upstream-repo","version":"1.2.3","ref":"v1.2.3"},"mirror":{"architectures":["amd64","arm64"]}}'
 ```
 
 ### With a custom registry
