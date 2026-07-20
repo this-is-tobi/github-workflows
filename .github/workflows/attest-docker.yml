@@ -107,7 +107,9 @@ jobs:
         subject-digest: ${{ inputs.DIGEST }}
         sbom-path: sbom.spdx.json
         push-to-registry: true
-        # Avoids requiring the extra `artifact-metadata: write` permission on callers.
+        # Storage records (linked-artifacts metadata) are only supported for
+        # organization-owned repos and would require `artifact-metadata: write`
+        # on callers. The attestation itself is always persisted regardless.
         create-storage-record: false
 
     - name: Attest build provenance
@@ -117,7 +119,7 @@ jobs:
         subject-name: ${{ steps.normalize.outputs.NORMALIZED_IMAGE }}
         subject-digest: ${{ inputs.DIGEST }}
         push-to-registry: true
-        # Avoids requiring the extra `artifact-metadata: write` permission on callers.
+        # See "Attest SBOM" above for why storage records are disabled.
         create-storage-record: false
 
     - name: Write custom predicate
@@ -135,4 +137,5 @@ jobs:
         predicate-type: ${{ inputs.PREDICATE_TYPE }}
         predicate-path: custom-predicate.json
         push-to-registry: true
+        # See "Attest SBOM" above for why storage records are disabled.
         create-storage-record: false
