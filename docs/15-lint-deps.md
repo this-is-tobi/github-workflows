@@ -26,7 +26,7 @@ The workflow is **command-driven**: it never installs the checkers itself. Your 
 
 ## Notes
 
-- **Auto-detection** (à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): when `PACKAGE_MANAGER`/`RUNTIME` are empty, the package manager is resolved from the corepack `packageManager` field in `package.json` first, then lock files (`bun.lock`/`bun.lockb` → bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn), falling back to npm; the runtime resolves to Bun when the package manager or a lock file says so, else Node.js. Set the inputs explicitly to override. Yarn Berry (`.yarnrc.yml`) installs with `--immutable`, classic with `--frozen-lockfile`.
+- **Auto-detection** (à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): when `PACKAGE_MANAGER`/`RUNTIME` are empty, the workflow walks upward from `WORKING_DIRECTORY` to the checkout root, checking at each level for the corepack `packageManager` field in `package.json` first, then lock files (`bun.lock`/`bun.lockb` → bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `package-lock.json` → npm), falling back to npm if nothing is found anywhere up to the root. This means a job scoped to a monorepo sub-package still detects the package manager from the workspace root's lock file. The runtime resolves to Bun when the detected package manager is bun, else Node.js. Set the inputs explicitly to override. Yarn Berry (`.yarnrc.yml`) installs with `--immutable`, classic with `--frozen-lockfile`.
 - **Command-driven, not tool-pinned**: the workflow never installs knip/publint — the consumer's repo owns those as pinned devDependencies, so versions stay reproducible and the workflow works with any monorepo orchestrator.
 - **Empty command = skip**: leave `KNIP_COMMAND` or `PUBLINT_COMMAND` empty to run only the other one. Passing neither runs install (and any `PRE_COMMAND`) and nothing else.
 - **publint needs a build**: publint inspects the published `dist`/types. Either point `PUBLINT_COMMAND` at a task that builds first (e.g. a turbo target with `dependsOn: [build]`) or pass `PRE_COMMAND: <build>` so the artifacts exist before the check runs.
@@ -87,7 +87,7 @@ jobs:
 
 ### Monorepo with working directory
 
-Runs the checks scoped to a single package. `PACKAGE_MANAGER` is pinned because detection only inspects the job's `WORKING_DIRECTORY`, and in a workspace monorepo the lock file lives at the repository root — a sub-directory has nothing to detect.
+Runs the checks scoped to a single package. `PACKAGE_MANAGER` is left unset: detection walks up from `apps/api` to the repository root and finds the workspace's lock file there.
 
 ```yaml
 jobs:
@@ -97,7 +97,6 @@ jobs:
       contents: read
     with:
       WORKING_DIRECTORY: apps/api
-      PACKAGE_MANAGER: pnpm
       KNIP_COMMAND: pnpm exec knip
       PUBLINT_COMMAND: pnpm exec publint
 ```

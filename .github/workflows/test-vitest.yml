@@ -90,44 +90,64 @@ jobs:
         RUNTIME_INPUT: ${{ inputs.RUNTIME }}
         VERSION_INPUT: ${{ inputs.RUNTIME_VERSION }}
       run: |
-        has_bun_lock() { [ -f bun.lockb ] || [ -f bun.lock ]; }
+        # Find the package manager by walking from the working directory up
+        # to the checkout root - the same resolution npm/pnpm/yarn/bun
+        # workspaces (and @antfu/ni) use, so a job scoped to a sub-package
+        # still finds the workspace root's lock file or 'packageManager'
+        # field. The closest directory with a signal wins.
+        detect_pm_at() {
+          local dir="$1"
+          if [ -f "$dir/package.json" ]; then
+            local field
+            field=$(jq -r '.packageManager // empty' "$dir/package.json" 2>/dev/null | cut -d@ -f1 || true)
+            if [ -n "$field" ]; then echo "$field"; return 0; fi
+          fi
+          if [ -f "$dir/bun.lockb" ] || [ -f "$dir/bun.lock" ]; then echo "bun"; return 0; fi
+          if [ -f "$dir/pnpm-lock.yaml" ]; then echo "pnpm"; return 0; fi
+          if [ -f "$dir/yarn.lock" ]; then echo "yarn"; return 0; fi
+          if [ -f "$dir/package-lock.json" ]; then echo "npm"; return 0; fi
+          return 1
+        }
 
-        # Detect package manager. Precedence mirrors @antfu/ni: an explicit
-        # input wins, then the corepack 'packageManager' field in package.json,
-        # then lock files, and finally npm as a last resort.
+        walk_pm() {
+          local dir root depth found
+          dir=$(pwd -P)
+          root=$(cd "${GITHUB_WORKSPACE:-/}" 2>/dev/null && pwd -P || echo /)
+          depth=0
+          while [ "$depth" -lt 30 ]; do
+            if found=$(detect_pm_at "$dir"); then
+              echo "$found"
+              return 0
+            fi
+            if [ "$dir" = "$root" ] || [ "$dir" = "/" ]; then
+              break
+            fi
+            dir=$(dirname "$dir")
+            depth=$((depth + 1))
+          done
+          echo "npm"
+        }
+
+        # Resolve package manager: an explicit input wins, otherwise walk_pm
         if [ -n "$PM_INPUT" ]; then
           DETECTED_PM="$PM_INPUT"
         else
-          PM_FIELD=""
-          if [ -f package.json ]; then
-            PM_FIELD=$(jq -r '.packageManager // empty' package.json 2>/dev/null | cut -d@ -f1 || true)
-          fi
-          if [ -n "$PM_FIELD" ]; then
-            DETECTED_PM="$PM_FIELD"
-          elif has_bun_lock; then
-            DETECTED_PM="bun"
-          elif [ -f pnpm-lock.yaml ]; then
-            DETECTED_PM="pnpm"
-          elif [ -f yarn.lock ]; then
-            DETECTED_PM="yarn"
-          else
-            DETECTED_PM="npm"
-          fi
+          DETECTED_PM=$(walk_pm)
         fi
         echo "Package manager detected: $DETECTED_PM"
-        echo "package-manager=${DETECTED_PM}" >> $GITHUB_OUTPUT
+        echo "package-manager=${DETECTED_PM}" >> "$GITHUB_OUTPUT"
 
-        # Detect runtime: explicit input wins, else Bun when the package
-        # manager or a lock file says so, otherwise Node.js.
+        # Detect runtime: explicit input wins, else Bun when the resolved
+        # package manager is bun, otherwise Node.js.
         if [ -n "$RUNTIME_INPUT" ]; then
           DETECTED_RUNTIME="$RUNTIME_INPUT"
-        elif [ "$DETECTED_PM" = "bun" ] || has_bun_lock; then
+        elif [ "$DETECTED_PM" = "bun" ]; then
           DETECTED_RUNTIME="bun"
         else
           DETECTED_RUNTIME="node"
         fi
         echo "Runtime detected: $DETECTED_RUNTIME"
-        echo "runtime=${DETECTED_RUNTIME}" >> $GITHUB_OUTPUT
+        echo "runtime=${DETECTED_RUNTIME}" >> "$GITHUB_OUTPUT"
 
         # Resolve runtime version: use the explicit input if set, otherwise a
         # per-runtime default (avoids e.g. defaulting Bun to "24", a Node

@@ -28,8 +28,8 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 - **Multi-Package Manager Support**: Supports npm, pnpm, yarn, and bun package managers.
 - **Auto-Configuration**: Automatically installs and configures `@antfu/eslint-config` if no ESLint config exists.
 - **File Type Support**: Lints JavaScript, TypeScript, JSON, JSONC, Markdown, and YAML files.
-- **Package Manager Detection** (à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): an explicit `PACKAGE_MANAGER` wins; otherwise the corepack `packageManager` field in `package.json` is read first, then lock files (`bun.lockb`/`bun.lock` → Bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → Yarn), falling back to npm.
-- **Runtime Detection**: an explicit `RUNTIME` wins; otherwise Bun when the detected package manager or a bun lock file says so, else Node.js.
+- **Package Manager Detection** (à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): an explicit `PACKAGE_MANAGER` wins; otherwise the workflow walks upward from `WORKING_DIRECTORY` to the checkout root — the same resolution npm/pnpm/yarn/bun workspaces themselves use — checking at each level for the corepack `packageManager` field in `package.json` first, then lock files (`bun.lockb`/`bun.lock` → Bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → Yarn, `package-lock.json` → npm). The closest directory with a signal wins, falling back to npm if nothing is found anywhere up to the root. This means a job scoped to a monorepo sub-package (`WORKING_DIRECTORY: packages/frontend`) still detects the package manager from the workspace root's lock file.
+- **Runtime Detection**: an explicit `RUNTIME` wins; otherwise Bun when the detected package manager is bun, else Node.js.
 - **Yarn Berry**: when a `.yarnrc.yml` is present the install uses `--immutable`; classic Yarn uses `--frozen-lockfile`.
 - **ESLint Config Detection**: Checks for existing ESLint config files, creates `eslint.config.js` with `@antfu/eslint-config` if none found.
 - The workflow creates a temporary ESLint configuration using `@antfu/eslint-config` if no configuration is detected.
@@ -89,7 +89,7 @@ jobs:
 
 ### Monorepo with working directory
 
-Runs one lint job per package in parallel, each scoped to its own `WORKING_DIRECTORY` and `LINT_PATHS`. A monorepo uses a **single** package manager, so both jobs pin the same one (`pnpm` here).
+Runs one lint job per package in parallel, each scoped to its own `WORKING_DIRECTORY` and `LINT_PATHS`. Neither job sets `PACKAGE_MANAGER`: detection walks up from `packages/frontend`/`packages/backend` to the repository root and finds the single lock file that a monorepo's workspace keeps there.
 
 ```yaml
 jobs:
@@ -99,7 +99,6 @@ jobs:
       contents: read
     with:
       WORKING_DIRECTORY: packages/frontend
-      PACKAGE_MANAGER: pnpm
       LINT_PATHS: src components
 
   lint-backend:
@@ -108,11 +107,10 @@ jobs:
       contents: read
     with:
       WORKING_DIRECTORY: packages/backend
-      PACKAGE_MANAGER: pnpm
       LINT_PATHS: "src,tests"
 ```
 
-> `PACKAGE_MANAGER` is set explicitly because detection only inspects the job's `WORKING_DIRECTORY`, and in a workspace monorepo the lock file lives at the repository root — a sub-directory has nothing to detect. The simpler alternative is a single job at the root (`WORKING_DIRECTORY: .`, detection works) that lints every package — see the [monorepo CI example](./90-global-workflows-examples.md#monorepo-app).
+> Pin `PACKAGE_MANAGER` explicitly only if a sub-package genuinely uses a different package manager than the rest of the repository (uncommon), or ships its own lock file that should take precedence over the workspace root's. An even simpler alternative for most monorepos is a single job at the root (`WORKING_DIRECTORY: .`) that lints every package in one pass — see the [monorepo CI example](./90-global-workflows-examples.md#monorepo-app).
 
 ### Non-blocking linting
 
