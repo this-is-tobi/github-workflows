@@ -19,7 +19,7 @@ jobs:
       pull-requests: write
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
     with:
-      SONAR_URL: 'https://sonarqube.example.com'
+      SONAR_URL: "https://sonarqube.example.com"
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
@@ -51,11 +51,13 @@ For more details, see:
 
 - [Test Helm charts installation with chart-testing (`test-helm.yml`)](../.github/workflows/test-helm.yml)
 - [Test JavaScript/Typescript codebase using Vitest (`test-vitest.yml`)](../.github/workflows/test-vitest.yml)
+- [Test Kubernetes deployments in an ephemeral Kind cluster (`test-kube-deployment.yml`)](../.github/workflows/test-kube-deployment.yml)
+- [Run end-to-end Playwright tests across a browser matrix (`test-playwright.yml`)](../.github/workflows/test-playwright.yml)
 
-**Build & Attest**
+**Build**
 
 - [Build docker images and push it to a registry (`build-docker.yml`)](../.github/workflows/build-docker.yml)
-- [Attest a container image with SLSA provenance and/or SBOM (`attest-docker.yml`)](../.github/workflows/attest-docker.yml)
+- [Generate and attach security attestations to a Docker image (`attest-docker.yml`)](../.github/workflows/attest-docker.yml)
 
 **Scan**
 
@@ -66,11 +68,13 @@ For more details, see:
 
 - [Release Apps using release-please and optional automerge (`release-app.yml`)](../.github/workflows/release-app.yml)
 - [Release Helm charts using chart-releaser (`release-helm.yml`)](../.github/workflows/release-helm.yml)
+- [Publish packages to any NPM-compatible registry (`release-npm.yml`)](../.github/workflows/release-npm.yml)
 - [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](../.github/workflows/update-helm-chart.yml)
 
 **Deploy**
 
 - [Post preview links and optionally redeploy an ArgoCD preview app (`argocd-preview.yml`)](../.github/workflows/argocd-preview.yml)
+- [Post or update a PR comment with preview environment URLs (`preview-comment.yml`)](../.github/workflows/preview-comment.yml)
 
 **Utility**
 

@@ -4,16 +4,16 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 
 ## Inputs
 
-| Input              | Type    | Description                                     | Required | Default                |
-| ------------------ | ------- | ----------------------------------------------- | -------- | ---------------------- |
-| RUNTIME_VERSION    | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest) | No       | ""                   |
-| PACKAGE_MANAGER    | string  | Package manager to use (npm, pnpm, yarn, bun)   | No       | "npm"                  |
-| RUNTIME            | string  | JavaScript runtime to use (node, bun)           | No       | "node"                 |
-| ESLINT_CONFIG      | string  | ESLint config package to use                    | No       | "@antfu/eslint-config" |
-| WORKING_DIRECTORY  | string  | Working directory for the project               | No       | "."                    |
-| LINT_PATHS         | string  | Paths to lint (space or comma-separated)        | No       | "."                    |
-| ESLINT_CONFIG_FILE | string  | Path to custom ESLint config file               | No       | ""                     |
-| FAIL_ON_ERROR      | boolean | Whether to fail the workflow on linting errors  | No       | true                   |
+| Input              | Type    | Description                                                                              | Required | Default                |
+| ------------------ | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------------- |
+| RUNTIME_VERSION    | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest) | No       | ""                     |
+| PACKAGE_MANAGER    | string  | Package manager to use (npm, pnpm, yarn, bun)                                            | No       | "npm"                  |
+| RUNTIME            | string  | JavaScript runtime to use (node, bun)                                                    | No       | "node"                 |
+| ESLINT_CONFIG      | string  | ESLint config package to use                                                             | No       | "@antfu/eslint-config" |
+| WORKING_DIRECTORY  | string  | Working directory for the project                                                        | No       | "."                    |
+| LINT_PATHS         | string  | Paths to lint (comma- or space-separated)                                                | No       | "."                    |
+| ESLINT_CONFIG_FILE | string  | Path to custom ESLint config file                                                        | No       | ""                     |
+| FAIL_ON_ERROR      | boolean | Whether to fail the workflow on linting errors                                           | No       | true                   |
 
 ## Permissions
 
@@ -34,6 +34,7 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 - The workflow creates a temporary ESLint configuration using `@antfu/eslint-config` if no configuration is detected.
 - The default configuration enables linting for JS, TS, JSON, JSONC, YAML, and Markdown files.
 - Custom ESLint configurations take precedence over the auto-generated one.
+- **ESLINT_CONFIG must be antfu-compatible**: When no ESLint config exists, the workflow auto-generates an `eslint.config.js` that imports the package specified by `ESLINT_CONFIG` (defaulting to `@antfu/eslint-config`) as the `antfu` export and passes antfu-specific options. A non-antfu-compatible config package passed via `ESLINT_CONFIG` would fail to load.
 
 ## Examples
 
@@ -51,8 +52,8 @@ jobs:
       contents: read
     with:
       RUNTIME_VERSION: "18"
-      PACKAGE_MANAGER: "pnpm"
-      LINT_PATHS: "src tests"
+      PACKAGE_MANAGER: pnpm
+      LINT_PATHS: src tests
 ```
 
 ### Bun runtime
@@ -66,8 +67,8 @@ jobs:
     permissions:
       contents: read
     with:
-      RUNTIME: "bun"
-      PACKAGE_MANAGER: "bun"
+      RUNTIME: bun
+      PACKAGE_MANAGER: bun
       LINT_PATHS: "src,tests,docs"
 ```
 
@@ -83,7 +84,7 @@ jobs:
       contents: read
     with:
       ESLINT_CONFIG: "@company/eslint-config"
-      LINT_PATHS: "apps packages"
+      LINT_PATHS: apps packages
 ```
 
 ### Monorepo with working directory
@@ -97,16 +98,16 @@ jobs:
     permissions:
       contents: read
     with:
-      WORKING_DIRECTORY: "packages/frontend"
-      LINT_PATHS: "src components"
-      
+      WORKING_DIRECTORY: packages/frontend
+      LINT_PATHS: src components
+
   lint-backend:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-js.yml@v0
     permissions:
       contents: read
     with:
-      WORKING_DIRECTORY: "packages/backend"
-      PACKAGE_MANAGER: "pnpm"
+      WORKING_DIRECTORY: packages/backend
+      PACKAGE_MANAGER: pnpm
       LINT_PATHS: "src,tests"
 ```
 
@@ -122,7 +123,7 @@ jobs:
       contents: read
     with:
       FAIL_ON_ERROR: false
-      LINT_PATHS: "src tests docs"
+      LINT_PATHS: src tests docs
 ```
 
 ### Custom config file
@@ -136,6 +137,6 @@ jobs:
     permissions:
       contents: read
     with:
-      ESLINT_CONFIG_FILE: ".eslintrc.custom.js"
+      ESLINT_CONFIG_FILE: .eslintrc.custom.js
       LINT_PATHS: "apps,packages,tools"
 ```

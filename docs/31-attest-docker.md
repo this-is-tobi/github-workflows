@@ -4,16 +4,16 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a
 
 ## Inputs
 
-| Input                     | Type    | Description                                                                                                                                        | Required | Default          |
-| ------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- |
-| IMAGE_NAME                | string  | Full image name including registry and path (e.g. `ghcr.io/my-org/my-image`). Normalized automatically.                                               | Yes      | -                |
-| DIGEST                    | string  | Digest of the image to attest (e.g. `sha256:abc123...`). Use the `digest` output of `build-docker.yml`.                                               | Yes      | -                |
-| PROVENANCE                | boolean | Generate GitHub's standard [SLSA](https://slsa.dev/) build provenance attestation (calling workflow, repository and commit)                           | No       | false            |
-| SBOM                      | boolean | Generate an SBOM (Software Bill of Materials) attestation for the image                                                                               | No       | false            |
-| SIGN                      | boolean | Keyless-sign the image digest with [cosign](https://github.com/sigstore/cosign)                                                                       | No       | false            |
-| PREDICATE_TYPE            | string  | URI identifying the type of a custom in-toto predicate to attach **in addition** to the standard attestations. Set together with `PREDICATE`. Use a URI you control (not `https://slsa.dev/provenance/v1`). | No       | -                |
-| PREDICATE                 | string  | JSON content for the custom in-toto predicate. Set together with `PREDICATE_TYPE`.                                                                    | No       | -                |
-| RUNS_ON                   | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                                              | No       | ["ubuntu-24.04"] |
+| Input          | Type    | Description                                                                                                                                                                                                 | Required | Default          |
+| -------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- |
+| IMAGE_NAME     | string  | Full image name including registry and path (e.g. `ghcr.io/my-org/my-image`). Normalized automatically.                                                                                                     | Yes      | -                |
+| DIGEST         | string  | Digest of the image to attest (e.g. `sha256:abc123...`). Use the `digest` output of `build-docker.yml`.                                                                                                     | Yes      | -                |
+| PROVENANCE     | boolean | Generate GitHub's standard [SLSA](https://slsa.dev/) build provenance attestation (calling workflow, repository and commit)                                                                                 | No       | false            |
+| SBOM           | boolean | Generate an SBOM (Software Bill of Materials) attestation for the image                                                                                                                                     | No       | false            |
+| SIGN           | boolean | Keyless-sign the image digest with [cosign](https://github.com/sigstore/cosign)                                                                                                                             | No       | false            |
+| PREDICATE_TYPE | string  | URI identifying the type of a custom in-toto predicate to attach **in addition** to the standard attestations. Set together with `PREDICATE`. Use a URI you control (not `https://slsa.dev/provenance/v1`). | No       | -                |
+| PREDICATE      | string  | JSON content for the custom in-toto predicate. Set together with `PREDICATE_TYPE`.                                                                                                                          | No       | -                |
+| RUNS_ON        | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                                                                                                    | No       | ["ubuntu-24.04"] |
 
 ## Secrets
 
@@ -33,11 +33,11 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a
 ## Notes
 
 - This workflow is designed to be called **after** `build-docker.yml`, using its `digest` and `image` outputs.
-- At least one of `PROVENANCE`, `SBOM`, or `SIGN` must be `true` for the job to perform a useful action.
+- At least one of `PROVENANCE`, `SBOM`, `SIGN`, or a custom predicate (both `PREDICATE` and `PREDICATE_TYPE` set) must be provided for the job to perform a useful action.
 - **SLSA Provenance**: `PROVENANCE: true` generates GitHub's standard auto-detected SLSA build provenance (workflow, repo, commit of the calling repository) via [`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance), attached to the image in the registry.
 - **SBOM**: generates an SPDX SBOM via Trivy, then attests and attaches it to the image in the registry.
 - **Signing**: when `SIGN` is `true`, the image digest is keyless-signed with cosign (Sigstore/Fulcio via OIDC), independent of `PROVENANCE`/`SBOM`.
-- **Custom predicate**: set both `PREDICATE_TYPE` and `PREDICATE` to attach an extra in-toto attestation **alongside** the standard provenance — useful, for example, to record an upstream source/version and architectures that this build mirrors, which the auto-generated provenance has no field for. Use a predicate type URI you control; do **not** reuse the reserved `https://slsa.dev/provenance/v1` type, as GitHub validates its `buildType` against a fixed allowlist and rejects custom values.
+- **Custom predicate**: set both `PREDICATE_TYPE` and `PREDICATE` together to attach an extra in-toto attestation **alongside** the standard provenance — useful, for example, to record an upstream source/version and architectures that this build mirrors, which the auto-generated provenance has no field for. Omitting either input while providing the other causes a fast-fail error. Use a predicate type URI you control; do **not** reuse the reserved `https://slsa.dev/provenance/v1` type, as GitHub validates its `buildType` against a fixed allowlist and rejects custom values.
 - The image name is automatically normalized (lowercase, `_` replaced with `-`) for OCI registry compatibility.
 - For `ghcr.io`, authentication uses `github.token` automatically; for other registries, provide `REGISTRY_USERNAME` and `REGISTRY_PASSWORD` as secrets.
 - **Alternative**: when using `build-docker.yml` in a **matrix strategy**, outputs from individual matrix jobs cannot be easily forwarded to this workflow. In that case, prefer enabling `PROVENANCE` and/or `SBOM` directly in `build-docker.yml` instead — each matrix job will attest its own image automatically.

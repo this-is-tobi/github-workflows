@@ -19,7 +19,6 @@ Delete GitHub Actions caches related to a PR/branch and optionally delete a sing
 | Scope    | Access | Description                                        |
 | -------- | ------ | -------------------------------------------------- |
 | packages | write  | Required to delete GHCR container package versions |
-| contents | read   | Read repository contents                           |
 | actions  | write  | Manage Actions caches via cache API                |
 
 ## Notes
@@ -27,7 +26,7 @@ Delete GitHub Actions caches related to a PR/branch and optionally delete a sing
 - Cache deletion logic picks `BRANCH_NAME` if provided; otherwise derives a PR ref from `PR_NUMBER`.
 - Use `CLEAN_GH_CACHE`, `CLEAN_GHCR_IMAGE`, and `CLEAN_ORPHANED_GHCR_IMAGE` to control which cleanup operations run.
 - Image deletion job (`cleanup-image`) only runs when `CLEAN_GHCR_IMAGE: true` and `IMAGE` is supplied.
-- Orphaned image cleanup (`cleanup-orphaned-image`) deletes SHA-only tagged images (7-character hex digests) when `CLEAN_ORPHANED_GHCR_IMAGE: true`.
+- Orphaned image cleanup (`cleanup-orphaned-image`) deletes SHA-only tagged images (7–40 character hex SHAs) when `CLEAN_ORPHANED_GHCR_IMAGE: true`.
 - Multi-arch manifest cleanup is handled automatically when deleting images.
 - Uses GitHub CLI (`gh`) for improved API interactions and error handling.
 - `IMAGE` must include a tag (e.g. `ghcr.io/my-org/my-image:pr-123`); images are deleted via the GitHub Packages API.
@@ -56,7 +55,7 @@ jobs:
 
 ### Clean orphaned SHA-only images
 
-Removes all GHCR image versions tagged only with a 7-character hex SHA — leftover build artifacts from deleted branches. `CLEAN_GH_CACHE: false` skips cache deletion so only registry cleanup runs. Provide the image name without a tag; the workflow discovers and deletes all matching SHA-only versions.
+Removes all GHCR image versions tagged only with a 7–40 character hex SHA — leftover build artifacts from deleted branches. `CLEAN_GH_CACHE: false` skips cache deletion so only registry cleanup runs. Provide the image name without a tag; the workflow discovers and deletes all matching SHA-only versions.
 
 ```yaml
 jobs:

@@ -22,11 +22,10 @@ Comprehensive Helm chart validation with two parallel jobs: chart structure lint
 
 - **Two conditional jobs for flexible validation:**
   - **`lint-charts`**: Uses `helm/chart-testing-action` with `ct lint` to validate chart structure, syntax, dependencies, best practices, and version increment requirements. Runs only if `LINT_CHARTS=true`.
-  - **`lint-docs`**: Uses `jnorwood/helm-docs` with `--validate` flag to ensure documentation matches current chart configuration without making changes. Runs only if `LINT_DOCS=true`.
+  - **`lint-docs`**: Uses `jnorwood/helm-docs` with a read-only volume mount of the charts directory. If committed documentation is out of date, helm-docs' attempt to regenerate files fails against the read-only mount, causing the job to fail. Runs only if `LINT_DOCS=true`.
 - Set `LINT_CHARTS=false` to skip chart structure validation (useful for docs-only changes).
 - Set `LINT_DOCS=false` to skip documentation validation (useful for chart logic changes without doc updates).
 - Chart-testing requires a configuration file (typically `.github/ct.yaml`) to define linting rules, target branch, chart directories, and validation options.
-- Documentation validation mounts `./charts` read-only and exits non-zero if generated docs would differ from committed files.
 - Jobs run independently when both are enabled; workflow succeeds if all enabled jobs pass.
 - Consider pinning Docker images by digest for stronger supply-chain guarantees if stability is critical.
 - When you modify `Chart.yaml`, `values.yaml`, or templates that affect documentation, regenerate the docs locally:
@@ -34,7 +33,7 @@ Comprehensive Helm chart validation with two parallel jobs: chart structure lint
   docker run --rm \
     -v "$(pwd)/charts:/helm-docs" \
     -u $(id -u) \
-    docker.io/jnorwood/helm-docs:1.14.2
+    docker.io/jnorwood/helm-docs:v1.14.2
   ```
   Then review and commit the updated `README.md` under `charts/<chart-name>/`. After committing, the `lint-docs` job should pass again.
 
@@ -51,7 +50,7 @@ jobs:
     permissions:
       contents: read
     with:
-      HELM_DOCS_VERSION: 1.14.2
+      HELM_DOCS_VERSION: v1.14.2
       CT_CONF_PATH: .github/ct.yaml
 ```
 
@@ -61,14 +60,14 @@ Example chart-testing configuration (`.github/ct.yaml`):
 # See https://github.com/helm/chart-testing/blob/main/doc/ct_lint.md
 target-branch: main
 chart-dirs:
-  - charts
+- charts
 helm-extra-args: --timeout 600s
 check-version-increment: true
 validate-maintainers: false
 excluded-charts:
-  - unstable-chart
+- unstable-chart
 chart-repos:
-  - bitnami=https://charts.bitnami.com/bitnami
+- bitnami=https://charts.bitnami.com/bitnami
 ```
 
 ### Docs-only validation

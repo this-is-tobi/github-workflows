@@ -17,10 +17,10 @@ Run SonarQube static analysis and check the quality gate. The workflow optionall
 
 ## Secrets
 
-| Secret            | Description                      | Required | Default |
-| ----------------- | -------------------------------- | -------- | ------- |
-| SONAR_TOKEN       | SonarQube token                  | Yes      | -       |
-| SONAR_PROJECT_KEY | SonarQube project identifier key | Yes      | -       |
+| Secret            | Description                      | Required |
+| ----------------- | -------------------------------- | -------- |
+| SONAR_TOKEN       | SonarQube token                  | Yes      |
+| SONAR_PROJECT_KEY | SonarQube project identifier key | Yes      |
 
 ## Permissions
 
@@ -32,7 +32,8 @@ Run SonarQube static analysis and check the quality gate. The workflow optionall
 
 ## Notes
 
-- When `COVERAGE_IMPORT` is `true` the workflow downloads the artifact using `COVERAGE_ARTIFACT_NAME` into `COVERAGE_ARTIFACT_PATH` before running the SonarQube scan; when `COVERAGE_IMPORT` is `false` no download is attempted. For pull requests, it passes PR decoration args; otherwise it analyzes the current branch. Default sources are `apps,packages`; override or extend via `SONAR_EXTRA_ARGS` (e.g., `-Dsonar.sources=.`).
+- When `COVERAGE_IMPORT` is `true` the workflow downloads the artifact using `COVERAGE_ARTIFACT_NAME` into `COVERAGE_ARTIFACT_PATH` before running the SonarQube scan; when `COVERAGE_IMPORT` is `false` no download is attempted. For pull requests, it passes PR decoration args; otherwise it analyzes the current branch.
+- `SOURCES_PATH` has no default and should be provided by the caller (e.g., `-Dsonar.sources=apps,packages` or `-Dsonar.sources=.`). Omitting it passes an empty `-Dsonar.sources=`.
 - Requires `SONAR_TOKEN` and `SONAR_PROJECT_KEY` to authenticate with SonarQube.
 - Fails the workflow if the SonarQube quality gate fails.
 - Uses `sonarsource/sonarqube-scan-action` for SonarQube analysis.
@@ -42,7 +43,7 @@ Run SonarQube static analysis and check the quality gate. The workflow optionall
 
 The examples progress from a full-featured scan with coverage import to a lightweight coverage-free run, and show how to opt out of blocking on quality gate failures.
 
-#### Simple example
+### Simple example
 
 Full monorepo setup with per-package coverage. `COVERAGE_IMPORT: true` downloads the `unit-tests-coverage` artifact produced by an upstream test job. The `SONAR_EXTRA_ARGS` value points SonarQube to each package's `lcov.info` and excludes spec files and assets from metrics.
 
@@ -66,7 +67,7 @@ jobs:
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
 ```
 
-#### Without coverage import
+### Without coverage import
 
 For a simpler scan where coverage is not available:
 
