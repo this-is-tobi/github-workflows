@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.0](https://github.com/this-is-tobi/github-workflows/compare/v0.12.0...v0.13.0) (2026-07-22)
+
+
+### Features
+
+* **release-helm:** add local mode for monorepo chart publishing ([7d58c96](https://github.com/this-is-tobi/github-workflows/commit/7d58c968d13c9a66e2a45b4843fc10a3717eea13))
+* **update-helm-chart:** add local mode with direct commit and version outputs ([4517d9c](https://github.com/this-is-tobi/github-workflows/commit/4517d9ccf2ca5a9986a549ea264935ec53bc4a81))
+
+
+### Bug Fixes
+
+* correct and harden reusable workflows ([49d93d0](https://github.com/this-is-tobi/github-workflows/commit/49d93d04903ef711e3e3c5375f0c458647b54f44))
+
 ## [0.12.0](https://github.com/this-is-tobi/github-workflows/compare/v0.11.0...v0.12.0) (2026-07-16)
 
 
