@@ -7,7 +7,6 @@ on:
         description: Image used to perform scan (eg. docker.io/debian:latest)
         required: false
         type: string
-
       PATH:
         description: Path used to perform scan
         required: false

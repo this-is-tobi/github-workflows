@@ -64,6 +64,7 @@ For more details, see:
 
 - [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](../.github/workflows/scan-sonarqube.yml)
 - [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](../.github/workflows/scan-trivy.yml)
+- [Scan git history for leaked secrets using gitleaks (`scan-gitleaks.yml`)](../.github/workflows/scan-gitleaks.yml)
 
 **Release**
 
