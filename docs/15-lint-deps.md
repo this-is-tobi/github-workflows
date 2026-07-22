@@ -87,7 +87,7 @@ jobs:
 
 ### Monorepo with working directory
 
-Runs the checks scoped to a single package. Each job installs and checks independently within its `WORKING_DIRECTORY`.
+Runs the checks scoped to a single package. `PACKAGE_MANAGER` is pinned because detection only inspects the job's `WORKING_DIRECTORY`, and in a workspace monorepo the lock file lives at the repository root — a sub-directory has nothing to detect.
 
 ```yaml
 jobs:
