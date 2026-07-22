@@ -7,9 +7,9 @@ Run end-to-end Playwright tests across a dynamic matrix of browsers. Handles Jav
 | Input              | Type    | Description                                                                                      | Required | Default                                  |
 | ------------------ | ------- | ------------------------------------------------------------------------------------------------ | -------- | ---------------------------------------- |
 | BROWSERS           | string  | Comma-separated browsers to test (`chrome`, `firefox`, `edge`, `electron`)                       | No       | `chrome`                                 |
-| RUNTIME            | string  | JavaScript runtime to use (`node` or `bun`)                                                      | No       | `node`                                   |
-| RUNTIME_VERSION    | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest)         | No       | -                                         |
-| PACKAGE_MANAGER    | string  | Package manager to use (`npm`, `yarn`, `pnpm`, `bun`)                                            | No       | `npm`                                    |
+| RUNTIME            | string  | JavaScript runtime (`node` or `bun`). Empty auto-detects                                         | No       | `""`                                     |
+| RUNTIME_VERSION    | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest)         | No       | -                                        |
+| PACKAGE_MANAGER    | string  | Package manager (`npm`, `yarn`, `pnpm`, `bun`). Empty auto-detects                               | No       | `""`                                     |
 | WORKING_DIRECTORY  | string  | Working directory for running commands                                                           | No       | `.`                                      |
 | PRE_COMMAND        | string  | Shell command to run before tests (e.g., env setup, build)                                       | No       | -                                        |
 | TEST_COMMAND       | string  | Shell command for running Playwright tests. The `$BROWSER` env var contains the current browser. | No       | `npx playwright test --project=$BROWSER` |
@@ -31,7 +31,7 @@ Run end-to-end Playwright tests across a dynamic matrix of browsers. Handles Jav
 - **`$BROWSER` env var** — set automatically for each matrix job. Reference it directly in `TEST_COMMAND`:
   ```yaml
   with:
-    TEST_COMMAND: "npx playwright test --project=$BROWSER"
+    TEST_COMMAND: npx playwright test --project=$BROWSER
   ```
 
 - **System browsers vs bundled** — Chrome, Firefox, and Edge are provisioned as system browsers via the `browser-actions/setup-*` actions. This avoids downloading Playwright's bundled browser binaries (faster CI). Your Playwright config should use system [channels](https://playwright.dev/docs/browsers#google-chrome--microsoft-edge):
@@ -48,7 +48,8 @@ Run end-to-end Playwright tests across a dynamic matrix of browsers. Handles Jav
 
 - **Artifacts** are uploaded **only on failure** to avoid storage waste. Set `ARTIFACT_PATH` to the directory Playwright writes reports/screenshots to. Each browser gets its own artifact named `playwright-report-<browser>`.
 
-- **`pnpm`/`yarn` support** — if `PACKAGE_MANAGER` is `pnpm` or `yarn`, Corepack is installed and enabled automatically before dependency installation, so the version pinned in `package.json`'s `packageManager` field (if any) is used.
+- **Auto-detection** (à la [`@antfu/ni`](https://github.com/antfu-collective/ni)) — when `PACKAGE_MANAGER`/`RUNTIME` are empty, the package manager is resolved from the corepack `packageManager` field in `package.json` first, then lock files (`bun.lockb`/`bun.lock` → bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn), falling back to npm; the runtime resolves to Bun when the package manager or a bun lock file says so, else Node.js. Detection runs once in the `infos` job and is shared with every browser in the matrix.
+- **`pnpm`/`yarn` support** — if the detected package manager is `pnpm` or `yarn`, Corepack is installed and enabled automatically before dependency installation, so the version pinned in `package.json`'s `packageManager` field (if any) is used. Yarn Berry (`.yarnrc.yml`) installs with `--immutable`, classic with `--frozen-lockfile`.
 
 - **PRE_COMMAND** runs after dependency installation and before tests. Use it for build steps, environment setup scripts, or `npx playwright install --with-deps` for bundled browsers.
 
@@ -96,10 +97,10 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/test-playwright.yml@v0
     with:
       RUNTIME: bun
-      RUNTIME_VERSION: "1.3.10"
+      RUNTIME_VERSION: 1.3.10
       PACKAGE_MANAGER: bun
       BROWSERS: "chrome,firefox"
-      PRE_COMMAND: "bun run build"
+      PRE_COMMAND: bun run build
       TEST_COMMAND: "bun run test:e2e -- --project=$BROWSER"
       ARTIFACT_PATH: ./test-results/
 ```
@@ -119,7 +120,7 @@ jobs:
       PACKAGE_MANAGER: bun
       WORKING_DIRECTORY: packages/frontend
       BROWSERS: "chrome,firefox"
-      PRE_COMMAND: "bun run build"
+      PRE_COMMAND: bun run build
       TEST_COMMAND: "bun run test:e2e -- --project=$BROWSER"
       ARTIFACT_PATH: ./packages/frontend/test-results/
 ```
@@ -136,6 +137,6 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/test-playwright.yml@v0
     with:
       BROWSERS: "chrome,firefox"
-      TEST_COMMAND: "npx playwright test --project=$BROWSER"
+      TEST_COMMAND: npx playwright test --project=$BROWSER
       FAIL_ON_ERROR: false
 ```

@@ -4,20 +4,20 @@ on:
   workflow_call:
     inputs:
       RUNTIME:
-        description: JavaScript runtime to use (node or bun)
+        description: JavaScript runtime to use (node or bun). Empty auto-detects from lock files
         required: false
         type: string
-        default: "node"
+        default: ""
       RUNTIME_VERSION:
         description: Runtime version to use. Defaults to a sensible version per runtime when left empty (Node.js 24, Bun latest)
         required: false
         type: string
         default: ""
       PACKAGE_MANAGER:
-        description: Package manager to use (npm, yarn, pnpm, bun)
+        description: Package manager (npm, yarn, pnpm, bun). Empty auto-detects from the packageManager field and lock files
         required: false
         type: string
-        default: "npm"
+        default: ""
       WORKING_DIRECTORY:
         description: Working directory for build and publish commands
         required: false
@@ -95,49 +95,78 @@ jobs:
     - name: Checks-out repository
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-    - name: Resolve runtime version
-      id: runtime-version
+    - name: Detect project configuration
+      id: detect
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        PM_INPUT: ${{ inputs.PACKAGE_MANAGER }}
+        RUNTIME_INPUT: ${{ inputs.RUNTIME }}
+        VERSION_INPUT: ${{ inputs.RUNTIME_VERSION }}
       run: |
-        # Use the explicit input if set, otherwise a per-runtime default
-        # (avoids e.g. defaulting Bun to "24", a Node version, when
-        # RUNTIME_VERSION is left unset)
-        if [ -n "${{ inputs.RUNTIME_VERSION }}" ]; then
-          RESOLVED_VERSION="${{ inputs.RUNTIME_VERSION }}"
+        set -euo pipefail
+        has_bun_lock() { [ -f bun.lockb ] || [ -f bun.lock ]; }
+
+        # Detect package manager. Precedence mirrors @antfu/ni: an explicit
+        # input wins, then the corepack 'packageManager' field in package.json,
+        # then lock files, and finally npm as a last resort.
+        if [ -n "$PM_INPUT" ]; then
+          PM="$PM_INPUT"
         else
-          case "${{ inputs.RUNTIME }}" in
-            bun) RESOLVED_VERSION="latest" ;;
-            *) RESOLVED_VERSION="24" ;;
-          esac
+          PM_FIELD=""
+          if [ -f package.json ]; then
+            PM_FIELD=$(jq -r '.packageManager // empty' package.json 2>/dev/null | cut -d@ -f1 || true)
+          fi
+          if [ -n "$PM_FIELD" ]; then PM="$PM_FIELD"
+          elif has_bun_lock; then PM="bun"
+          elif [ -f pnpm-lock.yaml ]; then PM="pnpm"
+          elif [ -f yarn.lock ]; then PM="yarn"
+          else PM="npm"; fi
         fi
-        echo "Resolved runtime version: $RESOLVED_VERSION"
-        echo "value=${RESOLVED_VERSION}" >> $GITHUB_OUTPUT
+        echo "Package manager: $PM"
+        echo "package-manager=${PM}" >> "$GITHUB_OUTPUT"
+
+        # Detect runtime: explicit input wins, else Bun when the package
+        # manager or a lock file says so, otherwise Node.js.
+        if [ -n "$RUNTIME_INPUT" ]; then RUNTIME="$RUNTIME_INPUT"
+        elif [ "$PM" = "bun" ] || has_bun_lock; then RUNTIME="bun"
+        else RUNTIME="node"; fi
+        echo "Runtime: $RUNTIME"
+        echo "runtime=${RUNTIME}" >> "$GITHUB_OUTPUT"
+
+        # Resolve runtime version: explicit input wins, else a per-runtime
+        # default (avoids defaulting Bun to a Node version).
+        if [ -n "$VERSION_INPUT" ]; then VERSION="$VERSION_INPUT"
+        elif [ "$RUNTIME" = "bun" ]; then VERSION="latest"
+        else VERSION="24"; fi
+        echo "Runtime version: $VERSION"
+        echo "runtime-version=${VERSION}" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
       # Also runs for bun-only projects publishing via trusted publishing (empty
       # NPM_TOKEN), which needs the npm CLI - see the dedicated publish step below
-      if: ${{ inputs.RUNTIME == 'node' || inputs.PACKAGE_MANAGER != 'bun' || env.NPM_TOKEN_PROVIDED != 'true' }}
+      if: ${{ steps.detect.outputs.runtime == 'node' || steps.detect.outputs.package-manager != 'bun' || env.NPM_TOKEN_PROVIDED != 'true' }}
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
-        node-version: ${{ inputs.RUNTIME == 'node' && steps.runtime-version.outputs.value || '24' }}
+        node-version: ${{ steps.detect.outputs.runtime == 'node' && steps.detect.outputs.runtime-version || '24' }}
         registry-url: ${{ inputs.REGISTRY_URL }}
         scope: ${{ inputs.SCOPE }}
 
     - name: Setup Bun
       # Also set up Bun when it is only the package manager (RUNTIME=node),
       # otherwise the install/publish steps would call a missing 'bun' binary
-      if: ${{ inputs.RUNTIME == 'bun' || inputs.PACKAGE_MANAGER == 'bun' }}
+      if: ${{ steps.detect.outputs.runtime == 'bun' || steps.detect.outputs.package-manager == 'bun' }}
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
-        bun-version: ${{ inputs.RUNTIME == 'bun' && steps.runtime-version.outputs.value || 'latest' }}
+        bun-version: ${{ steps.detect.outputs.runtime == 'bun' && steps.detect.outputs.runtime-version || 'latest' }}
 
     - name: Setup Corepack
-      if: ${{ inputs.PACKAGE_MANAGER == 'pnpm' || inputs.PACKAGE_MANAGER == 'yarn' }}
+      if: ${{ steps.detect.outputs.package-manager == 'pnpm' || steps.detect.outputs.package-manager == 'yarn' }}
       run: |
         npm install -g corepack@latest
         corepack enable
 
     - name: Configure registry for Bun
-      if: ${{ inputs.RUNTIME == 'bun' }}
+      if: ${{ steps.detect.outputs.runtime == 'bun' }}
       run: |
         REGISTRY_HOST=$(echo "$REGISTRY_URL" | sed 's|https://||g' | sed 's|http://||g' | sed 's|/$||')
         npm config set registry "$REGISTRY_URL"
@@ -157,8 +186,10 @@ jobs:
     - name: Get cache directory
       id: cache-dir
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        PKG_MANAGER: ${{ steps.detect.outputs.package-manager }}
       run: |
-        case "${{ inputs.PACKAGE_MANAGER }}" in
+        case "$PKG_MANAGER" in
           npm)  echo "CACHE_DIR=$(npm config get cache)" >> "$GITHUB_OUTPUT" ;;
           yarn) echo "CACHE_DIR=$(yarn cache dir)" >> "$GITHUB_OUTPUT" ;;
           pnpm) echo "CACHE_DIR=$(pnpm store path)" >> "$GITHUB_OUTPUT" ;;
@@ -169,16 +200,20 @@ jobs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.cache-dir.outputs.CACHE_DIR }}
-        key: ${{ inputs.PACKAGE_MANAGER }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml', '**/bun.lock') }}
+        key: ${{ steps.detect.outputs.package-manager }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml', '**/bun.lock') }}
         restore-keys: |
-          ${{ inputs.PACKAGE_MANAGER }}-${{ runner.os }}-${{ runner.arch }}-
+          ${{ steps.detect.outputs.package-manager }}-${{ runner.os }}-${{ runner.arch }}-
 
     - name: Install dependencies
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        PKG_MANAGER: ${{ steps.detect.outputs.package-manager }}
+      # Yarn Berry (.yarnrc.yml) uses --immutable; classic uses --frozen-lockfile
       run: |
-        case "${{ inputs.PACKAGE_MANAGER }}" in
+        case "$PKG_MANAGER" in
           npm)  npm ci ;;
-          yarn) yarn install --frozen-lockfile ;;
+          yarn)
+            if [ -f .yarnrc.yml ]; then yarn install --immutable; else yarn install --frozen-lockfile; fi ;;
           pnpm) pnpm install --frozen-lockfile ;;
           bun)  bun install --frozen-lockfile ;;
         esac
@@ -205,7 +240,7 @@ jobs:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     - name: Publish package (npm)
-      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'npm' }}
+      if: ${{ inputs.PUBLISH_COMMAND == '' && steps.detect.outputs.package-manager == 'npm' }}
       continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
@@ -221,7 +256,7 @@ jobs:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     - name: Publish package (yarn)
-      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'yarn' }}
+      if: ${{ inputs.PUBLISH_COMMAND == '' && steps.detect.outputs.package-manager == 'yarn' }}
       continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
@@ -237,7 +272,7 @@ jobs:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     - name: Publish package (pnpm)
-      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'pnpm' }}
+      if: ${{ inputs.PUBLISH_COMMAND == '' && steps.detect.outputs.package-manager == 'pnpm' }}
       continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
@@ -253,7 +288,7 @@ jobs:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     - name: Publish package (bun)
-      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'bun' && env.NPM_TOKEN_PROVIDED == 'true' }}
+      if: ${{ inputs.PUBLISH_COMMAND == '' && steps.detect.outputs.package-manager == 'bun' && env.NPM_TOKEN_PROVIDED == 'true' }}
       continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
@@ -278,7 +313,7 @@ jobs:
       # bun publish has no OIDC/trusted-publishing support, so when no token is
       # provided the npm CLI (>= 11.5.1, set up above with Node.js 24) publishes
       # instead - it mints the short-lived OIDC token automatically
-      if: ${{ inputs.PUBLISH_COMMAND == '' && inputs.PACKAGE_MANAGER == 'bun' && env.NPM_TOKEN_PROVIDED != 'true' }}
+      if: ${{ inputs.PUBLISH_COMMAND == '' && steps.detect.outputs.package-manager == 'bun' && env.NPM_TOKEN_PROVIDED != 'true' }}
       continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |

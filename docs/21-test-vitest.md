@@ -7,8 +7,8 @@ Comprehensive JavaScript/TypeScript test execution using Vitest with automatic r
 | Input                  | Type    | Description                                                                              | Required | Default             |
 | ---------------------- | ------- | ---------------------------------------------------------------------------------------- | -------- | ------------------- |
 | RUNTIME_VERSION        | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest) | No       | ""                  |
-| PACKAGE_MANAGER        | string  | Package manager to use (npm, pnpm, yarn, bun)                                            | No       | "npm"               |
-| RUNTIME                | string  | JavaScript runtime to use (node, bun)                                                    | No       | "node"              |
+| PACKAGE_MANAGER        | string  | Package manager (npm, pnpm, yarn, bun). Empty auto-detects                               | No       | ""                  |
+| RUNTIME                | string  | JavaScript runtime (node, bun). Empty auto-detects                                       | No       | ""                  |
 | WORKING_DIRECTORY      | string  | Working directory for the project                                                        | No       | "."                 |
 | TEST_COMMAND           | string  | Custom test command to run (defaults to vitest run)                                      | No       | ""                  |
 | TEST_PRECOMMAND        | string  | Custom command to run before tests (e.g. build)                                          | No       | ""                  |
@@ -34,8 +34,8 @@ Comprehensive JavaScript/TypeScript test execution using Vitest with automatic r
 - **Vitest Requirement**: Skips test execution gracefully when Vitest is not listed as a dependency in package.json.
 - **Coverage Support**: Optional test coverage collection with configurable reporters.
 - **Flexible Test Commands**: Uses package.json test script if available, falls back to direct Vitest execution.
-- **Package Manager Detection**: Same logic as lint-js.yml - looks for lock files to determine the appropriate package manager.
-- **Runtime Detection**: Detects Bun vs Node.js based on lock files and project configuration.
+- **Package Manager Detection** (same logic as `lint-js.yml`, à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): explicit input wins, else the corepack `packageManager` field, then lock files, then npm. Yarn Berry (`.yarnrc.yml`) installs with `--immutable`, classic with `--frozen-lockfile`.
+- **Runtime Detection**: explicit input wins, else Bun when the detected package manager or a bun lock file says so, else Node.js.
 - **Coverage inputs apply to direct Vitest invocation only**: The `COVERAGE`, `COVERAGE_REPORTER`, and `TIMEOUT` inputs only take effect when the workflow invokes Vitest directly (i.e. when `package.json` has no `test` script). If `package.json` defines a `test` script, the workflow runs that script instead and these inputs are ignored.
 
 ## Examples

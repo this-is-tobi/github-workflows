@@ -8,9 +8,9 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 
 | Input             | Type    | Description                                                                                   | Required | Default                      |
 | ----------------- | ------- | --------------------------------------------------------------------------------------------- | -------- | ---------------------------- |
-| RUNTIME           | string  | JavaScript runtime to use (`node` or `bun`)                                                   | No       | `node`                       |
+| RUNTIME           | string  | JavaScript runtime (`node` or `bun`). Empty auto-detects                                      | No       | `""`                         |
 | RUNTIME_VERSION   | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest)      | No       | -                            |
-| PACKAGE_MANAGER   | string  | Package manager to use (`npm`, `yarn`, `pnpm`, `bun`)                                         | No       | `npm`                        |
+| PACKAGE_MANAGER   | string  | Package manager (`npm`, `yarn`, `pnpm`, `bun`). Empty auto-detects                            | No       | `""`                         |
 | WORKING_DIRECTORY | string  | Working directory for install, build and publish commands                                     | No       | `.`                          |
 | REGISTRY_URL      | string  | NPM registry URL                                                                              | No       | `https://registry.npmjs.org` |
 | SCOPE             | string  | Scope for the NPM registry (e.g. `@my-org`). Leave empty for unscoped packages.               | No       | -                            |
@@ -41,7 +41,8 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 - Authentication uses the `NODE_AUTH_TOKEN` environment variable, set from `NPM_TOKEN`, which is the standard mechanism understood by npm, yarn, pnpm and bun.
 - For the **Node.js** runtime, `actions/setup-node` creates the `.npmrc` auth entry automatically based on `REGISTRY_URL` and `SCOPE`.
 - For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries. Bun is set up whenever `PACKAGE_MANAGER: bun` is used, even with `RUNTIME: node`. Bun has no OIDC/trusted-publishing support ([oven-sh/bun#24855](https://github.com/oven-sh/bun/issues/24855)), so when `NPM_TOKEN` is omitted the publish step transparently falls back to the npm CLI, which handles the OIDC exchange — install and build still run with bun.
-- **pnpm/yarn** are set up automatically via Corepack when `PACKAGE_MANAGER` is `pnpm` or `yarn`; no manual install is needed, and the version pinned in `package.json`'s `packageManager` field (if any) is used.
+- **Auto-detection** (à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): when `PACKAGE_MANAGER`/`RUNTIME` are empty, the package manager is resolved from the corepack `packageManager` field in `package.json` first, then lock files (`bun.lockb`/`bun.lock` → bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn), falling back to npm; the runtime resolves to Bun when the package manager or a bun lock file says so, else Node.js. Set the inputs explicitly to override. The detected package manager also selects the matching publish step.
+- **pnpm/yarn** are set up automatically via Corepack when the detected package manager is `pnpm` or `yarn`; no manual install is needed, and the version pinned in `package.json`'s `packageManager` field (if any) is used. Yarn Berry (`.yarnrc.yml`) installs with `--immutable`, classic with `--frozen-lockfile`.
 - The `yarn` publish step uses `yarn npm publish` (Yarn Berry / v2+).
 - `pnpm publish` is called with `--no-git-checks` to avoid requiring a clean git state in CI.
 - `PRE_COMMAND` runs at the **repo root** with `NODE_AUTH_TOKEN` set — useful for building shared workspace packages before publishing. `BUILD_COMMAND` runs inside `WORKING_DIRECTORY`.
