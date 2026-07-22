@@ -80,7 +80,7 @@ jobs:
       test-command: ${{ steps.detect.outputs.test-command }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Detect project configuration
       id: detect
@@ -208,7 +208,7 @@ jobs:
     if: ${{ needs.detect-setup.outputs.has-tests == 'true' && needs.detect-setup.outputs.has-vitest == 'true' }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
