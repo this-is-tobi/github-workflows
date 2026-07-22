@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/this-is-tobi/github-workflows/compare/v0.13.0...v0.14.0) (2026-07-22)
+
+
+### Features
+
+* **lint-deps:** add reusable dependency-hygiene workflow ([50832fb](https://github.com/this-is-tobi/github-workflows/commit/50832fb71cbdbf2574ac88740f006b62d69ec2a4))
+
+
+### Bug Fixes
+
+* detect JS package manager/runtime by walking up to the checkout root ([aa0d889](https://github.com/this-is-tobi/github-workflows/commit/aa0d889f614a051e1a6b690974c494dcee13bd4f))
+* harmonize JS runtime and package-manager auto-detection ([b72c2c8](https://github.com/this-is-tobi/github-workflows/commit/b72c2c89dd21ffa1356751c8bd89df3ee484185c))
+* validate packageManager field type before using it in detection ([f97f93c](https://github.com/this-is-tobi/github-workflows/commit/f97f93c00aca43953af8fa79ed35a5cebcfc3882))
+
 ## [0.13.0](https://github.com/this-is-tobi/github-workflows/compare/v0.12.0...v0.13.0) (2026-07-22)
 
 
