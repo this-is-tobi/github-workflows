@@ -123,10 +123,12 @@ jobs:
         scope: ${{ inputs.SCOPE }}
 
     - name: Setup Bun
-      if: ${{ inputs.RUNTIME == 'bun' }}
+      # Also set up Bun when it is only the package manager (RUNTIME=node),
+      # otherwise the install/publish steps would call a missing 'bun' binary
+      if: ${{ inputs.RUNTIME == 'bun' || inputs.PACKAGE_MANAGER == 'bun' }}
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
-        bun-version: ${{ steps.runtime-version.outputs.value }}
+        bun-version: ${{ inputs.RUNTIME == 'bun' && steps.runtime-version.outputs.value || 'latest' }}
 
     - name: Setup Corepack
       if: ${{ inputs.PACKAGE_MANAGER == 'pnpm' || inputs.PACKAGE_MANAGER == 'yarn' }}

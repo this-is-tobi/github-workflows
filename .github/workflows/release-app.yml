@@ -77,7 +77,7 @@ on:
         required: false
     outputs:
       release-created:
-        description: Has the releease been created
+        description: Has the release been created
         value: ${{ jobs.release.outputs.release-created }}
       version:
         description: Full semver value
@@ -95,7 +95,7 @@ on:
 jobs:
   release:
     name: Create new release
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
     permissions:
       contents: write
       issues: write

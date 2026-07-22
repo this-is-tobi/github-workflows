@@ -71,9 +71,19 @@ jobs:
 
     - name: Set sonarqube args
       id: sonar-args
+      # Refs are passed via env (never inlined into the shell) so a branch name
+      # like '$(...)' or backticks can't trigger command substitution here
+      env:
+        PR_KEY: ${{ github.event.number }}
+        PR_BRANCH: ${{ github.head_ref }}
+        PR_BASE: ${{ github.base_ref }}
+        PR_REPO: ${{ github.repository }}
+        BRANCH_NAME: ${{ github.ref_name }}
       run: |
-        echo "SONAR_ARGS_PR=-Dsonar.pullrequest.provider=github -Dsonar.pullrequest.key=${{ github.event.number }} -Dsonar.pullrequest.branch=${{ github.head_ref }} -Dsonar.pullrequest.base=${{ github.base_ref }} -Dsonar.pullrequest.github.repository=${{ github.repository }}" >> $GITHUB_OUTPUT
-        echo "SONAR_ARGS_BRANCH=-Dsonar.branch.name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        {
+          echo "SONAR_ARGS_PR=-Dsonar.pullrequest.provider=github -Dsonar.pullrequest.key=${PR_KEY} -Dsonar.pullrequest.branch=${PR_BRANCH} -Dsonar.pullrequest.base=${PR_BASE} -Dsonar.pullrequest.github.repository=${PR_REPO}"
+          echo "SONAR_ARGS_BRANCH=-Dsonar.branch.name=${BRANCH_NAME}"
+        } >> "$GITHUB_OUTPUT"
 
     - name: SonarQube Scan
       uses: sonarsource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
@@ -87,7 +97,7 @@ jobs:
           -Dsonar.scm.provider=git
           -Dsonar.sources=${{ inputs.SOURCES_PATH}}
           ${{ github.event_name == 'pull_request' && steps.sonar-args.outputs.SONAR_ARGS_PR || steps.sonar-args.outputs.SONAR_ARGS_BRANCH }}
-          ${{ inputs.SONAR_EXTRA_ARGS != '' && inputs.SONAR_EXTRA_ARGS }}
+          ${{ inputs.SONAR_EXTRA_ARGS != '' && inputs.SONAR_EXTRA_ARGS || '' }}
       continue-on-error: ${{ inputs.FAIL_ON_ERROR == false }}
 
     - name: SonarQube Quality Gate check

@@ -136,7 +136,7 @@ jobs:
 
         # Get main image ID
         MAIN_IMAGE_ID=$(echo "$ALL_VERSIONS" | jq -r --arg t "$IMAGE_TAG" \
-          '.[] | select(.metadata.container.tags[]? | contains($t)) | .id' | head -n1)
+          '.[] | select(.metadata.container.tags[]? == $t) | .id' | head -n1)
 
         if [ -z "$MAIN_IMAGE_ID" ]; then
           echo "Image with tag '$IMAGE_TAG' not found"
