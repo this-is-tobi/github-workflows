@@ -8,7 +8,7 @@
     {
       "customType": "regex",
       "description": "Bump tool versions pinned as workflow input defaults, marked with a 'renovate:' comment on the line above.",
-      "fileMatch": ["^\\.github/workflows/.+\\.ya?ml$"],
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s+default: (?<currentValue>[^\\s]+)"
       ],
