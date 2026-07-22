@@ -77,7 +77,7 @@ jobs:
           local dir="$1"
           if [ -f "$dir/package.json" ]; then
             local field
-            field=$(jq -r '.packageManager // empty' "$dir/package.json" 2>/dev/null | cut -d@ -f1 || true)
+            field=$(jq -r 'if (.packageManager? | type) == "string" then (.packageManager | gsub("^\\s+|\\s+$"; "")) else empty end' "$dir/package.json" 2>/dev/null | cut -d@ -f1 || true)
             if [ -n "$field" ]; then echo "$field"; return 0; fi
           fi
           if [ -f "$dir/bun.lockb" ] || [ -f "$dir/bun.lock" ]; then echo "bun"; return 0; fi
