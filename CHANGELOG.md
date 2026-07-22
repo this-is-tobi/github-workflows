@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/this-is-tobi/github-workflows/compare/v0.14.0...v0.15.0) (2026-07-22)
+
+
+### Features
+
+* **scan-gitleaks:** add reusable secret scanning workflow ([1d02d65](https://github.com/this-is-tobi/github-workflows/commit/1d02d6564a3f95815a554f67b8143130d06e8282))
+
 ## [0.14.0](https://github.com/this-is-tobi/github-workflows/compare/v0.13.0...v0.14.0) (2026-07-22)
 
 
