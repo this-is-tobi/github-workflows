@@ -45,6 +45,7 @@ For more details, see:
 - [Lint Helm charts structure and validate documentation (`lint-helm.yml`)](../.github/workflows/lint-helm.yml)
 - [Validate Helm chart values against a JSON schema (`lint-helm-schema.yml`)](../.github/workflows/lint-helm-schema.yml)
 - [Lint JavaScript, JSON, Markdown and YAML files using ESLint (`lint-js.yml`)](../.github/workflows/lint-js.yml)
+- [Lint dependency hygiene with knip and publint (`lint-deps.yml`)](../.github/workflows/lint-deps.yml)
 - [Lint YAML files using yamllint (`lint-yaml.yml`)](../.github/workflows/lint-yaml.yml)
 
 **Test**
