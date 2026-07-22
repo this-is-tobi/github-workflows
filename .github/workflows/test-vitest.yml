@@ -9,15 +9,15 @@ on:
         required: false
         default: ""
       PACKAGE_MANAGER:
-        description: Package manager to use (npm, pnpm, yarn, bun)
+        description: Package manager (npm, pnpm, yarn, bun). Empty auto-detects from the packageManager field and lock files
         type: string
         required: false
-        default: "npm"
+        default: ""
       RUNTIME:
-        description: JavaScript runtime to use (node, bun)
+        description: JavaScript runtime to use (node, bun). Empty auto-detects from lock files
         type: string
         required: false
-        default: "node"
+        default: ""
       WORKING_DIRECTORY:
         description: Working directory for the project
         type: string
@@ -85,26 +85,43 @@ jobs:
     - name: Detect project configuration
       id: detect
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        PM_INPUT: ${{ inputs.PACKAGE_MANAGER }}
+        RUNTIME_INPUT: ${{ inputs.RUNTIME }}
+        VERSION_INPUT: ${{ inputs.RUNTIME_VERSION }}
       run: |
-        # Detect package manager
-        if [ "${{ inputs.PACKAGE_MANAGER }}" != "npm" ]; then
-          DETECTED_PM="${{ inputs.PACKAGE_MANAGER }}"
-        elif [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
-          DETECTED_PM="bun"
-        elif [ -f "pnpm-lock.yaml" ]; then
-          DETECTED_PM="pnpm"
-        elif [ -f "yarn.lock" ]; then
-          DETECTED_PM="yarn"
+        has_bun_lock() { [ -f bun.lockb ] || [ -f bun.lock ]; }
+
+        # Detect package manager. Precedence mirrors @antfu/ni: an explicit
+        # input wins, then the corepack 'packageManager' field in package.json,
+        # then lock files, and finally npm as a last resort.
+        if [ -n "$PM_INPUT" ]; then
+          DETECTED_PM="$PM_INPUT"
         else
-          DETECTED_PM="npm"
+          PM_FIELD=""
+          if [ -f package.json ]; then
+            PM_FIELD=$(jq -r '.packageManager // empty' package.json 2>/dev/null | cut -d@ -f1 || true)
+          fi
+          if [ -n "$PM_FIELD" ]; then
+            DETECTED_PM="$PM_FIELD"
+          elif has_bun_lock; then
+            DETECTED_PM="bun"
+          elif [ -f pnpm-lock.yaml ]; then
+            DETECTED_PM="pnpm"
+          elif [ -f yarn.lock ]; then
+            DETECTED_PM="yarn"
+          else
+            DETECTED_PM="npm"
+          fi
         fi
         echo "Package manager detected: $DETECTED_PM"
         echo "package-manager=${DETECTED_PM}" >> $GITHUB_OUTPUT
 
-        # Detect runtime
-        if [ "${{ inputs.RUNTIME }}" != "node" ]; then
-          DETECTED_RUNTIME="${{ inputs.RUNTIME }}"
-        elif [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
+        # Detect runtime: explicit input wins, else Bun when the package
+        # manager or a lock file says so, otherwise Node.js.
+        if [ -n "$RUNTIME_INPUT" ]; then
+          DETECTED_RUNTIME="$RUNTIME_INPUT"
+        elif [ "$DETECTED_PM" = "bun" ] || has_bun_lock; then
           DETECTED_RUNTIME="bun"
         else
           DETECTED_RUNTIME="node"
@@ -115,8 +132,8 @@ jobs:
         # Resolve runtime version: use the explicit input if set, otherwise a
         # per-runtime default (avoids e.g. defaulting Bun to "24", a Node
         # version, when RUNTIME_VERSION is left unset)
-        if [ -n "${{ inputs.RUNTIME_VERSION }}" ]; then
-          RESOLVED_VERSION="${{ inputs.RUNTIME_VERSION }}"
+        if [ -n "$VERSION_INPUT" ]; then
+          RESOLVED_VERSION="$VERSION_INPUT"
         else
           case "$DETECTED_RUNTIME" in
             bun) RESOLVED_VERSION="latest" ;;
@@ -180,7 +197,7 @@ jobs:
         node-version: ${{ needs.detect-setup.outputs.runtime == 'node' && needs.detect-setup.outputs.runtime-version || '24' }}
 
     - name: Setup Bun
-      if: ${{ needs.detect-setup.outputs.runtime == 'bun' }}
+      if: ${{ needs.detect-setup.outputs.runtime == 'bun' || needs.detect-setup.outputs.package-manager == 'bun' }}
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version: ${{ needs.detect-setup.outputs.runtime-version }}
@@ -204,7 +221,13 @@ jobs:
     - name: Install dependencies (yarn)
       if: ${{ needs.detect-setup.outputs.package-manager == 'yarn' }}
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
-      run: yarn install --frozen-lockfile
+      # Yarn Berry (.yarnrc.yml) uses --immutable; classic uses --frozen-lockfile
+      run: |
+        if [ -f .yarnrc.yml ]; then
+          yarn install --immutable
+        else
+          yarn install --frozen-lockfile
+        fi
 
     - name: Install dependencies (bun)
       if: ${{ needs.detect-setup.outputs.package-manager == 'bun' }}

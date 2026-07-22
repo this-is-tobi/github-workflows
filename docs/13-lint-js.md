@@ -7,8 +7,8 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 | Input              | Type    | Description                                                                              | Required | Default                |
 | ------------------ | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------------- |
 | RUNTIME_VERSION    | string  | Runtime version to use. Empty resolves to a per-runtime default (Node.js 24, Bun latest) | No       | ""                     |
-| PACKAGE_MANAGER    | string  | Package manager to use (npm, pnpm, yarn, bun)                                            | No       | "npm"                  |
-| RUNTIME            | string  | JavaScript runtime to use (node, bun)                                                    | No       | "node"                 |
+| PACKAGE_MANAGER    | string  | Package manager (npm, pnpm, yarn, bun). Empty auto-detects                               | No       | ""                     |
+| RUNTIME            | string  | JavaScript runtime (node, bun). Empty auto-detects                                       | No       | ""                     |
 | ESLINT_CONFIG      | string  | ESLint config package to use                                                             | No       | "@antfu/eslint-config" |
 | WORKING_DIRECTORY  | string  | Working directory for the project                                                        | No       | "."                    |
 | LINT_PATHS         | string  | Paths to lint (comma- or space-separated)                                                | No       | "."                    |
@@ -28,8 +28,9 @@ Comprehensive JavaScript/TypeScript file linting using ESLint with automatic run
 - **Multi-Package Manager Support**: Supports npm, pnpm, yarn, and bun package managers.
 - **Auto-Configuration**: Automatically installs and configures `@antfu/eslint-config` if no ESLint config exists.
 - **File Type Support**: Lints JavaScript, TypeScript, JSON, JSONC, Markdown, and YAML files.
-- **Package Manager Detection**: Looks for `bun.lockb`/`bun.lock` → uses Bun, `pnpm-lock.yaml` → uses pnpm, `yarn.lock` → uses Yarn, falls back to npm.
-- **Runtime Detection**: Looks for Bun lock files → uses Bun, falls back to Node.js.
+- **Package Manager Detection** (à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): an explicit `PACKAGE_MANAGER` wins; otherwise the corepack `packageManager` field in `package.json` is read first, then lock files (`bun.lockb`/`bun.lock` → Bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → Yarn), falling back to npm.
+- **Runtime Detection**: an explicit `RUNTIME` wins; otherwise Bun when the detected package manager or a bun lock file says so, else Node.js.
+- **Yarn Berry**: when a `.yarnrc.yml` is present the install uses `--immutable`; classic Yarn uses `--frozen-lockfile`.
 - **ESLint Config Detection**: Checks for existing ESLint config files, creates `eslint.config.js` with `@antfu/eslint-config` if none found.
 - The workflow creates a temporary ESLint configuration using `@antfu/eslint-config` if no configuration is detected.
 - The default configuration enables linting for JS, TS, JSON, JSONC, YAML, and Markdown files.
