@@ -965,6 +965,16 @@ jobs:
     with:
       LINT_PATHS: src tests
 
+  lint-deps:
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-deps.yml@v0
+    permissions:
+      contents: read
+    with:
+      # publint inspects the built package, so build first via PRE_COMMAND
+      PRE_COMMAND: npm run build
+      KNIP_COMMAND: npx knip
+      PUBLINT_COMMAND: npx publint
+
   test-vitest:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     permissions:
@@ -996,6 +1006,7 @@ jobs:
     needs:
     - lint-commits
     - lint-js
+    - lint-deps
     - test-vitest
     - scan-sonarqube
     steps:
