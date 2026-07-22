@@ -43,7 +43,7 @@ The following examples range from a zero-config invocation with automatic packag
 
 ### Simple example
 
-Overrides auto-detection by pinning the runtime version and package manager explicitly. When no ESLint config is found in the project, `@antfu/eslint-config` is installed automatically and a temporary `eslint.config.js` is generated.
+The runtime and package manager are auto-detected, so a typical call only sets what to lint. When no ESLint config is found in the project, `@antfu/eslint-config` is installed automatically and a temporary `eslint.config.js` is generated.
 
 ```yaml
 jobs:
@@ -52,14 +52,12 @@ jobs:
     permissions:
       contents: read
     with:
-      RUNTIME_VERSION: "18"
-      PACKAGE_MANAGER: pnpm
       LINT_PATHS: src tests
 ```
 
-### Bun runtime
+### Pinning the runtime and package manager
 
-`RUNTIME: bun` and `PACKAGE_MANAGER: bun` should be set together for a consistent setup. Bun is detected automatically from lock files, but setting them explicitly avoids any ambiguity.
+Detection covers most repositories; pin `RUNTIME`/`PACKAGE_MANAGER`/`RUNTIME_VERSION` only to override it — for example to force a specific Node version, or when no lock file is committed for detection to read.
 
 ```yaml
 jobs:
@@ -70,6 +68,7 @@ jobs:
     with:
       RUNTIME: bun
       PACKAGE_MANAGER: bun
+      RUNTIME_VERSION: 1.3.10
       LINT_PATHS: "src,tests,docs"
 ```
 
@@ -90,7 +89,7 @@ jobs:
 
 ### Monorepo with working directory
 
-Runs two parallel lint jobs, each scoped to a separate package. Each job installs and lints independently within its `WORKING_DIRECTORY`, so different runtimes, package managers, or `LINT_PATHS` can be configured per package.
+Runs one lint job per package in parallel, each scoped to its own `WORKING_DIRECTORY` and `LINT_PATHS`. A monorepo uses a **single** package manager, so both jobs pin the same one (`pnpm` here).
 
 ```yaml
 jobs:
@@ -100,6 +99,7 @@ jobs:
       contents: read
     with:
       WORKING_DIRECTORY: packages/frontend
+      PACKAGE_MANAGER: pnpm
       LINT_PATHS: src components
 
   lint-backend:
@@ -111,6 +111,8 @@ jobs:
       PACKAGE_MANAGER: pnpm
       LINT_PATHS: "src,tests"
 ```
+
+> `PACKAGE_MANAGER` is set explicitly because detection only inspects the job's `WORKING_DIRECTORY`, and in a workspace monorepo the lock file lives at the repository root — a sub-directory has nothing to detect. The simpler alternative is a single job at the root (`WORKING_DIRECTORY: .`, detection works) that lints every package — see the [monorepo CI example](./90-global-workflows-examples.md#monorepo-app).
 
 ### Non-blocking linting
 

@@ -44,7 +44,7 @@ The following examples range from a minimal invocation to customised setups cove
 
 ### Simple example
 
-Auto-detects Vitest and the package manager from project files. Pinning `RUNTIME_VERSION` and `PACKAGE_MANAGER` explicitly avoids detection ambiguity and makes the CI environment reproducible.
+Auto-detects Vitest, the runtime, and the package manager from project files — a typical call needs no `with:` block at all. Pin `RUNTIME`/`PACKAGE_MANAGER`/`RUNTIME_VERSION` only to override detection or lock a specific version.
 
 ```yaml
 jobs:
@@ -52,9 +52,6 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
     permissions:
       contents: read
-    with:
-      RUNTIME_VERSION: "20"
-      PACKAGE_MANAGER: pnpm
 ```
 
 ### With coverage
@@ -106,7 +103,7 @@ jobs:
 
 ### Monorepo testing
 
-Two parallel jobs each resolve their own dependencies from `WORKING_DIRECTORY`. Different runtimes, timeouts, or coverage settings can be applied per package without interference.
+One job per package in parallel, each scoped to its own `WORKING_DIRECTORY` with its own timeout or coverage settings. A monorepo uses a **single** package manager, so both jobs pin the same one (`pnpm` here).
 
 ```yaml
 jobs:
@@ -116,6 +113,7 @@ jobs:
       contents: read
     with:
       WORKING_DIRECTORY: packages/frontend
+      PACKAGE_MANAGER: pnpm
       COVERAGE: true
       COVERAGE_REPORTER: text
 
@@ -128,6 +126,8 @@ jobs:
       PACKAGE_MANAGER: pnpm
       TIMEOUT: "180000"
 ```
+
+> `PACKAGE_MANAGER` is set explicitly because detection only inspects the job's `WORKING_DIRECTORY`, and in a workspace monorepo the lock file lives at the repository root — a sub-directory has nothing to detect. A single job at the root (`WORKING_DIRECTORY: .`) that tests every package avoids this — see the [monorepo CI example](./90-global-workflows-examples.md#monorepo-app).
 
 ### Non-blocking tests
 
