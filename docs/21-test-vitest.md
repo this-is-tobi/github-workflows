@@ -34,8 +34,8 @@ Comprehensive JavaScript/TypeScript test execution using Vitest with automatic r
 - **Vitest Requirement**: Skips test execution gracefully when Vitest is not listed as a dependency in package.json.
 - **Coverage Support**: Optional test coverage collection with configurable reporters.
 - **Flexible Test Commands**: Uses package.json test script if available, falls back to direct Vitest execution.
-- **Package Manager Detection** (same logic as `lint-js.yml`, à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): explicit input wins, else the corepack `packageManager` field, then lock files, then npm. Yarn Berry (`.yarnrc.yml`) installs with `--immutable`, classic with `--frozen-lockfile`.
-- **Runtime Detection**: explicit input wins, else Bun when the detected package manager or a bun lock file says so, else Node.js.
+- **Package Manager Detection** (same logic as `lint-js.yml`, à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): an explicit input wins; otherwise the workflow walks upward from `WORKING_DIRECTORY` to the checkout root, checking at each level for the corepack `packageManager` field, then lock files, falling back to npm. This means a job scoped to a monorepo sub-package still detects the package manager from the workspace root's lock file. Yarn Berry (`.yarnrc.yml`) installs with `--immutable`, classic with `--frozen-lockfile`.
+- **Runtime Detection**: explicit input wins, else Bun when the detected package manager is bun, else Node.js.
 - **Coverage inputs apply to direct Vitest invocation only**: The `COVERAGE`, `COVERAGE_REPORTER`, and `TIMEOUT` inputs only take effect when the workflow invokes Vitest directly (i.e. when `package.json` has no `test` script). If `package.json` defines a `test` script, the workflow runs that script instead and these inputs are ignored.
 
 ## Examples
@@ -103,7 +103,7 @@ jobs:
 
 ### Monorepo testing
 
-One job per package in parallel, each scoped to its own `WORKING_DIRECTORY` with its own timeout or coverage settings. A monorepo uses a **single** package manager, so both jobs pin the same one (`pnpm` here).
+One job per package in parallel, each scoped to its own `WORKING_DIRECTORY` with its own timeout or coverage settings. Neither job sets `PACKAGE_MANAGER`: detection walks up to the repository root and finds the single lock file the monorepo's workspace keeps there.
 
 ```yaml
 jobs:
@@ -113,7 +113,6 @@ jobs:
       contents: read
     with:
       WORKING_DIRECTORY: packages/frontend
-      PACKAGE_MANAGER: pnpm
       COVERAGE: true
       COVERAGE_REPORTER: text
 
@@ -123,11 +122,10 @@ jobs:
       contents: read
     with:
       WORKING_DIRECTORY: packages/backend
-      PACKAGE_MANAGER: pnpm
       TIMEOUT: "180000"
 ```
 
-> `PACKAGE_MANAGER` is set explicitly because detection only inspects the job's `WORKING_DIRECTORY`, and in a workspace monorepo the lock file lives at the repository root — a sub-directory has nothing to detect. A single job at the root (`WORKING_DIRECTORY: .`) that tests every package avoids this — see the [monorepo CI example](./90-global-workflows-examples.md#monorepo-app).
+> Pin `PACKAGE_MANAGER` explicitly only if a sub-package genuinely uses a different package manager than the rest of the repository, or ships its own lock file that should take precedence. A single job at the root (`WORKING_DIRECTORY: .`) that tests every package is an even simpler alternative for most monorepos — see the [monorepo CI example](./90-global-workflows-examples.md#monorepo-app).
 
 ### Non-blocking tests
 
