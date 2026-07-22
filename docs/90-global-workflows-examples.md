@@ -361,7 +361,7 @@ jobs:
 
 ### CD Pipeline
 
-A single release-please run covers the whole monorepo. When a new release is created, all service images are rebuilt with the release version tag and the external Helm chart is bumped.
+A single release-please run covers the whole monorepo. When a new release is created, all service images are rebuilt with the release version tag and the Helm chart is bumped. This example bumps a chart in an **external** charts repository via `update-helm-chart` (caller mode); if the chart instead lives **inside** the monorepo (e.g. `charts/my-app`), release it in the same pipeline with `release-helm` in `local` mode — see [Releasing an in-repo chart (local mode)](#releasing-an-in-repo-chart-local-mode) below.
 
 ```yaml
 name: CD
@@ -475,6 +475,199 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
+### Releasing an in-repo chart (local mode)
+
+When the Helm chart is part of the monorepo (e.g. `charts/my-app`) rather than a separate charts repository, keep **two decoupled version streams**:
+
+- the **app** version, driven by release-please (`release-app`);
+- the **chart** version, driven by `update-helm-chart` in `local` mode — bumped when the app releases (with the new `appVersion` injected), or on its own for chart-only changes.
+
+`chart-releaser`'s tag-based change detection is unreliable here (the tag namespace is full of app tags like `v1.2.3`), so the chart is published by `release-helm` in **`local` mode**, which simply packages the committed `Chart.yaml` and pushes it to the OCI registry.
+
+**App release path** — replace the `bump-chart` (caller mode) job of the CD pipeline above with this pair: after each app release, the chart is bumped on its own lifecycle (`prerelease` on `develop`, `patch` on `main` — the existing prerelease `x.y.z-rc.n` graduates automatically), committed directly on the branch, and published in the same run:
+
+```yaml
+jobs:
+  # ... 'release' and 'build-docker' jobs from the CD pipeline above ...
+
+  bump-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
+    needs:
+    - release
+    if: ${{ needs.release.outputs.release-created == 'true' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      RUN_MODE: local
+      CHART_NAME: my-app
+      APP_VERSION: ${{ needs.release.outputs.version }}
+      UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
+      PRERELEASE_IDENTIFIER: rc
+
+  release-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    needs:
+    - bump-chart
+    permissions:
+      contents: read
+      packages: write
+    with:
+      MODE: local
+      CHARTS_DIR: ./charts
+      CHART_NAME: my-app
+      # Package exactly the bump commit pushed by update-helm-chart
+      CHECKOUT_REF: ${{ needs.bump-chart.outputs.commit-sha }}
+```
+
+> The bump commit is pushed with `GITHUB_TOKEN`, and such pushes never trigger new workflow runs — no CD loop, which is precisely why the chart must be released in the same run via the `commit-sha` output.
+
+**Chart-only path** — a chart fix must ship without waiting for an app release. Add a dedicated workflow triggered only by chart changes (human pushes — the bot's own bump commits don't retrigger it). The guard job skips the bump when the pushed commit already changed `version:` in `Chart.yaml` (e.g. a developer bumped it manually in the PR), releasing it as-is instead:
+
+```yaml
+name: CD - chart
+
+on:
+  push:
+    branches:
+    - develop
+    - main
+    paths:
+    - "charts/**"
+
+jobs:
+  chart-infos:
+    name: Check chart version bump
+    runs-on: ubuntu-latest
+    outputs:
+      version-bumped: ${{ steps.check.outputs.BUMPED }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 2
+
+    - name: Check whether the push already bumped the chart version
+      id: check
+      run: |
+        if git diff HEAD^ HEAD -- charts/my-app/Chart.yaml | grep -q '^+version:'; then
+          echo "BUMPED=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "BUMPED=false" >> "$GITHUB_OUTPUT"
+        fi
+
+  bump-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
+    needs:
+    - chart-infos
+    if: ${{ needs.chart-infos.outputs.version-bumped == 'false' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      RUN_MODE: local
+      CHART_NAME: my-app
+      # APP_VERSION omitted: chart-only release, appVersion stays untouched
+      UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
+      PRERELEASE_IDENTIFIER: rc
+
+  release-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    needs:
+    - chart-infos
+    - bump-chart
+    # Run whether the bump happened (fresh commit) or was already pushed (skip)
+    if: ${{ !cancelled() && needs.chart-infos.result == 'success' && (needs.bump-chart.result == 'success' || needs.bump-chart.result == 'skipped') }}
+    permissions:
+      contents: read
+      packages: write
+    with:
+      MODE: local
+      CHARTS_DIR: ./charts
+      CHART_NAME: my-app
+      # Empty when bump-chart was skipped -> packages the pushed commit as-is
+      CHECKOUT_REF: ${{ needs.bump-chart.outputs.commit-sha }}
+```
+
+**Scaling to more release trains** (`alpha` → `beta` → `main`): `release-app` already supports it — point `PRERELEASE_BRANCH` at the current branch and select a per-branch release-please config, and mirror the train on the chart side with `PRERELEASE_IDENTIFIER`:
+
+```yaml
+jobs:
+  release:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    with:
+      ENABLE_PRERELEASE: true
+      RELEASE_BRANCH: main
+      PRERELEASE_BRANCH: ${{ github.ref_name }}
+      PRERELEASE_CONFIG_FILE: release-please-config-${{ github.ref_name }}.json
+      PRERELEASE_MANIFEST_FILE: .release-please-manifest-${{ github.ref_name }}.json
+
+  bump-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
+    with:
+      RUN_MODE: local
+      CHART_NAME: my-app
+      UPGRADE_TYPE: ${{ github.ref_name == 'main' && 'patch' || 'prerelease' }}
+      PRERELEASE_IDENTIFIER: ${{ github.ref_name }}
+```
+
+The chart bump logic handles the whole train natively: `0.4.1-alpha.3` → (push to `beta`) `0.4.1-beta` → `0.4.1-beta.1` → (push to `main`) `0.4.1`. On the ArgoCD side, point each environment at the matching stream with a semver constraint on `targetRevision`: stable environments use e.g. `1.x` (semver ranges exclude prereleases by default), pre-production environments use a prerelease-inclusive range such as `>=0.0.0-0`, and the per-train identifiers (`-alpha.n`, `-beta.n`) keep the streams distinguishable.
+
+The chart is then pullable with `helm pull oci://ghcr.io/<owner>/<repo>/my-app --version <version>`. See [`release-helm.yml` → Modes](./51-release-helm.md#modes) and [`update-helm-chart.yml`](./52-update-helm-chart.md) for the full details.
+
+---
+
+## Helm Chart Release Patterns
+
+Whatever the topology, releasing a chart is always the **same two building blocks**:
+
+1. **The bump brain** — [`update-helm-chart.yml`](./52-update-helm-chart.md) computes the next chart version on the chart's own lifecycle. The *style* knob is its mode: `called` opens a **pull request** (release-please style, human gate or automerge) while `local` **commits directly** and the release continues in the same run.
+2. **The publisher** — [`release-helm.yml`](./51-release-helm.md) in `local` mode packages the committed `Chart.yaml` and pushes it to the OCI registry. Direct style feeds it the bump commit via `CHECKOUT_REF`; PR style lets the merge trigger a chart CD workflow whose guard job detects the already-bumped version and publishes as-is.
+
+**The repo that hosts the chart owns the style** — in a monorepo the app repo's CD picks the mode; with a dedicated chart repository its entry-point workflow does. The topology only changes *where* the two jobs run:
+
+| Release style                       | Monorepo (chart in app repo)                                                                                            | Dedicated chart repository                                                                                                                                   |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **PR-gated** (release-please style) | App CD → `update-helm-chart` (`called`, PR on same repo) → merge triggers the chart CD guard → `release-helm` (`local`) | App CD → `update-helm-chart` (`caller`) → chart repo entry-point (`called`, PR) → merge triggers the chart CD → `release-helm` (`local` or `chart-releaser`) |
+| **Direct** (in-pipeline)            | App CD → `update-helm-chart` (`local`) → `release-helm` (`local`, same run)                                             | App CD → `update-helm-chart` (`caller`) → chart repo entry-point (`local`) → `release-helm` (`local`, same run)                                              |
+
+Shared guarantees across all four quadrants:
+
+- Chart and app versions stay **decoupled** (`appVersion` tracks the app; chart `version` follows its own stream, including chart-only releases with `APP_VERSION` empty).
+- Loop safety is identical: direct bump commits are pushed with `GITHUB_TOKEN` and never retrigger workflows; PR merges (human or PAT automerge) do trigger the chart CD, whose guard prevents any re-bump.
+- `release-helm`'s `chart-releaser` mode remains the classic alternative for dedicated chart repositories that want auto-detection, GitHub Releases and a `gh-pages` `index.yaml` on top of the OCI push.
+
+The **monorepo direct** flow is shown [above](#releasing-an-in-repo-chart-local-mode); the **monorepo PR-gated** variant only swaps the `bump-chart` job (the publisher stays the chart CD guard workflow shown above, which the merged PR triggers):
+
+```yaml
+jobs:
+  # ... 'release' and 'build-docker' jobs from the CD pipeline above ...
+  # No in-run 'release-chart' job here: the chart CD guard workflow publishes
+  # the chart when the bump PR merges.
+
+  bump-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
+    needs:
+    - release
+    if: ${{ needs.release.outputs.release-created == 'true' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      RUN_MODE: called
+      CHART_NAME: my-app
+      APP_VERSION: ${{ needs.release.outputs.version }}
+      UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
+      PRERELEASE_IDENTIFIER: rc
+      # Open the bump PR against the branch being released
+      BASE_BRANCH: ${{ github.ref_name }}
+      AUTOMERGE_RELEASE: true
+    secrets:
+      GH_PAT: ${{ secrets.GH_PAT }}
+```
+
+> GitHub limitation: PRs opened with `GITHUB_TOKEN` don't auto-trigger PR CI checks — merge via automerge (`GH_PAT`) or manually. The dedicated-repo variants of both styles are shown in the [Update App Version Workflow](#update-app-version-workflow) templates below.
+
 ---
 
 ## Helm Charts Repository
@@ -496,7 +689,7 @@ on:
     - synchronize
     - ready_for_review
     paths:
-    - 'charts/**'
+    - "charts/**"
   workflow_dispatch:
 
 env:
@@ -589,7 +782,9 @@ jobs:
 
 ### CD Pipeline
 
-Triggered on push to `main`. chart-releaser detects which charts had their version bumped and creates the corresponding GitHub Releases; charts are also pushed to the OCI registry.
+Triggered on push to `main`. chart-releaser detects which charts had their version bumped and pushes them to the OCI registry (optionally creating GitHub Releases with `CREATE_GITHUB_RELEASE: true`).
+
+> Harmonized alternative: instead of chart-releaser's tag-based detection, you can reuse the exact same guard + `release-helm` `local` chart CD as the monorepo (`on: push: paths: charts/**` — see [Helm Chart Release Patterns](#helm-chart-release-patterns)). Keep `chart-releaser` mode when you want auto-detection across many charts, GitHub Releases, or a classic `gh-pages` `index.yaml`.
 
 ```yaml
 name: CD
@@ -614,6 +809,8 @@ jobs:
 ### Update App Version Workflow
 
 The chart repository exposes a `workflow_call` + `workflow_dispatch` entry-point so external application repositories can trigger a chart version bump via the `update-helm-chart` caller workflow. Store this file as `.github/workflows/update-app-version.yml` in the **chart repository**.
+
+This entry-point is where the chart repository **owns its release style** (see [Helm Chart Release Patterns](#helm-chart-release-patterns)): the first template below is **PR-gated** (`called` — bump PR, then the CD pipeline releases on merge), the second is **direct** (`local` — bump commit and OCI publish in the same run). The app-side caller is identical either way.
 
 ```yaml
 name: Update chart
@@ -695,6 +892,41 @@ jobs:
       PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
 ```
 
+#### Direct style variant
+
+Same triggers and inputs (keep the `on:` block from the template above — the `RUN_MODE` input must stay declared because the caller forwards it, but the entry-point deliberately ignores it: the chart repository owns its style). The bump is committed straight to the default branch and the chart is published in the same run — mirroring the [monorepo direct flow](#releasing-an-in-repo-chart-local-mode) exactly:
+
+```yaml
+jobs:
+  bump-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/update-helm-chart.yml@v0
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      # Style is fixed by the chart repo, not by the caller
+      RUN_MODE: local
+      CHART_NAME: ${{ inputs.CHART_NAME }}
+      APP_VERSION: ${{ inputs.APP_VERSION }}
+      UPGRADE_TYPE: ${{ inputs.UPGRADE_TYPE }}
+      PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
+
+  release-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    needs:
+    - bump-chart
+    permissions:
+      contents: read
+      packages: write
+    with:
+      MODE: local
+      CHART_NAME: ${{ inputs.CHART_NAME }}
+      # Package exactly the bump commit pushed by update-helm-chart
+      CHECKOUT_REF: ${{ needs.bump-chart.outputs.commit-sha }}
+```
+
+> Direct pushes to the default branch must be allowed for `github-actions[bot]` (no "require a pull request" rule); keep the PR-gated template otherwise. With this variant the CD pipeline above is only needed for charts modified directly by PRs in the chart repository — its guard-based alternative is described in [Helm Chart Release Patterns](#helm-chart-release-patterns).
+
 ---
 
 ## JS Library / npm Package
@@ -731,7 +963,7 @@ jobs:
     permissions:
       contents: read
     with:
-      LINT_PATHS: "src tests"
+      LINT_PATHS: src tests
 
   test-vitest:
     uses: this-is-tobi/github-workflows/.github/workflows/test-vitest.yml@v0
