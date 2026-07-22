@@ -244,26 +244,34 @@ jobs:
 
     - name: Run ESLint
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        ESLINT_CONFIG_FILE: ${{ inputs.ESLINT_CONFIG_FILE }}
+        LINT_PATHS: ${{ inputs.LINT_PATHS }}
       run: |
         CONFIG_FLAG=""
-        if [ -n "${{ inputs.ESLINT_CONFIG_FILE }}" ]; then
-          CONFIG_FLAG="--config ${{ inputs.ESLINT_CONFIG_FILE }}"
+        # Match the detection step: only use --config when the file actually exists
+        if [ -n "$ESLINT_CONFIG_FILE" ] && [ -f "$ESLINT_CONFIG_FILE" ]; then
+          CONFIG_FLAG="--config $ESLINT_CONFIG_FILE"
         fi
+
+        # Accept comma- or space-separated paths (shell word-splitting only
+        # handles whitespace, so normalize commas to spaces first)
+        LINT_PATHS="${LINT_PATHS//,/ }"
 
         # Run ESLint and capture exit code
         EXIT_CODE=0
         case "${{ needs.detect-setup.outputs.package-manager }}" in
           npm)
-            npx eslint $CONFIG_FLAG ${{ inputs.LINT_PATHS }} || EXIT_CODE=$?
+            npx eslint $CONFIG_FLAG $LINT_PATHS || EXIT_CODE=$?
             ;;
           pnpm)
-            pnpm exec eslint $CONFIG_FLAG ${{ inputs.LINT_PATHS }} || EXIT_CODE=$?
+            pnpm exec eslint $CONFIG_FLAG $LINT_PATHS || EXIT_CODE=$?
             ;;
           yarn)
-            yarn eslint $CONFIG_FLAG ${{ inputs.LINT_PATHS }} || EXIT_CODE=$?
+            yarn eslint $CONFIG_FLAG $LINT_PATHS || EXIT_CODE=$?
             ;;
           bun)
-            bunx eslint $CONFIG_FLAG ${{ inputs.LINT_PATHS }} || EXIT_CODE=$?
+            bunx eslint $CONFIG_FLAG $LINT_PATHS || EXIT_CODE=$?
             ;;
         esac
 

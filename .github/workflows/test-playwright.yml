@@ -72,7 +72,9 @@ jobs:
     - name: Generate browser matrix
       id: matrix
       run: |
-        BROWSERS=$(echo "$INPUT_BROWSERS" | jq -Rc 'split(",")')
+        # Trim surrounding whitespace and drop empties so "chrome, firefox"
+        # yields ["chrome","firefox"] rather than ["chrome"," firefox"]
+        BROWSERS=$(echo "$INPUT_BROWSERS" | jq -Rc 'split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length > 0))')
         echo "BROWSERS=$BROWSERS" >> "$GITHUB_OUTPUT"
       env:
         INPUT_BROWSERS: ${{ inputs.BROWSERS }}

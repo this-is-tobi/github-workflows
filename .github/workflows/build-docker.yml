@@ -224,7 +224,7 @@ jobs:
       with:
         images: ${{ needs.infos.outputs.normalized-image }}
         tags: |
-          type=raw,value=${{ needs.infos.outputs.lower-branch }},enable=${{ github.head_ref != 'main' && github.head_ref != 'develop' }}
+          type=raw,value=${{ needs.infos.outputs.lower-branch }},enable=${{ needs.infos.outputs.lower-branch != 'main' && needs.infos.outputs.lower-branch != 'develop' }}
           type=raw,value=${{ needs.infos.outputs.short-sha }},enable=${{ needs.infos.outputs.short-sha != '' }}
           type=raw,value=${{ inputs.IMAGE_TAG }},enable=${{ inputs.IMAGE_TAG != '' }}
           type=raw,value=${{ format('{0}.{1}', needs.infos.outputs.major-tag, needs.infos.outputs.minor-tag) }},enable=${{ inputs.TAG_MAJOR_AND_MINOR && needs.infos.outputs.major-tag != '' && needs.infos.outputs.minor-tag != '' && needs.infos.outputs.prerelease-tag == '' }}

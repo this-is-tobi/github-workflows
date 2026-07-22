@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       ARGOCD_SYNC_PAYLOAD_TEMPLATE:
-        description: Template
+        description: JSON body for the ArgoCD sync API call (can include the `<pr_number>` placeholder)
         required: true
         type: string
       ARGOCD_URL:
@@ -75,7 +75,10 @@ jobs:
       run: |
         set -e
 
-        RESPONSE_CODE=$(curl -s -w "%{http_code}" -o >(RESPONSE_BODY=$(cat)) -X POST "$ARGOCD_URL/api/v1/applications/$ARGOCD_APP_NAME/sync" \
+        # Capture the body via a temp file: a process substitution assignment
+        # runs in a subshell, so it would never reach the parent shell here
+        RESPONSE_BODY_FILE="$(mktemp)"
+        RESPONSE_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X POST "$ARGOCD_URL/api/v1/applications/$ARGOCD_APP_NAME/sync" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer $ARGOCD_TOKEN" \
           -d "$ARGOCD_SYNC_PAYLOAD")
@@ -84,7 +87,7 @@ jobs:
 
         if [ "$RESPONSE_CODE" -ne 200 ]; then
           echo "Error: Non-200 HTTP response detected."
-          echo "Response body: $RESPONSE_BODY"
+          echo "Response body: $(cat "$RESPONSE_BODY_FILE")"
           exit 1
         fi
       env:

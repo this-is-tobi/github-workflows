@@ -122,14 +122,22 @@ jobs:
         # See "Attest SBOM" above for why storage records are disabled.
         create-storage-record: false
 
+    - name: Validate custom predicate inputs
+      # PREDICATE and PREDICATE_TYPE are only meaningful together; fail fast with
+      # a clear message instead of letting actions/attest error out mid-run
+      if: ${{ (inputs.PREDICATE != '') != (inputs.PREDICATE_TYPE != '') }}
+      run: |
+        echo "::error::PREDICATE and PREDICATE_TYPE must be set together (only one was provided)."
+        exit 1
+
     - name: Write custom predicate
-      if: ${{ inputs.PREDICATE != '' }}
+      if: ${{ inputs.PREDICATE != '' && inputs.PREDICATE_TYPE != '' }}
       env:
         PREDICATE_JSON: ${{ inputs.PREDICATE }}
       run: printf '%s' "$PREDICATE_JSON" > custom-predicate.json
 
     - name: Attest custom predicate
-      if: ${{ inputs.PREDICATE != '' }}
+      if: ${{ inputs.PREDICATE != '' && inputs.PREDICATE_TYPE != '' }}
       uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
       with:
         subject-name: ${{ steps.normalize.outputs.NORMALIZED_IMAGE }}

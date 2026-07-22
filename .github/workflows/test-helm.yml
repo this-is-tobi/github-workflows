@@ -15,7 +15,7 @@ on:
 
 jobs:
   test-charts:
-    name: Lint charts
+    name: Install charts
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
     permissions:
       contents: read
@@ -41,7 +41,12 @@ jobs:
       uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
 
     - name: Run chart-testing (install)
+      # Refs/paths via env (never inlined) so a branch name like '$(...)' can't
+      # trigger command substitution in this shell
+      env:
+        CT_CONF_PATH: ${{ inputs.CT_CONF_PATH }}
+        TARGET_BRANCH: ${{ github.head_ref || github.event.repository.default_branch }}
       run: |
         ct install \
-          --config ${{ inputs.CT_CONF_PATH }} \
-          --target-branch ${{ github.head_ref || github.event.repository.default_branch }}
+          --config "$CT_CONF_PATH" \
+          --target-branch "$TARGET_BRANCH"
