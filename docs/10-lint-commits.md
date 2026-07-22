@@ -4,22 +4,21 @@ Validate commit messages follow the [Conventional Commits](https://www.conventio
 
 ## Inputs
 
-| Input              | Type    | Description                                                                              | Required | Default                                                        |
-| ------------------ | ------- | ---------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------- |
-| COMMITS_SOURCE     | string  | Source of commits to lint (`pr` for PR, `push` for push)                                 | No       | "pr"                                                           |
-| CONFIG_FILE        | string  | Path to custom commitlint config file                                                    | No       | ""                                                             |
-| FAIL_ON_ERROR      | boolean | Whether to fail the workflow on linting errors                                           | No       | true                                                           |
-| ALLOWED_TYPES      | string  | Comma-separated list of allowed commit types                                             | No       | "feat,fix,docs,style,refactor,perf,test,build,ci,chore,revert" |
-| REQUIRE_SCOPE      | boolean | Whether to require a scope in commit messages                                            | No       | false                                                          |
-| MAX_SUBJECT_LENGTH | number  | Maximum length of the commit subject line                                                | No       | 100                                                            |
-| RUNS_ON            | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"]                                               |
+| Input              | Type    | Description                                                                                                                  | Required | Default                                                        |
+| ------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------- |
+| COMMITS_SOURCE     | string  | Source of commits to lint (`pr` for PR, `push` for push)                                                                     | No       | "pr"                                                           |
+| CONFIG_FILE        | string  | Path to custom commitlint config file                                                                                        | No       | ""                                                             |
+| FAIL_ON_ERROR      | boolean | Whether to fail the workflow on linting errors                                                                               | No       | true                                                           |
+| ALLOWED_TYPES      | string  | Comma-separated list of allowed commit types                                                                                 | No       | "feat,fix,docs,style,refactor,perf,test,build,ci,chore,revert" |
+| REQUIRE_SCOPE      | boolean | Whether to require a scope in commit messages                                                                                | No       | false                                                          |
+| MAX_SUBJECT_LENGTH | number  | Maximum length of the commit header line (including `type(scope): ` prefix) — controls commitlint's `header-max-length` rule | No       | 100                                                            |
+| RUNS_ON            | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                     | No       | ["ubuntu-24.04"]                                               |
 
 ## Permissions
 
-| Scope         | Access | Description                          |
-| ------------- | ------ | ------------------------------------ |
-| contents      | read   | Read commit history                  |
-| pull-requests | read   | Read PR information for commit range |
+| Scope    | Access | Description         |
+| -------- | ------ | ------------------- |
+| contents | read   | Read commit history |
 
 ## Notes
 
@@ -47,7 +46,6 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     permissions:
       contents: read
-      pull-requests: read
 ```
 
 ### Require scope
@@ -60,14 +58,13 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     permissions:
       contents: read
-      pull-requests: read
     with:
       REQUIRE_SCOPE: true
 ```
 
 ### Custom allowed types
 
-Restricts the accepted types to a minimal set and lowers the subject line limit to 72 characters — a common Git convention that fits in standard terminal widths.
+Restricts the accepted types to a minimal set and lowers the commit header length limit to 72 characters — a common Git convention that fits in standard terminal widths.
 
 ```yaml
 jobs:
@@ -75,7 +72,6 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     permissions:
       contents: read
-      pull-requests: read
     with:
       ALLOWED_TYPES: "feat,fix,docs,chore"
       MAX_SUBJECT_LENGTH: 72
@@ -91,9 +87,8 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     permissions:
       contents: read
-      pull-requests: read
     with:
-      CONFIG_FILE: ".commitlintrc.js"
+      CONFIG_FILE: .commitlintrc.js
 ```
 
 ### Non-blocking check
@@ -106,7 +101,6 @@ jobs:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
     permissions:
       contents: read
-      pull-requests: read
     with:
       FAIL_ON_ERROR: false
 ```

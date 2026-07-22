@@ -13,6 +13,7 @@ Add or sync labels on pull requests using a configuration file.
 | Scope         | Access | Description               |
 | ------------- | ------ | ------------------------- |
 | pull-requests | write  | Required to add PR labels |
+| contents      | read   | Read repository files     |
 
 ## Notes
 
@@ -48,15 +49,15 @@ doc:
     - "docs/**"
 api:
 - changed-files:
-  - any-glob-to-any-file: 
+  - any-glob-to-any-file:
     - "apps/api/**"
 client:
 - changed-files:
-  - any-glob-to-any-file: 
+  - any-glob-to-any-file:
     - "apps/client/**"
 ci:
 - changed-files:
-  - any-glob-to-any-file: 
+  - any-glob-to-any-file:
     - ".github/**"
     - "ci/**"
 ```

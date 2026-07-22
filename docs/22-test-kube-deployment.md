@@ -30,6 +30,7 @@ Test Kubernetes deployments in an ephemeral [Kind](https://kind.sigs.k8s.io/) (K
 
 ## Notes
 
+- **KIND_VERSION** must NOT include a `v` prefix (the workflow prepends `v` automatically); the default is `0.27.0`. Passing `v0.27.0` would result in `vv0.27.0`.
 - **IMAGES** is newline-separated. Pass a YAML literal block scalar (`|`) in the caller:
   ```yaml
   with:
@@ -103,7 +104,7 @@ jobs:
       HELM_CHART: ./helm
       HELM_RELEASE: my-app
       HELM_VALUES: ./ci/kind/helm-values.prod.yaml
-      HELM_ARGS: "--set api.image.tag=pr-42 --set worker.image.tag=pr-42"
+      HELM_ARGS: --set api.image.tag=pr-42 --set worker.image.tag=pr-42
       TEST_COMMAND: "curl -sf http://localhost/healthz"
 ```
 
@@ -119,7 +120,7 @@ jobs:
       contents: read
     uses: this-is-tobi/github-workflows/.github/workflows/test-kube-deployment.yml@v0
     with:
-      DEPLOY_COMMAND: "kubectl apply -f ./k8s/"
+      DEPLOY_COMMAND: kubectl apply -f ./k8s/
       TEST_COMMAND: |
         kubectl wait --for=condition=ready pod -l app=my-app --timeout=120s
         kubectl get pods -A

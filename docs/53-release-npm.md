@@ -25,29 +25,28 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 
 ## Secrets
 
-| Secret    | Description                                                                                       | Required |
-| --------- | -------------------------------------------------------------------------------------------------- | -------- |
+| Secret    | Description                                                                                                                                                                                       | Required |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | NPM_TOKEN | Authentication token for the NPM registry. Optional if the registry has trusted publishing (OIDC) configured for the calling workflow - see [Trusted publishing](#trusted-publishing-oidc) below. | No       |
 
 ## Permissions
 
-| Scope    | Access | Description                                                     |
-| -------- | ------ | ----------------------------------------------------------------|
-| contents | read   | Check out the repository                                        |
-| id-token | write  | Mint the OIDC token used for trusted publishing (npm, pnpm)     |
-| packages | write  | Required only when publishing to GitHub Packages                |
+| Scope    | Access | Description                                                 |
+| -------- | ------ | ----------------------------------------------------------- |
+| contents | read   | Check out the repository                                    |
+| id-token | write  | Mint the OIDC token used for trusted publishing (npm, pnpm) |
 
 ## Notes
 
 - Authentication uses the `NODE_AUTH_TOKEN` environment variable, set from `NPM_TOKEN`, which is the standard mechanism understood by npm, yarn, pnpm and bun.
 - For the **Node.js** runtime, `actions/setup-node` creates the `.npmrc` auth entry automatically based on `REGISTRY_URL` and `SCOPE`.
-- For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries. Bun has no OIDC/trusted-publishing support ([oven-sh/bun#24855](https://github.com/oven-sh/bun/issues/24855)), so when `NPM_TOKEN` is omitted the publish step transparently falls back to the npm CLI, which handles the OIDC exchange — install and build still run with bun.
+- For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries. Bun is set up whenever `PACKAGE_MANAGER: bun` is used, even with `RUNTIME: node`. Bun has no OIDC/trusted-publishing support ([oven-sh/bun#24855](https://github.com/oven-sh/bun/issues/24855)), so when `NPM_TOKEN` is omitted the publish step transparently falls back to the npm CLI, which handles the OIDC exchange — install and build still run with bun.
 - **pnpm/yarn** are set up automatically via Corepack when `PACKAGE_MANAGER` is `pnpm` or `yarn`; no manual install is needed, and the version pinned in `package.json`'s `packageManager` field (if any) is used.
 - The `yarn` publish step uses `yarn npm publish` (Yarn Berry / v2+).
 - `pnpm publish` is called with `--no-git-checks` to avoid requiring a clean git state in CI.
 - `PRE_COMMAND` runs at the **repo root** with `NODE_AUTH_TOKEN` set — useful for building shared workspace packages before publishing. `BUILD_COMMAND` runs inside `WORKING_DIRECTORY`.
 - `PUBLISH_COMMAND` fully overrides the auto-detected publish step and is the right option for Turborepo, Lerna, or any custom release tooling.
-- `DRY_RUN` appends `--dry-run` to the publish command (all package managers support this flag) to validate packaging without uploading.
+- `DRY_RUN` appends `--dry-run` to the publish command to validate packaging without uploading. Note: Yarn Berry's `yarn npm publish` does not support `--dry-run`, so `DRY_RUN: true` is not supported with `PACKAGE_MANAGER: yarn`.
 - `FAIL_ON_ERROR: false` sets `continue-on-error: true` on the publish step, useful when some packages in a matrix may already be published.
 - Dependency caches are keyed by package manager, OS, architecture, and the combined hash of all lock files.
 
@@ -110,10 +109,10 @@ jobs:
       id-token: write
     with:
       RUNTIME: bun
-      RUNTIME_VERSION: "1.3.10"
+      RUNTIME_VERSION: 1.3.10
       PACKAGE_MANAGER: bun
-      PRE_COMMAND: "bun run build --filter=@my-org/shared"
-      BUILD_COMMAND: "bun run build"
+      PRE_COMMAND: bun run build --filter=@my-org/shared
+      BUILD_COMMAND: bun run build
       WORKING_DIRECTORY: ./packages/my-lib
       TAG: latest
     secrets:
