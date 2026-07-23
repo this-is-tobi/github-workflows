@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.15.1](https://github.com/this-is-tobi/github-workflows/compare/v0.15.0...v0.15.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **deps:** update actions/attest to v4.2.0 ([50028d7](https://github.com/this-is-tobi/github-workflows/commit/50028d7429c2e47b01d40a566137a9ccc25aafad))
+* **deps:** update actions/checkout to v7.0.1 ([3a55390](https://github.com/this-is-tobi/github-workflows/commit/3a55390478ed662623722aabc685943a57987053))
+* **deps:** update actions/labeler to v6.2.0 ([b96e549](https://github.com/this-is-tobi/github-workflows/commit/b96e549657c4acc7b431d68915a0c30b91aba9f3))
+* **deps:** update actions/labeler to v7 ([62f68c3](https://github.com/this-is-tobi/github-workflows/commit/62f68c3bd146f1757a2ec5ffe4e66bb8d6f15259))
+* **deps:** update actions/setup-node to v6.5.0 ([34c1007](https://github.com/this-is-tobi/github-workflows/commit/34c1007062055c640ab8148e5fd893c77aa52798))
+* **deps:** update actions/setup-node to v7 ([6381c6c](https://github.com/this-is-tobi/github-workflows/commit/6381c6c27ad023bfcb5435ff1b21533203361aea))
+* **deps:** update actions/setup-python to v7 ([666aa34](https://github.com/this-is-tobi/github-workflows/commit/666aa347f07191b9cea50105fa87e6a6377fe5af))
+* **deps:** update docker/login-action to v4.4.0 ([20603e7](https://github.com/this-is-tobi/github-workflows/commit/20603e7fcf9643f41a43a7f688d4e448c95699cb))
+* **deps:** update docker/metadata-action to v6.2.0 ([40f326f](https://github.com/this-is-tobi/github-workflows/commit/40f326fa4688556ee006c6a2621063f65ab8856c))
+* **deps:** update docker/setup-buildx-action to v4.2.0 ([f4f4ce0](https://github.com/this-is-tobi/github-workflows/commit/f4f4ce099483f1fca21209b2259730d200d0de1f))
+* **deps:** update dorny/paths-filter to v4.0.2 ([6217099](https://github.com/this-is-tobi/github-workflows/commit/621709912e110036815f3d63591cd27fced35062))
+* **deps:** update github/codeql-action to v4.37.3 ([95f134f](https://github.com/this-is-tobi/github-workflows/commit/95f134fccafe24243c8788067072955adbf059e4))
+* **deps:** update python to 3.14 ([44fe58d](https://github.com/this-is-tobi/github-workflows/commit/44fe58d9aeead8c7b03034082e30c4c5aee1b532))
+* **deps:** update sigstore/cosign-installer to v4.1.2 ([78d3fb5](https://github.com/this-is-tobi/github-workflows/commit/78d3fb5532d5fb6994cfa2698719861d2d6ceba4))
+* **deps:** update sonarsource/sonarqube-scan-action to v8.2.1 ([8184fcd](https://github.com/this-is-tobi/github-workflows/commit/8184fcd0b0dbcb1d9be0665dc5059c03aee86d3b))
+
 ## [0.15.0](https://github.com/this-is-tobi/github-workflows/compare/v0.14.0...v0.15.0) (2026-07-22)
 
 
