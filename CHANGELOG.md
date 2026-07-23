@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.2](https://github.com/this-is-tobi/github-workflows/compare/v0.15.1...v0.15.2) (2026-07-23)
+
+
+### Bug Fixes
+
+* **deps:** update docker/login-action to v4.5.0 ([8cfcdf7](https://github.com/this-is-tobi/github-workflows/commit/8cfcdf78745496755038d966c5c475662ce568e4))
+
 ## [0.15.1](https://github.com/this-is-tobi/github-workflows/compare/v0.15.0...v0.15.1) (2026-07-23)
 
 
