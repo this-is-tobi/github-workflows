@@ -17,9 +17,9 @@
   ],
   "packageRules": [
     {
-      "description": "Action and pinned tool bumps land as 'fix' so release-please cuts a patch release, updating the v0 tag that downstream repos consume.",
+      "description": "Action and pinned tool bumps land as 'build' so they appear under the Dependencies changelog section; release-please treats 'build' as releasable (hidden: false in release-please-config.json) and cuts a patch release, updating the v0 tag that downstream repos consume.",
       "matchManagers": ["github-actions", "custom.regex"],
-      "semanticCommitType": "fix",
+      "semanticCommitType": "build",
       "commitMessageTopic": "{{depName}}"
     },
     {
