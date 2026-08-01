@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.15.4](https://github.com/this-is-tobi/github-workflows/compare/v0.15.3...v0.15.4) (2026-08-01)
+
+
+### Dependencies
+
+* **deps:** update actions/attest to v4.2.1 ([0fa8e96](https://github.com/this-is-tobi/github-workflows/commit/0fa8e96f381f8dd4aab91201c80ff5c507ac2385))
+* **deps:** update docker/login-action to v4.6.0 ([4753f22](https://github.com/this-is-tobi/github-workflows/commit/4753f224d965bcff4f25c8e81e244de5a64935dd))
+* **deps:** update github/codeql-action to v4.37.4 ([527c695](https://github.com/this-is-tobi/github-workflows/commit/527c695d07b9634fa413ad5724f9d418541920df))
+
 ## [0.15.3](https://github.com/this-is-tobi/github-workflows/compare/v0.15.2...v0.15.3) (2026-07-25)
 
 
