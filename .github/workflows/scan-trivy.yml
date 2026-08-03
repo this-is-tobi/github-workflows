@@ -7,6 +7,18 @@ on:
         description: Image used to perform scan (eg. docker.io/debian:latest)
         required: false
         type: string
+      IMAGE_ARTIFACT:
+        description: >-
+          Name of a workflow artifact holding an image tarball to scan locally, instead of
+          pulling IMAGE from a registry (e.g. produced by 'build-docker.yml' with PUSH set
+          to false). Takes precedence over IMAGE when both are set.
+        required: false
+        type: string
+      IMAGE_ARTIFACT_FILE:
+        description: Name of the tarball file inside IMAGE_ARTIFACT
+        required: false
+        type: string
+        default: image.tar
       PATH:
         description: Path used to perform scan
         required: false
@@ -41,21 +53,33 @@ on:
 jobs:
   images-scan:
     name: Scan images vulnerabilities
-    if: ${{ inputs.IMAGE != '' }}
+    if: ${{ inputs.IMAGE != '' || inputs.IMAGE_ARTIFACT != '' }}
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
     permissions:
       contents: read
       security-events: write
       packages: read
+    env:
+      # Label used in the summary/warning messages, since the scan target can be
+      # either a registry reference or a locally downloaded tarball
+      SCAN_TARGET: ${{ inputs.IMAGE_ARTIFACT != '' && format('artifact {0}', inputs.IMAGE_ARTIFACT) || inputs.IMAGE }}
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Download image artifact
+      if: ${{ inputs.IMAGE_ARTIFACT != '' }}
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: ${{ inputs.IMAGE_ARTIFACT }}
+        path: /tmp/trivy-image
 
     - name: Run Trivy vulnerability scanner on images
       id: scan
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
       with:
-        image-ref: "${{ inputs.IMAGE }}"
+        image-ref: ${{ inputs.IMAGE_ARTIFACT == '' && inputs.IMAGE || '' }}
+        input: ${{ inputs.IMAGE_ARTIFACT != '' && format('/tmp/trivy-image/{0}', inputs.IMAGE_ARTIFACT_FILE) || '' }}
         format: ${{ inputs.FORMAT }}
         vuln-type: "os,library"
         ignore-unfixed: true
@@ -71,7 +95,7 @@ jobs:
       # missing file would fail this step and skip the warning step below
       if: ${{ inputs.FORMAT == 'table' && steps.scan.outcome == 'success' }}
       run: |
-        echo "## Trivy Scan Results for image '${{ inputs.IMAGE }}'" >> $GITHUB_STEP_SUMMARY
+        echo "## Trivy Scan Results for image '${SCAN_TARGET}'" >> $GITHUB_STEP_SUMMARY
         echo '---' >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         cat ${{ format('trivy-results.{0}', inputs.FORMAT) }} >> $GITHUB_STEP_SUMMARY
@@ -89,10 +113,8 @@ jobs:
       # Every scan/upload step above is continue-on-error, so job.status stays
       # 'success' and failure() never fires - key off the step outcomes instead
       if: ${{ steps.scan.outcome == 'failure' || steps.upload.outcome == 'failure' }}
-      env:
-        IMAGE: ${{ inputs.IMAGE }}
       run: |
-        echo ":warning: The Trivy scan report for image \`${IMAGE}\` was not successfully completed and could not be uploaded to the Github Security Panel." >> "$GITHUB_STEP_SUMMARY"
+        echo ":warning: The Trivy scan report for image \`${SCAN_TARGET}\` was not successfully completed and could not be uploaded to the Github Security Panel." >> "$GITHUB_STEP_SUMMARY"
 
   config-scan:
     name: Scan config files vulnerabilities
