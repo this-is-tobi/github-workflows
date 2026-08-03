@@ -7,6 +7,8 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 | Input               | Type    | Description                                                                              | Required | Default          |
 | ------------------- | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------- |
 | IMAGE               | string  | Image used to perform scan (e.g., docker.io/debian:latest)                               | No       | -                |
+| IMAGE_ARTIFACT      | string  | Artifact holding an image tarball to scan locally instead of pulling `IMAGE`             | No       | -                |
+| IMAGE_ARTIFACT_FILE | string  | Name of the tarball file inside `IMAGE_ARTIFACT`                                         | No       | image.tar        |
 | PATH                | string  | Path used to perform config scan                                                         | No       | -                |
 | FORMAT              | string  | Format of the report (sarif, table, json, ...)                                           | No       | table            |
 | PR_NUMBER           | string  | PR number for comment posting                                                            | No       | -                |
@@ -31,7 +33,10 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 
 ## Notes
 
-- `images-scan` runs only if `IMAGE` is provided; `config-scan` runs only if `PATH` is provided.
+- `images-scan` runs if either `IMAGE` or `IMAGE_ARTIFACT` is provided; `config-scan` runs only if `PATH` is provided.
+- `IMAGE_ARTIFACT` scans an image that was never pushed to a registry. The artifact is downloaded from the current workflow run and handed to Trivy in tarball mode (`--input`), so the scan needs no registry access at all. This pairs with `build-docker.yml` used with `PUSH: false`, letting you gate publication on the scan result instead of scanning after the fact.
+- `IMAGE_ARTIFACT` takes precedence over `IMAGE` when both are set — the local tarball is scanned and nothing is pulled.
+- The artifact must have been produced by the **same workflow run**; downloading from another run is not supported.
 - `FORMAT` controls output format: `table` (default) prints results to workflow summary, `sarif` enables GitHub Security Tab integration.
 - When `GITHUB_SECURITY_TAB: true` and `FORMAT: sarif`, uploads results to the Security tab.
 - PR comments link to either the GitHub Security Tab (when `GITHUB_SECURITY_TAB: true`) or the Workflow Summary page.
@@ -80,6 +85,43 @@ jobs:
       PATH: ./apps/api
       FORMAT: sarif
       GITHUB_SECURITY_TAB: true
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+```
+
+### Scan an image that was built but not pushed
+
+Pair with `build-docker.yml` using `PUSH: false` to scan the image **before** it is published. The build exports the image as a tarball artifact, and Trivy scans it locally in tarball mode — no registry involved, so a vulnerable image never reaches the registry in the first place.
+
+```yaml
+jobs:
+  build:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ghcr.io/my-org/my-image
+      IMAGE_TAG: pr-${{ github.event.pull_request.number }}
+      IMAGE_CONTEXT: ./
+      IMAGE_DOCKERFILE: ./Dockerfile
+      PUSH: false
+      BUILD_ARM64: false
+
+  vuln-scan:
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
+    needs:
+    - build
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+      packages: read
+    with:
+      IMAGE_ARTIFACT: ${{ needs.build.outputs.artifact-prefix }}-amd64
+      PATH: ./
+      FORMAT: table
       PR_NUMBER: ${{ github.event.pull_request.number }}
 ```
 
