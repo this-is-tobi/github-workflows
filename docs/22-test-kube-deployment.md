@@ -10,6 +10,8 @@ Test Kubernetes deployments in an ephemeral [Kind](https://kind.sigs.k8s.io/) (K
 | KIND_CONFIG    | string  | Path to a Kind cluster configuration file (relative to repo root)                                                                 | No       | -                  |
 | KIND_CLUSTER_NAME | string | Name of the Kind cluster to create                                                                                             | No       | `chart-testing`    |
 | IMAGES         | string  | Newline-separated container images to pull and load into the Kind cluster. GHCR images are authenticated automatically.           | No       | -                  |
+| IMAGE_ARTIFACTS | string | Name or glob pattern of workflow artifact(s) holding image tarballs to load into the cluster                                      | No       | -                  |
+| IMAGE_ARTIFACTS_FILE | string | Name of the tarball file inside each artifact matched by `IMAGE_ARTIFACTS`                                                 | No       | `image.tar`        |
 | HELM_PREREQS   | string  | Newline-separated prerequisite Helm charts to install before the app (format per line: `namespace release chart [helm_flags...]`) | No       | -                  |
 | HELM_CHART     | string  | Path to the Helm chart directory to deploy. Mutually exclusive with `DEPLOY_COMMAND`.                                             | No       | -                  |
 | HELM_RELEASE   | string  | Helm release name for the application                                                                                             | No       | `app`              |
@@ -40,6 +42,14 @@ Test Kubernetes deployments in an ephemeral [Kind](https://kind.sigs.k8s.io/) (K
       ghcr.io/my-org/worker:pr-42
   ```
   Only `ghcr.io` images are authenticated automatically (using `github.token`). Images from other registries must be public or authentication must be handled via `PRE_COMMAND`.
+- **IMAGE_ARTIFACTS** loads images that were never pushed to a registry, using `kind load image-archive`. It accepts an exact artifact name or a glob pattern, matching the `pattern` input of `actions/download-artifact`:
+  ```yaml
+  with:
+    IMAGE_ARTIFACTS: image-*-amd64
+  ```
+  This pairs with `build-docker.yml` used with `PUSH: false`, so a Helm deploy can be validated against the exact image a PR produces without publishing it first. The artifacts must come from the **same workflow run**. `IMAGE_ARTIFACTS` and `IMAGES` can be combined — for instance a locally built app image alongside published sidecars.
+
+  The tarballs carry their own tag (`<IMAGE_NAME>:<IMAGE_TAG>` as built), so Helm values must reference that same tag. Set `imagePullPolicy: IfNotPresent` (or `Never`) in your values, otherwise the kubelet tries to pull the image from the registry and ignores the loaded copy.
 - **KIND_CLUSTER_NAME** is passed both to the cluster creation step and to every `kind load` invocation. Override it only if you need a specific cluster name (e.g., a `KIND_CONFIG` or test script that references it by name).
 - **HELM_PREREQS** is also newline-separated. Each line has the form `namespace release chart [helm_flags...]`. The first three fields are positional; everything after is passed directly to `helm upgrade --install`. Use native Helm flags such as `--repo`, `--values`, `--set`, `--version`, etc.:
   ```yaml
@@ -108,6 +118,53 @@ jobs:
       HELM_VALUES: ./ci/kind/helm-values.prod.yaml
       HELM_ARGS: --set api.image.tag=pr-42 --set worker.image.tag=pr-42
       TEST_COMMAND: "curl -sf http://localhost/healthz"
+```
+
+### Deploy an image that was built but not pushed
+
+Pair with `build-docker.yml` using `PUSH: false` to validate a real Helm deploy against the exact image a PR produces, without publishing anything. The build exports the image as a tarball artifact, which is loaded straight into the cluster with `kind load image-archive`.
+
+Note `imagePullPolicy: IfNotPresent` in the Helm args — without it the kubelet tries to pull the tag from the registry and never uses the loaded image.
+
+```yaml
+jobs:
+  build:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ghcr.io/my-org/my-app
+      IMAGE_TAG: pr-${{ github.event.pull_request.number }}
+      IMAGE_CONTEXT: ./
+      IMAGE_DOCKERFILE: ./Dockerfile
+      PUSH: false
+      BUILD_ARM64: false
+
+  deploy-test:
+    uses: this-is-tobi/github-workflows/.github/workflows/test-kube-deployment.yml@v0
+    needs:
+    - build
+    permissions:
+      packages: read
+      contents: read
+    with:
+      IMAGE_ARTIFACTS: ${{ needs.build.outputs.artifact-prefix }}-amd64
+      HELM_CHART: ./helm
+      HELM_VALUES: ./ci/kind/helm-values.yaml
+      HELM_ARGS: >-
+        --set image.tag=pr-${{ github.event.pull_request.number }}
+        --set image.pullPolicy=IfNotPresent
+      TEST_COMMAND: "curl -sf http://localhost/healthz"
+```
+
+For a monorepo building several images in a matrix, use a glob to load them all at once:
+
+```yaml
+with:
+  IMAGE_ARTIFACTS: image-*-amd64
 ```
 
 ### Custom deploy (no Helm)
