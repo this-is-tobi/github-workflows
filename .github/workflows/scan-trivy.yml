@@ -67,7 +67,9 @@ jobs:
       continue-on-error: true
 
     - name: Print Trivy scan results
-      if: ${{ inputs.FORMAT == 'table' }}
+      # Guard on the scan outcome: a failed scan writes no report file, and a
+      # missing file would fail this step and skip the warning step below
+      if: ${{ inputs.FORMAT == 'table' && steps.scan.outcome == 'success' }}
       run: |
         echo "## Trivy Scan Results for image '${{ inputs.IMAGE }}'" >> $GITHUB_STEP_SUMMARY
         echo '---' >> $GITHUB_STEP_SUMMARY
@@ -117,7 +119,9 @@ jobs:
       continue-on-error: true
 
     - name: Print Trivy scan results
-      if: ${{ inputs.FORMAT == 'table' }}
+      # Guard on the scan outcome: a failed scan writes no report file, and a
+      # missing file would fail this step and skip the warning step below
+      if: ${{ inputs.FORMAT == 'table' && steps.scan.outcome == 'success' }}
       run: |
         echo "## Trivy Scan Results for path '${{ inputs.PATH }}'" >> $GITHUB_STEP_SUMMARY
         echo '---' >> $GITHUB_STEP_SUMMARY
