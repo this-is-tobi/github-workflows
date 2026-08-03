@@ -8,6 +8,7 @@ Test Kubernetes deployments in an ephemeral [Kind](https://kind.sigs.k8s.io/) (K
 | -------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------ |
 | KIND_VERSION   | string  | Kind version to install                                                                                                           | No       | `0.27.0`           |
 | KIND_CONFIG    | string  | Path to a Kind cluster configuration file (relative to repo root)                                                                 | No       | -                  |
+| KIND_CLUSTER_NAME | string | Name of the Kind cluster to create                                                                                             | No       | `chart-testing`    |
 | IMAGES         | string  | Newline-separated container images to pull and load into the Kind cluster. GHCR images are authenticated automatically.           | No       | -                  |
 | HELM_PREREQS   | string  | Newline-separated prerequisite Helm charts to install before the app (format per line: `namespace release chart [helm_flags...]`) | No       | -                  |
 | HELM_CHART     | string  | Path to the Helm chart directory to deploy. Mutually exclusive with `DEPLOY_COMMAND`.                                             | No       | -                  |
@@ -39,6 +40,7 @@ Test Kubernetes deployments in an ephemeral [Kind](https://kind.sigs.k8s.io/) (K
       ghcr.io/my-org/worker:pr-42
   ```
   Only `ghcr.io` images are authenticated automatically (using `github.token`). Images from other registries must be public or authentication must be handled via `PRE_COMMAND`.
+- **KIND_CLUSTER_NAME** is passed both to the cluster creation step and to every `kind load` invocation. Override it only if you need a specific cluster name (e.g., a `KIND_CONFIG` or test script that references it by name).
 - **HELM_PREREQS** is also newline-separated. Each line has the form `namespace release chart [helm_flags...]`. The first three fields are positional; everything after is passed directly to `helm upgrade --install`. Use native Helm flags such as `--repo`, `--values`, `--set`, `--version`, etc.:
   ```yaml
   with:
