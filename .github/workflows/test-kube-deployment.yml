@@ -12,6 +12,11 @@ on:
         description: Path to Kind cluster configuration file (relative to repo root)
         required: false
         type: string
+      KIND_CLUSTER_NAME:
+        description: Name of the Kind cluster to create
+        required: false
+        type: string
+        default: chart-testing
       IMAGES:
         description: >-
           Newline-separated container images to pull from registry and load
@@ -95,6 +100,7 @@ jobs:
       uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
       with:
         version: v${{ inputs.KIND_VERSION }}
+        cluster_name: ${{ inputs.KIND_CLUSTER_NAME }}
         config: ${{ inputs.KIND_CONFIG }}
         wait: 120s
 
@@ -121,10 +127,11 @@ jobs:
           image=$(echo "$image" | xargs)
           [ -z "$image" ] && continue
           echo "Loading $image into Kind..."
-          kind load docker-image "$image"
+          kind load docker-image --name "$CLUSTER_NAME" "$image"
         done
       env:
         IMAGES: ${{ inputs.IMAGES }}
+        CLUSTER_NAME: ${{ inputs.KIND_CLUSTER_NAME }}
 
     - name: Install Helm prerequisites
       if: ${{ inputs.HELM_PREREQS != '' }}
