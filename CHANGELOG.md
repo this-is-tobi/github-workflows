@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.16.0](https://github.com/this-is-tobi/github-workflows/compare/v0.15.4...v0.16.0) (2026-08-03)
+
+
+### Features
+
+* **build-docker:** allow building an image without pushing it ([66298d4](https://github.com/this-is-tobi/github-workflows/commit/66298d43a93d8e02466c92b02c8169c9b7b368f6))
+* **scan-trivy:** allow scanning a local image tarball artifact ([79c9db7](https://github.com/this-is-tobi/github-workflows/commit/79c9db72a8e24863ff039e5a0404290d38cd0398))
+* **test-kube-deployment:** allow loading local image tarball artifacts ([74ee6ba](https://github.com/this-is-tobi/github-workflows/commit/74ee6ba426408b801f35208a7aa6047f7f77e21b))
+
+
+### Bug Fixes
+
+* **scan-trivy:** keep the job green when a scan produces no report ([66d48ac](https://github.com/this-is-tobi/github-workflows/commit/66d48ac3c3f294f09b6505152b5b7ba706321151))
+* **test-kube-deployment:** load images into the right kind cluster ([e4be841](https://github.com/this-is-tobi/github-workflows/commit/e4be841fe373731b7d14c2f56a031c5792732b15))
+
+
+### Dependencies
+
+* **deps:** update github/codeql-action to v4.37.5 ([6755565](https://github.com/this-is-tobi/github-workflows/commit/67555655db0a31b15073bd7ccfbdeea9b4e4cf1e))
+
 ## [0.15.4](https://github.com/this-is-tobi/github-workflows/compare/v0.15.3...v0.15.4) (2026-08-01)
 
 
