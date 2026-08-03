@@ -123,6 +123,8 @@ jobs:
         echo "All jobs passed or were skipped."
 ```
 
+> This pipeline pushes a `pr-<number>` image to GHCR so that `scan-trivy.yml` can pull it. If you would rather not publish PR images at all, set `PUSH: false` on the `build-docker` job: the image is exported as a tarball artifact instead. Downstream jobs consume it directly — `scan-trivy.yml` via `IMAGE_ARTIFACT` (tarball mode, no registry access) and `test-kube-deployment.yml` via `IMAGE_ARTIFACTS` (`kind load image-archive`) — so the PR is fully validated without anything reaching the registry. See [Build Docker](./30-build-docker.md) for the full pattern.
+
 ### CD Pipeline
 
 Triggered on push to `develop` or `main`. release-please opens and manages the release PR; once merged, a multi-arch image is built and the Helm chart version is bumped in the external chart repository.
