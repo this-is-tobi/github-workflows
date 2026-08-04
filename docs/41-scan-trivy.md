@@ -13,6 +13,9 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 | FORMAT              | string  | Format of the report (sarif, table, json, ...)                                           | No       | table            |
 | PR_NUMBER           | string  | PR number for comment posting                                                            | No       | -                |
 | GITHUB_SECURITY_TAB | boolean | Whether to upload SARIF to GitHub Security Tab                                           | No       | false            |
+| CATEGORY            | string  | Code scanning category for the SARIF upload (set one per target in a matrix)             | No       | -                |
+| SEVERITY            | string  | Comma separated severities to report (e.g., `CRITICAL,HIGH`)                             | No       | all severities   |
+| FAIL_ON_ERROR       | boolean | Whether to fail the workflow when vulnerabilities are found                              | No       | false            |
 | RUNS_ON             | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
 
 ## Secrets
@@ -42,6 +45,10 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 - PR comments link to either the GitHub Security Tab (when `GITHUB_SECURITY_TAB: true`) or the Workflow Summary page.
 - Registry authentication: uses GitHub token for `ghcr.io`, otherwise uses provided credentials.
 - Skips common directories via `skip-dirs: **/node_modules` in config scan.
+- `CATEGORY` matters whenever one repository uploads more than one SARIF report: uploads sharing a category **replace one another**, so a matrix scanning several images without it leaves only whichever leg finished last visible in the Security tab.
+- `FAIL_ON_ERROR` defaults to `false`, unlike the same-named input elsewhere in this repository. This workflow has always been report-only, so defaulting to `true` would start failing every existing caller on findings that predate the input. Set it explicitly to gate.
+- `SEVERITY` pairs naturally with `FAIL_ON_ERROR`: gate on a narrow set (`CRITICAL`) and report on a wider one from a scheduled run.
+- With `FAIL_ON_ERROR: true` the report is still written to the workflow summary before the job fails — a non-zero exit is precisely when there is something worth reading.
 
 ## Examples
 
@@ -144,4 +151,49 @@ jobs:
     secrets:
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+```
+
+### Gate a pull request on critical findings
+
+`FAIL_ON_ERROR` turns the scan into a blocking check. Pair it with a narrow `SEVERITY` so the gate stays actionable — a wide threshold on a broad image tends to fail every PR on findings unrelated to the change.
+
+```yaml
+jobs:
+  vuln-scan:
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+      packages: read
+    with:
+      IMAGE: ghcr.io/my-org/my-image:pr-${{ github.event.pull_request.number }}
+      FORMAT: table
+      SEVERITY: CRITICAL
+      FAIL_ON_ERROR: true
+```
+
+### Scan several images without clobbering the Security tab
+
+Each matrix leg needs its own `CATEGORY`, otherwise every upload replaces the previous one.
+
+```yaml
+jobs:
+  vuln-scan:
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-trivy.yml@v0
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [api, web, worker]
+    with:
+      IMAGE: ghcr.io/my-org/${{ matrix.image }}:latest
+      FORMAT: sarif
+      SEVERITY: CRITICAL,HIGH
+      GITHUB_SECURITY_TAB: true
+      CATEGORY: trivy-${{ matrix.image }}
 ```
