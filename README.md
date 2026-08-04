@@ -50,6 +50,7 @@ For more details, see:
 - [Test JavaScript/Typescript codebase using Vitest (`test-vitest.yml`)](./.github/workflows/test-vitest.yml)
 - [Test Kubernetes deployments in an ephemeral Kind cluster (`test-kube-deployment.yml`)](./.github/workflows/test-kube-deployment.yml)
 - [Run end-to-end Playwright tests across a browser matrix (`test-playwright.yml`)](./.github/workflows/test-playwright.yml)
+- [Run a command inside a built Docker image (`test-docker.yml`)](./.github/workflows/test-docker.yml)
 
 **Build**
 

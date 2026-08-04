@@ -37,6 +37,28 @@ on:
         required: false
         default: false
         type: boolean
+      CATEGORY:
+        description: >-
+          Code scanning category for the SARIF upload. Set a distinct value per
+          target when several callers upload from the same repository (e.g. one
+          matrix leg per image) - uploads sharing a category replace one another,
+          leaving only whichever finished last.
+        required: false
+        type: string
+      SEVERITY:
+        description: >-
+          Comma separated severities to report (e.g. 'CRITICAL,HIGH'). Empty
+          reports every severity Trivy knows about.
+        required: false
+        type: string
+      FAIL_ON_FINDINGS:
+        description: >-
+          Fail the job when vulnerabilities matching SEVERITY are found. Off by
+          default: the scan reports, it does not gate. Turn on for a blocking
+          check on a narrow severity set.
+        required: false
+        default: false
+        type: boolean
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
@@ -83,30 +105,42 @@ jobs:
         format: ${{ inputs.FORMAT }}
         vuln-type: "os,library"
         ignore-unfixed: true
+        # Falls back to trivy-action's own default rather than passing an empty
+        # string, so existing callers that never set SEVERITY are unaffected
+        severity: ${{ inputs.SEVERITY || 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' }}
+        exit-code: ${{ inputs.FAIL_ON_FINDINGS && '1' || '0' }}
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
         github-pat: ${{ github.token }}
       env:
         TRIVY_USERNAME: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.actor || secrets.REGISTRY_USERNAME }}
         TRIVY_PASSWORD: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.token || secrets.REGISTRY_PASSWORD }}
-      continue-on-error: true
+      # Reporting runs are tolerant of a failed scan (a transient registry error
+      # should not fail an informational job), but a gating run has to surface it
+      continue-on-error: ${{ !inputs.FAIL_ON_FINDINGS }}
 
     - name: Print Trivy scan results
-      # Guard on the scan outcome: a failed scan writes no report file, and a
-      # missing file would fail this step and skip the warning step below
-      if: ${{ inputs.FORMAT == 'table' && steps.scan.outcome == 'success' }}
+      # Runs even when the scan step failed: with FAIL_ON_FINDINGS the scan exits
+      # non-zero precisely when there is something worth reading, and the report
+      # is still written. A failed scan that produced no file is skipped rather
+      # than erroring, so the warning step below still gets a chance to run.
+      if: ${{ !cancelled() && inputs.FORMAT == 'table' && steps.scan.outcome != 'skipped' }}
+      env:
+        REPORT_FILE: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
       run: |
+        [ -f "$REPORT_FILE" ] || exit 0
         echo "## Trivy Scan Results for image '${SCAN_TARGET}'" >> $GITHUB_STEP_SUMMARY
         echo '---' >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
-        cat ${{ format('trivy-results.{0}', inputs.FORMAT) }} >> $GITHUB_STEP_SUMMARY
+        cat "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: Upload Trivy scan results to GitHub Security tab
       id: upload
       uses: github/codeql-action/upload-sarif@d1ba80a13dd99fba24a470575428917156a28b43 # v4.37.5
-      if: ${{ inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' }}
+      if: ${{ !cancelled() && inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' && steps.scan.outcome != 'skipped' }}
       with:
         sarif_file: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
+        category: ${{ inputs.CATEGORY }}
       continue-on-error: true
 
     - name: Warn about error
@@ -136,27 +170,37 @@ jobs:
         format: ${{ inputs.FORMAT }}
         skip-dirs: "**/node_modules"
         ignore-unfixed: true
+        # Falls back to trivy-action's own default rather than passing an empty
+        # string, so existing callers that never set SEVERITY are unaffected
+        severity: ${{ inputs.SEVERITY || 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' }}
+        exit-code: ${{ inputs.FAIL_ON_FINDINGS && '1' || '0' }}
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
         github-pat: ${{ github.token }}
-      continue-on-error: true
+      # See the image scan above for why this tracks FAIL_ON_FINDINGS
+      continue-on-error: ${{ !inputs.FAIL_ON_FINDINGS }}
 
     - name: Print Trivy scan results
-      # Guard on the scan outcome: a failed scan writes no report file, and a
-      # missing file would fail this step and skip the warning step below
-      if: ${{ inputs.FORMAT == 'table' && steps.scan.outcome == 'success' }}
+      # See the image scan above: runs even on a failed scan, since that is
+      # exactly when FAIL_ON_FINDINGS has something worth printing
+      if: ${{ !cancelled() && inputs.FORMAT == 'table' && steps.scan.outcome != 'skipped' }}
+      env:
+        REPORT_FILE: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
+        SCAN_PATH: ${{ inputs.PATH }}
       run: |
-        echo "## Trivy Scan Results for path '${{ inputs.PATH }}'" >> $GITHUB_STEP_SUMMARY
+        [ -f "$REPORT_FILE" ] || exit 0
+        echo "## Trivy Scan Results for path '${SCAN_PATH}'" >> $GITHUB_STEP_SUMMARY
         echo '---' >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
-        cat ${{ format('trivy-results.{0}', inputs.FORMAT) }} >> $GITHUB_STEP_SUMMARY
+        cat "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: Upload Trivy scan results to GitHub Security tab
       id: upload
       uses: github/codeql-action/upload-sarif@d1ba80a13dd99fba24a470575428917156a28b43 # v4.37.5
-      if: ${{ inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' }}
+      if: ${{ !cancelled() && inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' && steps.scan.outcome != 'skipped' }}
       with:
         sarif_file: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
+        category: ${{ inputs.CATEGORY }}
       continue-on-error: true
 
     - name: Warn about error

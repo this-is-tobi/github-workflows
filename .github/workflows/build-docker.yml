@@ -75,6 +75,13 @@ on:
         required: false
         default: false
         type: boolean
+      SIGN:
+        description: >-
+          Sign the image digest with cosign keyless signing. Requires the caller
+          to grant 'id-token: write'.
+        required: false
+        default: false
+        type: boolean
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
@@ -309,7 +316,7 @@ jobs:
         docker buildx imagetools inspect ${{ needs.infos.outputs.normalized-image }}:${{ steps.meta.outputs.version }}
 
   attest:
-    if: ${{ inputs.PUSH && (inputs.PROVENANCE || inputs.SBOM) }}
+    if: ${{ inputs.PUSH && (inputs.PROVENANCE || inputs.SBOM || inputs.SIGN) }}
     needs:
     - infos
     - merge
@@ -323,6 +330,7 @@ jobs:
       DIGEST: ${{ needs.merge.outputs.digest }}
       PROVENANCE: ${{ inputs.PROVENANCE }}
       SBOM: ${{ inputs.SBOM }}
+      SIGN: ${{ inputs.SIGN }}
       RUNS_ON: ${{ inputs.RUNS_ON }}
     secrets:
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
