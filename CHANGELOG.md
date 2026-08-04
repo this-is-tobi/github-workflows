@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.21.0](https://github.com/this-is-tobi/github-workflows/compare/v0.20.0...v0.21.0) (2026-08-04)
+
+
+### Features
+
+* **attest-docker:** attest SBOMs with cosign instead of actions/attest ([24ba84e](https://github.com/this-is-tobi/github-workflows/commit/24ba84e7a51ec99ca6756d1e3b21bbc0ad16b7b3))
+
+
+### Bug Fixes
+
+* **workflows:** make FAIL_ON_ERROR actually gate in the remaining workflows ([be0a05a](https://github.com/this-is-tobi/github-workflows/commit/be0a05ac83089086146f8c19418468eeb1aa043c))
+
 ## [0.20.0](https://github.com/this-is-tobi/github-workflows/compare/v0.19.1...v0.20.0) (2026-08-04)
 
 
