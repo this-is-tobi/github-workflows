@@ -65,6 +65,18 @@ on:
         required: false
         default: false
         type: boolean
+      CACHE_MODE:
+        description: >-
+          Buildx cache export mode - 'max' (default) exports every intermediate
+          layer, 'min' only the layers of the final image. A repository gets 10 GB
+          of Actions cache; 'max' across several large multi-stage images blows
+          through it, and once over budget GitHub evicts least-recently-used
+          entries, so builds import a cache manifest and then hit nothing. Use
+          'min' when the total exceeds the budget - a smaller cache that survives
+          beats a complete one that is always evicted.
+        required: false
+        default: max
+        type: string
       PROVENANCE:
         description: Generate SLSA provenance attestation for the image
         required: false
@@ -221,7 +233,7 @@ jobs:
         platforms: ${{ (inputs.USE_QEMU && ((inputs.BUILD_AMD64 && inputs.BUILD_ARM64 && 'linux/amd64,linux/arm64') || (inputs.BUILD_ARM64 && 'linux/arm64') || 'linux/amd64')) || (matrix.runners == 'ubuntu-24.04-arm' && 'linux/arm64') || 'linux/amd64' }}
         outputs: ${{ inputs.PUSH && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', needs.infos.outputs.normalized-image) || format('type=docker,name={0}:{1},dest=/tmp/image.tar', needs.infos.outputs.normalized-image, inputs.IMAGE_TAG) }}
         cache-from: ${{ inputs.CACHE && format('type=gha,scope={0}-{1}', needs.infos.outputs.lower-image, matrix.runners) || '' }}
-        cache-to: ${{ inputs.CACHE && format('type=gha,mode=max,scope={0}-{1}', needs.infos.outputs.lower-image, matrix.runners) || '' }}
+        cache-to: ${{ inputs.CACHE && format('type=gha,mode={0},scope={1}-{2}', inputs.CACHE_MODE, needs.infos.outputs.lower-image, matrix.runners) || '' }}
         build-args: |
           ${{ inputs.BUILD_ARGS }}
         secrets: ${{ secrets.BUILD_SECRETS }}

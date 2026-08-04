@@ -16,6 +16,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | PUSH                | boolean | Push the image to the registry. When `false`, the image is exported as a tarball artifact | No       | true             |
 | BUILD_ARGS          | string  | Newline-separated list of Docker build args (e.g. `MY_ARG=value`)                         | No       | -                |
 | CACHE               | boolean | Enable Docker build cache (uses GitHub Actions cache backend)                             | No       | false            |
+| CACHE_MODE          | string  | Buildx cache export mode: `max` (all intermediate layers) or `min` (final image only)    | No       | max              |
 | PROVENANCE          | boolean | Generate SLSA provenance attestation for the image                                        | No       | false            |
 | SBOM                | boolean | Generate SBOM attestation for the image                                                   | No       | false            |
 | SIGN                | boolean | Sign the image digest with cosign keyless signing                                         | No       | false            |
@@ -68,6 +69,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 - `BUILD_ARGS` accepts a newline-separated list of `KEY=value` pairs passed as Docker build arguments.
 - `BUILD_SECRETS` accepts a newline-separated list of `KEY=value` pairs forwarded to `docker/build-push-action`'s `secrets` input. Unlike `BUILD_ARGS`, these are mounted as files via BuildKit (`RUN --mount=type=secret,id=KEY cat /run/secrets/KEY`) and never persisted in image layers or history — use this instead of `BUILD_ARGS` for tokens/credentials needed only during the build.
 - `CACHE` enables the GitHub Actions cache backend (`type=gha`) to speed up repeated builds, scoped per image name. It works the same whether or not the image is pushed.
+- `CACHE_MODE` matters once a repository builds several large images. A repository gets **10 GB** of Actions cache; `mode=max` exports every intermediate layer, and past that budget GitHub evicts least-recently-used entries — builds then import a cache manifest and hit *nothing*, silently paying full rebuild cost while still looking cached. Check actual usage (`gh api /repos/{owner}/{repo}/actions/caches`) and drop to `min` if the total is over: a smaller cache that survives beats a complete one that is always evicted.
 
 ### Building without pushing (`PUSH: false`)
 
