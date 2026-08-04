@@ -99,8 +99,34 @@ jobs:
         format: spdx-json
         output: sbom.spdx.json
 
-    - name: Attest SBOM
+    - name: Check SBOM size
+      id: sbom
+      # actions/attest rejects an SBOM over 16 MiB. Checked here so an oversized
+      # one is a named, explained condition rather than a raw error thrown from
+      # inside the action - and, more importantly, so it does not take the
+      # provenance attestation down with it as collateral.
       if: ${{ inputs.SBOM }}
+      env:
+        MAX_BYTES: 16777216
+        IMAGE: ${{ steps.normalize.outputs.NORMALIZED_IMAGE }}
+      run: |
+        # `wc -c` pads its output on some platforms - strip it so the step output
+        # is a bare integer rather than " 12345"
+        SIZE=$(wc -c < sbom.spdx.json | tr -d "[:space:]")
+        echo "size=${SIZE}" >> "$GITHUB_OUTPUT"
+        if [ "${SIZE}" -gt "${MAX_BYTES}" ]; then
+          echo "oversize=true" >> "$GITHUB_OUTPUT"
+          echo "::warning::SBOM for ${IMAGE} is ${SIZE} bytes, over the ${MAX_BYTES} byte attestation limit - skipping the SBOM attestation."
+          {
+            echo ":warning: The SBOM for \`${IMAGE}\` is ${SIZE} bytes, over the ${MAX_BYTES} byte limit"
+            echo "that \`actions/attest\` accepts, so no SBOM attestation was published. This usually"
+            echo "means the image ships package-manager caches (npm's content store, Go module cache)"
+            echo "that belong in the build, not in the image."
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Attest SBOM
+      if: ${{ inputs.SBOM && steps.sbom.outputs.oversize != 'true' }}
       uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
       with:
         subject-name: ${{ steps.normalize.outputs.NORMALIZED_IMAGE }}
@@ -113,7 +139,10 @@ jobs:
         create-storage-record: false
 
     - name: Attest build provenance
-      if: ${{ inputs.PROVENANCE }}
+      # Deliberately not gated on the SBOM steps succeeding. Provenance is the
+      # attestation that establishes where and from what the image was built, so
+      # an SBOM problem must never be the reason an image ships without it.
+      if: ${{ !cancelled() && inputs.PROVENANCE }}
       uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
       with:
         subject-name: ${{ steps.normalize.outputs.NORMALIZED_IMAGE }}
@@ -147,3 +176,14 @@ jobs:
         push-to-registry: true
         # See "Attest SBOM" above for why storage records are disabled.
         create-storage-record: false
+
+    - name: Fail on skipped SBOM attestation
+      # Last, so the signature, the provenance and any custom predicate are all
+      # published first. An SBOM that was asked for and not delivered is still a
+      # gap worth failing on - it just should not cost the image everything else.
+      if: ${{ !cancelled() && steps.sbom.outputs.oversize == 'true' }}
+      env:
+        SIZE: ${{ steps.sbom.outputs.size }}
+      run: |
+        echo "::error::SBOM attestation skipped - the SBOM is ${SIZE} bytes, over the 16777216 byte limit."
+        exit 1

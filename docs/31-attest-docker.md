@@ -41,6 +41,8 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a
 - The image name is automatically normalized (lowercase, `_` replaced with `-`) for OCI registry compatibility.
 - For `ghcr.io`, authentication uses `github.token` automatically; for other registries, provide `REGISTRY_USERNAME` and `REGISTRY_PASSWORD` as secrets.
 - **Alternative**: when using `build-docker.yml` in a **matrix strategy**, outputs from individual matrix jobs cannot be easily forwarded to this workflow. In that case, prefer enabling `PROVENANCE` and/or `SBOM` directly in `build-docker.yml` instead — each matrix job will attest its own image automatically.
+- `actions/attest` rejects an SBOM larger than **16 MiB**. When Trivy produces one over that, the SBOM attestation is skipped with an explicit warning and the job fails at the *end* — after the signature, the provenance and any custom predicate have been published. Provenance is deliberately not gated on the SBOM steps: it is the attestation that establishes where and from what the image was built, so an SBOM problem must never be the reason an image ships without it.
+- An oversized SBOM almost always means the image ships package-manager caches (npm's content-addressable store, the Go module cache, mise downloads). Purging those in the same layer that creates them fixes the SBOM, the image size and the scan time together.
 
 ## Examples
 
