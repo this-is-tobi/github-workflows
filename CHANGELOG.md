@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.0](https://github.com/this-is-tobi/github-workflows/compare/v0.19.1...v0.20.0) (2026-08-04)
+
+
+### Features
+
+* **build-docker:** allow callers to choose the buildx cache export mode ([f365fc1](https://github.com/this-is-tobi/github-workflows/commit/f365fc12e21be5a63957bc0928610f52fa8581a9))
+
+
+### Bug Fixes
+
+* **attest-docker:** keep provenance when the SBOM cannot be attested ([3d05b59](https://github.com/this-is-tobi/github-workflows/commit/3d05b598a47c64970c2759c197d6c23568408220))
+
 ## [0.19.1](https://github.com/this-is-tobi/github-workflows/compare/v0.19.0...v0.19.1) (2026-08-04)
 
 
