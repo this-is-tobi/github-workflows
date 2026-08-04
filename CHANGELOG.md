@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/this-is-tobi/github-workflows/compare/v0.18.1...v0.19.0) (2026-08-04)
+
+
+### Features
+
+* **scan-trivy:** allow callers to raise the scan timeout ([d907571](https://github.com/this-is-tobi/github-workflows/commit/d9075716ee1a04ff7fd7e6d8cbca02557e8c43b3))
+
 ## [0.18.1](https://github.com/this-is-tobi/github-workflows/compare/v0.18.0...v0.18.1) (2026-08-04)
 
 
