@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/this-is-tobi/github-workflows/compare/v0.19.0...v0.19.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **scan-trivy:** keep large reports from wiping the step summary ([d6661e4](https://github.com/this-is-tobi/github-workflows/commit/d6661e43226e1e2fe413265b82051b337fa86e62))
+
 ## [0.19.0](https://github.com/this-is-tobi/github-workflows/compare/v0.18.1...v0.19.0) (2026-08-04)
 
 
