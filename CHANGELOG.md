@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/this-is-tobi/github-workflows/compare/v0.16.1...v0.17.0) (2026-08-04)
+
+
+### Features
+
+* **docker:** add image testing, cosign signing and scan gating ([ec9bb77](https://github.com/this-is-tobi/github-workflows/commit/ec9bb777cab2d088c363834b9d5f174d41e12181))
+
 ## [0.16.1](https://github.com/this-is-tobi/github-workflows/compare/v0.16.0...v0.16.1) (2026-08-04)
 
 
