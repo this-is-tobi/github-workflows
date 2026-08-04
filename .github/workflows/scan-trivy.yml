@@ -51,14 +51,11 @@ on:
           reports every severity Trivy knows about.
         required: false
         type: string
-      FAIL_ON_FINDINGS:
-        description: >-
-          Fail the job when vulnerabilities matching SEVERITY are found. Off by
-          default: the scan reports, it does not gate. Turn on for a blocking
-          check on a narrow severity set.
+      FAIL_ON_ERROR:
+        description: Whether to fail the workflow when vulnerabilities are found
+        type: boolean
         required: false
         default: false
-        type: boolean
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
@@ -108,7 +105,7 @@ jobs:
         # Falls back to trivy-action's own default rather than passing an empty
         # string, so existing callers that never set SEVERITY are unaffected
         severity: ${{ inputs.SEVERITY || 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' }}
-        exit-code: ${{ inputs.FAIL_ON_FINDINGS && '1' || '0' }}
+        exit-code: ${{ inputs.FAIL_ON_ERROR && '1' || '0' }}
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
         github-pat: ${{ github.token }}
       env:
@@ -116,10 +113,10 @@ jobs:
         TRIVY_PASSWORD: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.token || secrets.REGISTRY_PASSWORD }}
       # Reporting runs are tolerant of a failed scan (a transient registry error
       # should not fail an informational job), but a gating run has to surface it
-      continue-on-error: ${{ !inputs.FAIL_ON_FINDINGS }}
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
 
     - name: Print Trivy scan results
-      # Runs even when the scan step failed: with FAIL_ON_FINDINGS the scan exits
+      # Runs even when the scan step failed: with FAIL_ON_ERROR the scan exits
       # non-zero precisely when there is something worth reading, and the report
       # is still written. A failed scan that produced no file is skipped rather
       # than erroring, so the warning step below still gets a chance to run.
@@ -173,15 +170,15 @@ jobs:
         # Falls back to trivy-action's own default rather than passing an empty
         # string, so existing callers that never set SEVERITY are unaffected
         severity: ${{ inputs.SEVERITY || 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' }}
-        exit-code: ${{ inputs.FAIL_ON_FINDINGS && '1' || '0' }}
+        exit-code: ${{ inputs.FAIL_ON_ERROR && '1' || '0' }}
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
         github-pat: ${{ github.token }}
-      # See the image scan above for why this tracks FAIL_ON_FINDINGS
-      continue-on-error: ${{ !inputs.FAIL_ON_FINDINGS }}
+      # See the image scan above for why this tracks FAIL_ON_ERROR
+      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
 
     - name: Print Trivy scan results
       # See the image scan above: runs even on a failed scan, since that is
-      # exactly when FAIL_ON_FINDINGS has something worth printing
+      # exactly when FAIL_ON_ERROR has something worth printing
       if: ${{ !cancelled() && inputs.FORMAT == 'table' && steps.scan.outcome != 'skipped' }}
       env:
         REPORT_FILE: ${{ format('trivy-results.{0}', inputs.FORMAT) }}

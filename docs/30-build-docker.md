@@ -18,6 +18,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | CACHE               | boolean | Enable Docker build cache (uses GitHub Actions cache backend)                             | No       | false            |
 | PROVENANCE          | boolean | Generate SLSA provenance attestation for the image                                        | No       | false            |
 | SBOM                | boolean | Generate SBOM attestation for the image                                                   | No       | false            |
+| SIGN                | boolean | Sign the image digest with cosign keyless signing                                         | No       | false            |
 | BUILD_AMD64         | boolean | Build for amd64                                                                           | No       | true             |
 | BUILD_ARM64         | boolean | Build for arm64                                                                           | No       | true             |
 | USE_QEMU            | boolean | Use QEMU emulator for arm64                                                               | No       | false            |
@@ -48,7 +49,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | id-token     | write  | Required to sign attestations via OIDC |
 | attestations | write  | Required to create GitHub attestations |
 
-> GitHub statically validates permissions against every job declared in a called reusable workflow, including the `attest` job — even when it's skipped at runtime because `PROVENANCE`/`SBOM` are both `false`. Callers must always grant `id-token: write` and `attestations: write`, or the workflow fails to even start with `Error calling workflow ... is only allowed 'attestations: none, id-token: none'`.
+> GitHub statically validates permissions against every job declared in a called reusable workflow, including the `attest` job — even when it's skipped at runtime because `PROVENANCE`/`SBOM`/`SIGN` are all `false`. Callers must always grant `id-token: write` and `attestations: write`, or the workflow fails to even start with `Error calling workflow ... is only allowed 'attestations: none, id-token: none'`.
 
 ## Notes 
 
@@ -80,7 +81,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 - **Unsupported combination**: `PUSH: false` + `USE_QEMU: true` + both `BUILD_AMD64` and `BUILD_ARM64`. The `docker` exporter cannot write a multi-platform manifest list to a tarball, so the workflow fails fast in the `infos` job with an explicit error. Either use native runners (`USE_QEMU: false`) or build a single architecture at a time.
 - **Registry login** is skipped when `PUSH` is `false`, unless the image targets `ghcr.io` (where credentials always resolve from the job token) or `REGISTRY_USERNAME` is provided. This means a non-GHCR image can be built without any registry credentials, while private base images can still be pulled by passing the secrets anyway.
 - The caller still needs to grant `packages: write`, `id-token: write` and `attestations: write` even with `PUSH: false`, because GitHub validates permissions statically against every job declared in the reusable workflow — including the ones skipped at runtime.
-- When `PROVENANCE` or `SBOM` is enabled, attestation runs as an additional job after the image is built and merged. Internally, this delegates to the `attest-docker.yml` reusable workflow so that attestation logic is maintained in a single place. This is especially useful when using `build-docker.yml` in a **matrix strategy**, where outputs from individual matrix jobs cannot easily be passed to a separate `attest-docker.yml` call. By attesting within the same workflow, each matrix combination attests its own image automatically.
+- When `PROVENANCE`, `SBOM` or `SIGN` is enabled, attestation runs as an additional job after the image is built and merged. Internally, this delegates to the `attest-docker.yml` reusable workflow so that attestation logic is maintained in a single place. This is especially useful when using `build-docker.yml` in a **matrix strategy**, where outputs from individual matrix jobs cannot easily be passed to a separate `attest-docker.yml` call. By attesting within the same workflow, each matrix combination attests its own image automatically.
 - The dedicated `attest-docker.yml` workflow can also be called separately after building — this is useful when you need more control over the attestation step or when not using a matrix.
 
 ## Examples
@@ -361,6 +362,37 @@ jobs:
 # In the Dockerfile:
 RUN --mount=type=secret,id=GITHUB_TOKEN \
     my-tool --token "$(cat /run/secrets/GITHUB_TOKEN)"
+```
+
+### Signing
+
+`SIGN: true` signs the pushed manifest digest with [cosign](https://docs.sigstore.dev/) keyless signing, using the workflow's OIDC identity — no key material to store or rotate. It composes with `PROVENANCE` and `SBOM`; any combination of the three runs the same `attest` job.
+
+```yaml
+jobs:
+  build:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ghcr.io/my-org/my-image
+      IMAGE_TAG: 1.2.3
+      IMAGE_CONTEXT: ./
+      IMAGE_DOCKERFILE: ./Dockerfile
+      PROVENANCE: true
+      SBOM: true
+      SIGN: true
+```
+
+Verify a signed image with:
+
+```sh
+cosign verify ghcr.io/my-org/my-image:1.2.3 \
+  --certificate-identity-regexp '^https://github.com/my-org/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 ### Provenance and SBOM attestations
