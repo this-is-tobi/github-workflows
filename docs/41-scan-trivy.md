@@ -16,6 +16,7 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 | CATEGORY            | string  | Code scanning category for the SARIF upload (set one per target in a matrix)             | No       | -                |
 | SEVERITY            | string  | Comma separated severities to report (e.g., `CRITICAL,HIGH`)                             | No       | all severities   |
 | FAIL_ON_ERROR       | boolean | Whether to fail the workflow when vulnerabilities are found                              | No       | false            |
+| TIMEOUT             | string  | Trivy scan timeout as a Go duration (e.g. `15m`)                                         | No       | 5m (Trivy's)     |
 | RUNS_ON             | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
 
 ## Secrets
@@ -49,6 +50,7 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 - `FAIL_ON_ERROR` defaults to `false`, unlike the same-named input elsewhere in this repository. This workflow has always been report-only, so defaulting to `true` would start failing every existing caller on findings that predate the input. Set it explicitly to gate.
 - `SEVERITY` pairs naturally with `FAIL_ON_ERROR`: gate on a narrow set (`CRITICAL`) and report on a wider one from a scheduled run.
 - With `FAIL_ON_ERROR: true` the report is still written to the workflow summary before the job fails — a non-zero exit is precisely when there is something worth reading.
+- `TIMEOUT` is worth setting for large images. Trivy's 5m default is per-scan, not per-file, and a single big statically linked binary can consume it — the scan then aborts with `semaphore acquire: context deadline exceeded` and writes **no report at all**, so the target silently goes unscanned while faster images in the same matrix look fine.
 - The scan covers `os,library`, and `library` includes binaries the image did not build. On an image full of third-party release binaries, `ignore-unfixed` filters less than it looks: a Go stdlib CVE counts as fixed once Go ships the fix, even though the vulnerable artifact is somebody else's prebuilt binary that only a new upstream release can change. Gate accordingly, or the check fails on findings no change to your repository can address.
 
 ## Examples

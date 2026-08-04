@@ -64,6 +64,15 @@ on:
         type: boolean
         required: false
         default: false
+      TIMEOUT:
+        description: >-
+          Trivy scan timeout as a Go duration (e.g. '15m'). Trivy defaults to 5m,
+          which a large image can exceed while analysing a single big statically
+          linked binary. That failure is total rather than partial - the scan
+          aborts with a context deadline error and writes no report at all - so
+          it reads as a broken scan rather than as a slow one.
+        required: false
+        type: string
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
@@ -116,6 +125,7 @@ jobs:
         exit-code: ${{ inputs.FAIL_ON_ERROR && '1' || '0' }}
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
         trivyignores: ${{ inputs.TRIVYIGNORES }}
+        timeout: ${{ inputs.TIMEOUT }}
         github-pat: ${{ github.token }}
       env:
         TRIVY_USERNAME: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.actor || secrets.REGISTRY_USERNAME }}
@@ -197,6 +207,7 @@ jobs:
         exit-code: ${{ inputs.FAIL_ON_ERROR && '1' || '0' }}
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
         trivyignores: ${{ inputs.TRIVYIGNORES }}
+        timeout: ${{ inputs.TIMEOUT }}
         github-pat: ${{ github.token }}
       # See the image scan above for why this is constant rather than an expression
       continue-on-error: true
