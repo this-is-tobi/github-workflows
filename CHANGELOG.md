@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.1](https://github.com/this-is-tobi/github-workflows/compare/v0.18.0...v0.18.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **scan-trivy:** make FAIL_ON_ERROR actually gate the job ([6b8de73](https://github.com/this-is-tobi/github-workflows/commit/6b8de735b3911a460f86f9169bd0f6c4ae4f42b2))
+
+
+### Dependencies
+
+* **deps:** update github/codeql-action to v4.37.6 ([fa9d04f](https://github.com/this-is-tobi/github-workflows/commit/fa9d04fef4b186ec161cc4eed9546fa97e7f180c))
+
 ## [0.18.0](https://github.com/this-is-tobi/github-workflows/compare/v0.17.1...v0.18.0) (2026-08-04)
 
 
