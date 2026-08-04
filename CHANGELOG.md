@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/this-is-tobi/github-workflows/compare/v0.17.0...v0.17.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **test-docker:** resolve the registry-login condition outside the step if ([7e2d8f2](https://github.com/this-is-tobi/github-workflows/commit/7e2d8f277ccfec98e136f43d0d976dcc4111a748))
+
 ## [0.17.0](https://github.com/this-is-tobi/github-workflows/compare/v0.16.1...v0.17.0) (2026-08-04)
 
 
