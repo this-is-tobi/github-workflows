@@ -33,6 +33,7 @@ The workflow is **command-driven**: it never installs the checkers itself. Your 
 - **FAIL_ON_ERROR**: when `false`, a failing check is reported as a non-blocking step (via `continue-on-error`) instead of failing the job — useful while adopting a checker on a codebase with pre-existing findings.
 - **Mirrors `lint-js.yml`**: same pinned action SHAs and the same `RUNTIME`/`RUNTIME_VERSION`/`PACKAGE_MANAGER`/`WORKING_DIRECTORY`/`FAIL_ON_ERROR` inputs, so callers configure it the same way.
 - **Extensible**: the same command-driven shape extends to other hygiene tools — add a `PRE_COMMAND`/extra step for tools like `sherif` (monorepo version consistency) or `are-the-types-wrong` (type resolution).
+- `FAIL_ON_ERROR` is enforced by an explicit gate step at the end of the job, not by `continue-on-error`. An expression there (`${{ !inputs.FAIL_ON_ERROR }}`) silently resolves to `true` even when the input is set, which makes the gate a no-op — the step fails, the job reports success, and the only trace is a `failure` annotation in the run summary. Reports, artifacts and cleanup still run before the gate fires.
 
 ## Examples
 

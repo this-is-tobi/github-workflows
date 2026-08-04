@@ -73,6 +73,7 @@ Test Kubernetes deployments in an ephemeral [Kind](https://kind.sigs.k8s.io/) (K
 - **Cluster cleanup** runs unconditionally via `if: always()`, even when earlier steps fail, ensuring no leftover Kind clusters on the runner.
 - **Show logs on failure** automatically dumps the last 50 lines of logs from non-`Running` pods when any step fails, making it easy to diagnose startup or crash errors without accessing the runner directly.
 - Kind is installed automatically by `helm/kind-action`. No pre-installation is required on the runner beyond Docker (pre-installed on GitHub-hosted `ubuntu-*` runners).
+- `FAIL_ON_ERROR` is enforced by an explicit gate step at the end of the job, not by `continue-on-error`. An expression there (`${{ !inputs.FAIL_ON_ERROR }}`) silently resolves to `true` even when the input is set, which makes the gate a no-op — the step fails, the job reports success, and the only trace is a `failure` annotation in the run summary. Reports, artifacts and cleanup still run before the gate fires.
 
 ## Examples
 
