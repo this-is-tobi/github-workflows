@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/this-is-tobi/github-workflows/compare/v0.17.1...v0.18.0) (2026-08-04)
+
+
+### Features
+
+* **scan-trivy:** allow callers to name a Trivy ignore file ([2eee324](https://github.com/this-is-tobi/github-workflows/commit/2eee324bf6d926d67bd17640b72296b474c696cb))
+
 ## [0.17.1](https://github.com/this-is-tobi/github-workflows/compare/v0.17.0...v0.17.1) (2026-08-04)
 
 
