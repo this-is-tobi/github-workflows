@@ -49,6 +49,7 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 - `FAIL_ON_ERROR` defaults to `false`, unlike the same-named input elsewhere in this repository. This workflow has always been report-only, so defaulting to `true` would start failing every existing caller on findings that predate the input. Set it explicitly to gate.
 - `SEVERITY` pairs naturally with `FAIL_ON_ERROR`: gate on a narrow set (`CRITICAL`) and report on a wider one from a scheduled run.
 - With `FAIL_ON_ERROR: true` the report is still written to the workflow summary before the job fails — a non-zero exit is precisely when there is something worth reading.
+- The scan covers `os,library`, and `library` includes binaries the image did not build. On an image full of third-party release binaries, `ignore-unfixed` filters less than it looks: a Go stdlib CVE counts as fixed once Go ships the fix, even though the vulnerable artifact is somebody else's prebuilt binary that only a new upstream release can change. Gate accordingly, or the check fails on findings no change to your repository can address.
 
 ## Examples
 
