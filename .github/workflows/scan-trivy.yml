@@ -139,6 +139,7 @@ jobs:
       continue-on-error: true
 
     - name: Print Trivy scan results
+      id: report
       # Runs even when the scan step failed: with FAIL_ON_ERROR the scan exits
       # non-zero precisely when there is something worth reading, and the report
       # is still written. A failed scan that produced no file is skipped rather
@@ -148,11 +149,43 @@ jobs:
         REPORT_FILE: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
       run: |
         [ -f "$REPORT_FILE" ] || exit 0
-        echo "## Trivy Scan Results for image '${SCAN_TARGET}'" >> $GITHUB_STEP_SUMMARY
-        echo '---' >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        cat "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
+        # GITHUB_STEP_SUMMARY is capped at 1 MiB and a write over the cap is
+        # dropped whole, not trimmed - a broad scan of a large image would lose
+        # its entire summary rather than the tail of one table. The budget leaves
+        # room for the heading, the fences and the note below.
+        BUDGET=900000
+        {
+          echo "## Trivy Scan Results for image '${SCAN_TARGET}'"
+          echo '---'
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+        if [ "$(wc -c < "$REPORT_FILE")" -gt "$BUDGET" ]; then
+          head -c "$BUDGET" "$REPORT_FILE" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ''
+            echo '```'
+            echo '> [!NOTE]'
+            echo '> Truncated to fit the 1 MiB step summary limit - the complete'
+            echo '> report is attached to this run as an artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "truncated=true" >> "$GITHUB_OUTPUT"
+        else
+          cat "$REPORT_FILE" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+        fi
+        # Artifact names reject the ':' and '/' a registry reference is full of
+        printf 'slug=%s\n' "$(printf '%s' "${SCAN_TARGET}" | tr -c 'A-Za-z0-9._-' '-')" >> "$GITHUB_OUTPUT"
+
+    - name: Upload the complete Trivy report
+      # Only when the summary could not hold it - otherwise the summary already
+      # is the report and an artifact is a second copy nobody opens
+      if: ${{ !cancelled() && steps.report.outputs.truncated == 'true' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: trivy-report-${{ steps.report.outputs.slug }}
+        path: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
+        retention-days: 7
+      continue-on-error: true
 
     - name: Upload Trivy scan results to GitHub Security tab
       id: upload
@@ -213,6 +246,7 @@ jobs:
       continue-on-error: true
 
     - name: Print Trivy scan results
+      id: report
       # See the image scan above: runs even on a failed scan, since that is
       # exactly when FAIL_ON_ERROR has something worth printing
       if: ${{ !cancelled() && inputs.FORMAT == 'table' && steps.scan.outcome != 'skipped' }}
@@ -221,11 +255,39 @@ jobs:
         SCAN_PATH: ${{ inputs.PATH }}
       run: |
         [ -f "$REPORT_FILE" ] || exit 0
-        echo "## Trivy Scan Results for path '${SCAN_PATH}'" >> $GITHUB_STEP_SUMMARY
-        echo '---' >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        cat "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
+        # See the image scan above for why this is truncated rather than cat'd
+        BUDGET=900000
+        {
+          echo "## Trivy Scan Results for path '${SCAN_PATH}'"
+          echo '---'
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+        if [ "$(wc -c < "$REPORT_FILE")" -gt "$BUDGET" ]; then
+          head -c "$BUDGET" "$REPORT_FILE" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ''
+            echo '```'
+            echo '> [!NOTE]'
+            echo '> Truncated to fit the 1 MiB step summary limit - the complete'
+            echo '> report is attached to this run as an artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "truncated=true" >> "$GITHUB_OUTPUT"
+        else
+          cat "$REPORT_FILE" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+        fi
+        # Artifact names reject the ':' and '/' a registry reference is full of
+        printf 'slug=%s\n' "$(printf '%s' "${SCAN_PATH}" | tr -c 'A-Za-z0-9._-' '-')" >> "$GITHUB_OUTPUT"
+
+    - name: Upload the complete Trivy report
+      # See the image scan above
+      if: ${{ !cancelled() && steps.report.outputs.truncated == 'true' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: trivy-report-${{ steps.report.outputs.slug }}
+        path: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
+        retention-days: 7
+      continue-on-error: true
 
     - name: Upload Trivy scan results to GitHub Security tab
       id: upload
