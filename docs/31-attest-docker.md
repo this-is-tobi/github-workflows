@@ -35,14 +35,46 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a
 - This workflow is designed to be called **after** `build-docker.yml`, using its `digest` and `image` outputs.
 - At least one of `PROVENANCE`, `SBOM`, `SIGN`, or a custom predicate (both `PREDICATE` and `PREDICATE_TYPE` set) must be provided for the job to perform a useful action.
 - **SLSA Provenance**: `PROVENANCE: true` generates GitHub's standard auto-detected SLSA build provenance (workflow, repo, commit of the calling repository) via [`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance), attached to the image in the registry.
-- **SBOM**: generates an SPDX SBOM via Trivy, then attests and attaches it to the image in the registry.
+- **SBOM**: generates an SPDX SBOM via Trivy, then attaches it to the image in the registry as a **cosign** attestation (keyless, Sigstore/Fulcio via OIDC). See *Verifying attestations* below — the SBOM is verified differently from the provenance.
+- The SBOM is an **inventory, not a vulnerability report** — Trivy logs `"--format spdx-json" disables security scanning`, which is expected. Findings go stale within days while the package list does not, so baking them in would ship a verdict that is wrong shortly after publication. Scan the SBOM against a current database when you need one, without re-pulling the image: `trivy sbom sbom.spdx.json`.
 - **Signing**: when `SIGN` is `true`, the image digest is keyless-signed with cosign (Sigstore/Fulcio via OIDC), independent of `PROVENANCE`/`SBOM`.
 - **Custom predicate**: set both `PREDICATE_TYPE` and `PREDICATE` together to attach an extra in-toto attestation **alongside** the standard provenance — useful, for example, to record an upstream source/version and architectures that this build mirrors, which the auto-generated provenance has no field for. Omitting either input while providing the other causes a fast-fail error. Use a predicate type URI you control; do **not** reuse the reserved `https://slsa.dev/provenance/v1` type, as GitHub validates its `buildType` against a fixed allowlist and rejects custom values.
 - The image name is automatically normalized (lowercase, `_` replaced with `-`) for OCI registry compatibility.
 - For `ghcr.io`, authentication uses `github.token` automatically; for other registries, provide `REGISTRY_USERNAME` and `REGISTRY_PASSWORD` as secrets.
 - **Alternative**: when using `build-docker.yml` in a **matrix strategy**, outputs from individual matrix jobs cannot be easily forwarded to this workflow. In that case, prefer enabling `PROVENANCE` and/or `SBOM` directly in `build-docker.yml` instead — each matrix job will attest its own image automatically.
-- `actions/attest` rejects an SBOM larger than **16 MiB**. When Trivy produces one over that, the SBOM attestation is skipped with an explicit warning and the job fails at the *end* — after the signature, the provenance and any custom predicate have been published. Provenance is deliberately not gated on the SBOM steps: it is the attestation that establishes where and from what the image was built, so an SBOM problem must never be the reason an image ships without it.
-- An oversized SBOM almost always means the image ships package-manager caches (npm's content-addressable store, the Go module cache, mise downloads). Purging those in the same layer that creates them fixes the SBOM, the image size and the scan time together.
+- Provenance is not gated on the SBOM steps: it is the attestation that establishes where and from what the image was built, so a problem generating or attaching an SBOM never costs an image its provenance.
+
+## Verifying attestations
+
+The two attestations use different mechanisms, so they are verified with different commands.
+
+**Provenance** — a GitHub attestation, also visible in the repository's Attestations tab:
+
+```sh
+gh attestation verify oci://<registry>/<image>:<tag> --owner <org>
+```
+
+**SBOM** — a cosign attestation:
+
+```sh
+cosign verify-attestation --type spdxjson \
+  --certificate-identity-regexp '^https://github.com/<org>/<workflows-repo>/.github/workflows/attest-docker.yml@' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  <registry>/<image>@<digest>
+```
+
+> [!IMPORTANT]
+> The certificate identity is the **reusable workflow that signed it** — `attest-docker.yml` in the repository hosting these workflows — not the repository being released. Keyless signing records the called workflow in the certificate, so anchoring the pattern to your own repository will fail to match. Do not drop the constraint to make it pass: without it, verification accepts a signature from anyone.
+
+### Why the SBOM uses cosign
+
+`actions/attest` refuses an SBOM larger than 16 MiB. That is reachable on ordinary content — the transitive module graph of a few dozen statically linked Go or Rust binaries runs to thousands of packages — and the only way to fit under it would be to drop entries, which removes exactly the supply-chain data the SBOM exists to carry.
+
+cosign has no such ceiling, so it is used for **every** SBOM rather than as a fallback past some size. If the mechanism switched with size, the command needed to verify an image's SBOM would depend on how large that image happened to be, and could change from one release to the next as it grew. One mechanism means one command, for every image, permanently.
+
+Provenance stays on `actions/attest-build-provenance` because that action *generates* the SLSA predicate — build platform, workflow, commit, invocation. cosign only signs a predicate you already have.
+
+The trade-off: SBOMs do not appear in the repository's Attestations tab and are not returned by `gh attestation verify`. Provenance still is.
 
 ## Examples
 
