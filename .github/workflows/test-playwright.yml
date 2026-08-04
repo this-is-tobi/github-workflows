@@ -244,7 +244,10 @@ jobs:
 
     - name: Run Playwright tests
       id: playwright-run
-      continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
+      # Constant, never an expression. `continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}`
+      # silently resolves to true even with FAIL_ON_ERROR set, so the gate never
+      # gated. The gating decision is an explicit step at the end of the job.
+      continue-on-error: true
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: ${{ inputs.TEST_COMMAND }}
       env:
@@ -257,3 +260,10 @@ jobs:
         name: playwright-report-${{ matrix.browser }}
         path: ${{ inputs.ARTIFACT_PATH }}
         retention-days: ${{ inputs.ARTIFACT_RETENTION }}
+
+    - name: Fail on test errors
+      # Runs last so reports, artifacts and cleanup all happen first
+      if: ${{ !cancelled() && inputs.FAIL_ON_ERROR && (steps.playwright-run.outcome == 'failure') }}
+      run: |
+        echo "::error::Playwright tests failed."
+        exit 1

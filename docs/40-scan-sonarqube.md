@@ -38,6 +38,7 @@ Run SonarQube static analysis and check the quality gate. The workflow optionall
 - Fails the workflow if the SonarQube quality gate fails.
 - Uses `sonarsource/sonarqube-scan-action` for SonarQube analysis.
 - Supports JavaScript/TypeScript, Python, Java, Go, C#, and more.
+- `FAIL_ON_ERROR` is enforced by an explicit gate step at the end of the job, not by `continue-on-error`. An expression there (`${{ !inputs.FAIL_ON_ERROR }}`) silently resolves to `true` even when the input is set, which makes the gate a no-op — the step fails, the job reports success, and the only trace is a `failure` annotation in the run summary. Reports, artifacts and cleanup still run before the gate fires.
 
 ## Examples
 
