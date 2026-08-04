@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/this-is-tobi/github-workflows/compare/v0.16.0...v0.16.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **build-docker:** stop the digest merge picking up other images ([c990871](https://github.com/this-is-tobi/github-workflows/commit/c990871110722ca6ca252f9cf295cc696dad2b53))
+
 ## [0.16.0](https://github.com/this-is-tobi/github-workflows/compare/v0.15.4...v0.16.0) (2026-08-03)
 
 
