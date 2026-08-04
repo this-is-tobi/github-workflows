@@ -37,6 +37,14 @@ on:
         required: false
         default: false
         type: boolean
+      TRIVYIGNORES:
+        description: >-
+          Comma separated paths to Trivy ignore files, relative to the repository
+          root (e.g. '.trivyignore.yaml'). Trivy auto-detects a plain
+          '.trivyignore', but the YAML form - the only one supporting per-path
+          scoping and a documented reason per entry - has to be named explicitly.
+        required: false
+        type: string
       CATEGORY:
         description: >-
           Code scanning category for the SARIF upload. Set a distinct value per
@@ -107,6 +115,7 @@ jobs:
         severity: ${{ inputs.SEVERITY || 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' }}
         exit-code: ${{ inputs.FAIL_ON_ERROR && '1' || '0' }}
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
+        trivyignores: ${{ inputs.TRIVYIGNORES }}
         github-pat: ${{ github.token }}
       env:
         TRIVY_USERNAME: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.actor || secrets.REGISTRY_USERNAME }}
@@ -172,6 +181,7 @@ jobs:
         severity: ${{ inputs.SEVERITY || 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' }}
         exit-code: ${{ inputs.FAIL_ON_ERROR && '1' || '0' }}
         output: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
+        trivyignores: ${{ inputs.TRIVYIGNORES }}
         github-pat: ${{ github.token }}
       # See the image scan above for why this tracks FAIL_ON_ERROR
       continue-on-error: ${{ !inputs.FAIL_ON_ERROR }}
