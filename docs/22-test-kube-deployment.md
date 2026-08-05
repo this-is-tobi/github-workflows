@@ -34,6 +34,7 @@ Test Kubernetes deployments in an ephemeral [Kind](https://kind.sigs.k8s.io/) (K
 ## Notes
 
 - **KIND_VERSION** must NOT include a `v` prefix (the workflow prepends `v` automatically); the default is `0.27.0`. Passing `v0.27.0` would result in `vv0.27.0`.
+- **HELM_ARGS** (and the trailing flags of each `HELM_PREREQS` entry) are word-split into argv on whitespace only: quotes, globs and `$VAR` are **not** interpreted. A flag value containing a space cannot be expressed here — use `HELM_VALUES` with a values file instead. `HELM_ARGS` is read as a single line, so use a folded block scalar (`>-`, as in the examples below) rather than a literal one (`|`) when spreading flags over several lines.
 - **IMAGES** is newline-separated. Pass a YAML literal block scalar (`|`) in the caller:
   ```yaml
   with:

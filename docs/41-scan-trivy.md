@@ -17,6 +17,7 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 | SEVERITY            | string  | Comma separated severities to report (e.g., `CRITICAL,HIGH`)                             | No       | all severities   |
 | FAIL_ON_ERROR       | boolean | Whether to fail the workflow when vulnerabilities are found                              | No       | false            |
 | TIMEOUT             | string  | Trivy scan timeout as a Go duration (e.g. `15m`)                                         | No       | 5m (Trivy's)     |
+| TRIVYIGNORES        | string  | Comma separated paths to Trivy ignore files, relative to the repository root (e.g. `.trivyignore.yaml`). Trivy auto-detects a plain `.trivyignore`; the YAML form — the only one supporting per-path scoping and a documented reason per entry — has to be named explicitly | No | -                |
 | RUNS_ON             | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
 
 ## Secrets

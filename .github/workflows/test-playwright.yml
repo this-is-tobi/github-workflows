@@ -207,10 +207,10 @@ jobs:
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
         case "$PKG_MANAGER" in
-          npm)  echo "CACHE_DIR=$(npm config get cache)" >> $GITHUB_OUTPUT ;;
-          yarn) echo "CACHE_DIR=$(yarn cache dir)" >> $GITHUB_OUTPUT ;;
-          pnpm) echo "CACHE_DIR=$(pnpm store path)" >> $GITHUB_OUTPUT ;;
-          bun)  echo "CACHE_DIR=$(bun pm cache)" >> $GITHUB_OUTPUT ;;
+          npm)  echo "CACHE_DIR=$(npm config get cache)" >> "$GITHUB_OUTPUT" ;;
+          yarn) echo "CACHE_DIR=$(yarn cache dir)" >> "$GITHUB_OUTPUT" ;;
+          pnpm) echo "CACHE_DIR=$(pnpm store path)" >> "$GITHUB_OUTPUT" ;;
+          bun)  echo "CACHE_DIR=$(bun pm cache)" >> "$GITHUB_OUTPUT" ;;
         esac
       env:
         PKG_MANAGER: ${{ needs.infos.outputs.package-manager }}

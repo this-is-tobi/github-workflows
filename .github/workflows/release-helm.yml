@@ -233,7 +233,7 @@ jobs:
 
           # Push to OCI registry
           echo "Publishing ${chart_file} to OCI registry..."
-          helm push "$chart_package" oci://$REGISTRY/${OCI_REPO}
+          helm push "$chart_package" "oci://$REGISTRY/$OCI_REPO"
         done
 
   release-local:

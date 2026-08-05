@@ -161,11 +161,11 @@ jobs:
           esac
         fi
         echo "Resolved runtime version: $RESOLVED_VERSION"
-        echo "runtime-version=${RESOLVED_VERSION}" >> $GITHUB_OUTPUT
+        echo "runtime-version=${RESOLVED_VERSION}" >> "$GITHUB_OUTPUT"
 
         # Check for package.json
         if [ -f "package.json" ]; then
-          echo "package-file=package.json" >> $GITHUB_OUTPUT
+          echo "package-file=package.json" >> "$GITHUB_OUTPUT"
 
           # Check if vitest is in dependencies
           HAS_VITEST="false"
@@ -173,20 +173,22 @@ jobs:
             HAS_VITEST="true"
           fi
           echo "Vitest found in package.json: $HAS_VITEST"
-          echo "has-vitest=${HAS_VITEST}" >> $GITHUB_OUTPUT
+          echo "has-vitest=${HAS_VITEST}" >> "$GITHUB_OUTPUT"
 
           # Check for test script in package.json
           if grep -q '"test"' package.json; then
             echo "Test script found in package.json"
-            echo "test-command=npm run test" >> $GITHUB_OUTPUT
+            echo "test-command=npm run test" >> "$GITHUB_OUTPUT"
           else
             echo "No test script found in package.json"
-            echo "test-command=" >> $GITHUB_OUTPUT
+            echo "test-command=" >> "$GITHUB_OUTPUT"
           fi
         else
-          echo "package-file=" >> $GITHUB_OUTPUT
-          echo "has-vitest=false" >> $GITHUB_OUTPUT
-          echo "test-command=" >> $GITHUB_OUTPUT
+          {
+            echo "package-file="
+            echo "has-vitest=false"
+            echo "test-command="
+          } >> "$GITHUB_OUTPUT"
         fi
 
         # Check for test files
@@ -197,7 +199,7 @@ jobs:
           HAS_TESTS="true"
         fi
         echo "Test files found: $HAS_TESTS"
-        echo "has-tests=${HAS_TESTS}" >> $GITHUB_OUTPUT
+        echo "has-tests=${HAS_TESTS}" >> "$GITHUB_OUTPUT"
 
   test:
     name: Run tests
