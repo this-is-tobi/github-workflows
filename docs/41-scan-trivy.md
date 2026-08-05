@@ -25,6 +25,13 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 | ----------------- | --------------------------------------------------------------- | -------- |
 | REGISTRY_USERNAME | Username used to login into registry (not needed for `ghcr.io`) | No       |
 | REGISTRY_PASSWORD | Password used to login into registry (not needed for `ghcr.io`) | No       |
+| APP_CLIENT_ID     | GitHub App **Client ID** (not the numeric App ID). With `APP_PRIVATE_KEY`, raises the API budget for Trivy's database download. See [Authentication](./05-authentication.md) | No |
+| APP_PRIVATE_KEY   | GitHub App private key (PEM). Required alongside `APP_CLIENT_ID` | No       |
+| GH_PAT            | Personal access token, same purpose as the App credentials and resolved after them. Read-only access is sufficient | No       |
+
+> **Why supply a credential here.** Trivy fetches its vulnerability database through the GitHub API, which is limited to 1,000 requests/hour per repository under `GITHUB_TOKEN`. An App token or a `GH_PAT` raises that to 5,000 — worth setting if scans intermittently fail to download the DB. Either way read-only access is enough; nothing about the scan needs write, and the App token is minted `contents: read` + `metadata: read`.
+>
+> `APP_CLIENT_ID` and `APP_PRIVATE_KEY` must be supplied **together**. Setting only one fails the job rather than falling back to `GH_PAT` or `GITHUB_TOKEN`.
 
 ## Permissions
 

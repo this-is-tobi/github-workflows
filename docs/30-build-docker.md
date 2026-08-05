@@ -15,6 +15,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | IMAGE_TARGET        | string  | Target stage to build in the Dockerfile (builds the last stage if not set)                | No       | -                |
 | PUSH                | boolean | Push the image to the registry. When `false`, the image is exported as a tarball artifact | No       | true             |
 | BUILD_ARGS          | string  | Newline-separated list of Docker build args (e.g. `MY_ARG=value`)                         | No       | -                |
+| BUILD_SECRET_GITHUB_TOKEN | string | Which credential to expose as a `github_token=<token>` build secret, readable at `/run/secrets/github_token`. Raises the GitHub API rate limit for tools resolving releases during the build (mise, aqua, ubi). One of `none`, `app`, `pat`, `job-token` — see [Build secret credential](#build-secret-credential) | No | none |
 | CACHE               | boolean | Enable Docker build cache (uses GitHub Actions cache backend)                             | No       | false            |
 | CACHE_MODE          | string  | Buildx cache export mode: `max` (all intermediate layers) or `min` (final image only)    | No       | max              |
 | PROVENANCE          | boolean | Generate SLSA provenance attestation for the image                                        | No       | false            |
@@ -32,6 +33,30 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | REGISTRY_USERNAME | Username used to login into registry (not needed for `ghcr.io`)                                              | No       |
 | REGISTRY_PASSWORD | Password used to login into registry (not needed for `ghcr.io`)                                              | No       |
 | BUILD_SECRETS     | Newline-separated `KEY=VALUE` build secrets, exposed to the Dockerfile via BuildKit secret mounts (not ARGs) | No       |
+| APP_CLIENT_ID     | GitHub App **Client ID**, used only to mint the token injected by `BUILD_SECRET_GITHUB_TOKEN`. The token is minted read-only regardless of the App's own permissions — see below. Must be supplied together with `APP_PRIVATE_KEY`; setting only one fails the job | No |
+| APP_PRIVATE_KEY   | GitHub App private key (PEM). Required alongside `APP_CLIENT_ID` | No |
+| GH_PAT            | Personal access token, same purpose as the App credentials and resolved after them. **Use a read-only token** — see below | No |
+
+## Build secret credential
+
+`BUILD_SECRET_GITHUB_TOKEN` mounts a credential at `/run/secrets/github_token`, readable by **everything the Dockerfile executes** — every install script, package postinstall hook and prebuilt binary. How tight that credential is depends entirely on which one answers, so you name it rather than letting the workflow resolve one silently:
+
+| Value       | Resolves to                          | Narrowed to                                               | Narrowed by                   |
+| ----------- | ------------------------------------ | --------------------------------------------------------- | ----------------------------- |
+| `none`      | nothing injected *(default)*         | —                                                          | —                             |
+| `app`       | App token; **fails** if absent       | `contents: read` + `metadata: read`, this repository only | This workflow, at mint time   |
+| `pat`       | App token, else `GH_PAT`; **fails** if neither | Whatever you granted the PAT                     | You, when you created it      |
+| `job-token` | App token, else `GH_PAT`, else `GITHUB_TOKEN` | **Nothing** — the job's whole `permissions:` block | Nobody; it cannot be narrowed |
+
+Each mode fails rather than widening to the next credential on its own, so a caller can never mount something broader than it asked for.
+
+**`app` is the only mode this workflow can narrow itself.** It mints a fresh read-only token regardless of what the App installation is otherwise allowed to do, which is why the same App used for releases is safe to pass here — the narrowing, not the App, is what makes it read-only.
+
+**`pat` cannot be narrowed by the workflow.** The token is injected exactly as you created it, so give it `Contents: read` on this repository and nothing more, and never use a classic token.
+
+**`job-token` is the widest option, not a safe default.** `GITHUB_TOKEN`'s permissions are fixed when the job starts and there is no way to attenuate them per-step, so it arrives carrying every scope the calling job granted — for this workflow normally including `packages: write`. A compromised transitive build dependency could push to your registry with it. The workflow emits a `::warning::` whenever this mode actually falls through to the job token. Choose it only when you accept that, and prefer leaving `BUILD_SECRET_GITHUB_TOKEN` at `none` if you have no App and no rate-limit problem to solve.
+
+See [Authentication](./05-authentication.md#what-build-docker-actually-injects).
 
 ## Outputs
 

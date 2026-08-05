@@ -86,6 +86,7 @@ For more details, see:
 **Website:** <https://this-is-tobi.com/github-workflows/introduction>
 
 **Table of Contents** *- md sources*:
+- [Authentication](./docs/05-authentication.md) *- GITHUB_TOKEN, GitHub App and PAT modes, automerge gating*
 - [Lint Commits](./docs/10-lint-commits.md) *- Conventional commits validation*
 - [Lint Helm](./docs/11-lint-helm.md) *- Helm chart linting and documentation validation*
 - [Lint Helm Schema](./docs/12-lint-helm-schema.md) *- Helm chart values JSON schema validation*

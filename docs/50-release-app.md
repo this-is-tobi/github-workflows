@@ -12,6 +12,8 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 | TAG_MAJOR_AND_MINOR      | boolean | Tag major and minor versions                                                                                                                                                                     | No       | false                            |
 | AUTOMERGE_PRERELEASE     | boolean | Automatically merge the prerelease PR                                                                                                                                                            | No       | false                            |
 | AUTOMERGE_RELEASE        | boolean | Automatically merge the release PR                                                                                                                                                               | No       | false                            |
+| AUTOMERGE_METHOD         | string  | How the PR is merged when automerge is enabled: `auto` (queue until required checks pass, needs **Allow auto-merge** on the repo) or `admin` (merge now, bypassing branch protection)            | No       | auto                             |
+| RELEASE_PR_AUTHOR        | string  | Optional hardening: only act on release pull requests opened by this login — see [Which pull requests are eligible](#which-pull-requests-are-eligible)                                            | No       | ""                               |
 | PRERELEASE_BRANCH        | string  | Branch to create the prerelease on                                                                                                                                                               | No       | develop                          |
 | RELEASE_BRANCH           | string  | Branch to create the release on                                                                                                                                                                  | No       | main                             |
 | REBASE_PRERELEASE_BRANCH | boolean | Rebase prerelease branch on release after release                                                                                                                                                | No       | false                            |
@@ -25,9 +27,17 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 
 ## Secrets
 
-| Secret | Description                                           | Required | Default |
-| ------ | ----------------------------------------------------- | -------- | ------- |
-| GH_PAT | GitHub Personal Access Token (required for automerge, see [Token setup](#token-setup)) | No       | -       |
+| Secret          | Description                                                                                                                                              | Required | Default |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |
+| APP_CLIENT_ID   | GitHub App **Client ID** (not the numeric App ID). With `APP_PRIVATE_KEY`, authenticates as a GitHub App — takes precedence over `GH_PAT`. See [Authentication](./05-authentication.md) | No       | -       |
+| APP_PRIVATE_KEY | GitHub App private key (PEM). Required alongside `APP_CLIENT_ID`                                                                                          | No       | -       |
+| GH_PAT          | GitHub Personal Access Token. Legacy alternative, still supported (see [Token setup](#token-setup))                                                       | No       | -       |
+
+> Supplying App credentials makes the release pull request trigger `pull_request` workflows, so its CI actually runs — `GITHUB_TOKEN` cannot. It also makes the release **tag** and **GitHub Release** created by release-please fire `push: tags:` and `release:` triggers, which `GITHUB_TOKEN` never did. Check what your pipeline triggers on before switching. See [Loop safety](./05-authentication.md#loop-safety).
+
+> `APP_CLIENT_ID` and `APP_PRIVATE_KEY` must be supplied **together**. Setting only one fails the job rather than falling back to `GH_PAT` or `GITHUB_TOKEN`.
+
+> **Automerge is gated on the `AUTOMERGE_*` inputs, not on credentials.** Adding App credentials never enables merging by itself. If automerge is enabled and no credential is supplied, the job fails rather than silently skipping.
 
 ## Outputs
 
@@ -49,14 +59,50 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 
 ## Token setup
 
-The `GH_PAT` secret is only required when `AUTOMERGE_PRERELEASE` or `AUTOMERGE_RELEASE` is enabled. It must be a GitHub **Personal Access Token** stored as a repository secret named `GH_PAT` in the repository that runs this workflow.
+A credential is only required when `AUTOMERGE_PRERELEASE` or `AUTOMERGE_RELEASE` is enabled. Use either a **GitHub App** (preferred) or a **Personal Access Token**, stored as repository secrets in the repository that runs this workflow.
 
-The automerge step uses `gh pr merge --rebase` with either `--auto` or `--admin`:
+### GitHub App (recommended)
 
-- If the repository has **Settings > General > Allow auto-merge** enabled, the workflow uses `--auto` (the PR merges automatically once all required status checks pass).
-- Otherwise, it falls back to `--admin` which force-merges immediately, bypassing branch protection rules.
+Set `APP_CLIENT_ID` and `APP_PRIVATE_KEY`. Beyond automerge this also makes the release pull request trigger `pull_request` workflows, which `GITHUB_TOKEN` cannot — see [Authentication](./05-authentication.md) for the full setup.
 
-### Fine-grained PAT (recommended)
+Required App repository permissions: **Contents: Read & Write**, **Pull requests: Read & Write**, **Issues: Read & Write**, **Metadata: Read**.
+
+### Which pull requests are eligible
+
+A head branch name is chosen by whoever opened the pull request — on a fork PR it is just a branch inside their own repository — so it identifies a pull request but authorizes nothing. Three filters decide what this workflow will amend or merge:
+
+1. **Fork pull requests are rejected outright.** Without this, any GitHub user could open a PR from a branch named `release-please--branches--main` and have it merged into your release branch — under `AUTOMERGE_METHOD: admin`, past branch protection and every required check.
+2. **The branch must match exactly**, either `release-please--branches--<base>` or `release-please--branches--<base>--components--<name>` — the only two shapes release-please produces. A prefix match alone also accepted `release-please--branches--main-anything`.
+3. **The pull request author must match**, which closes the remaining case the fork check cannot: someone with push access crafting a release-please-shaped branch in your own repository.
+
+All three are on by default and need no configuration. The author is **derived from whichever credential opened the pull request**:
+
+| Credential | Author the workflow expects | Derived from |
+| ---------- | --------------------------- | ------------ |
+| GitHub App | `app/<app-slug>` | the token action's own `app-slug` output |
+| `GITHUB_TOKEN` | `app/github-actions` | fixed — this is always the author |
+| `GH_PAT` | *(check skipped)* | the author is the token owner, which cannot be derived |
+
+> Note the `app/` prefix. That is how the API reports a bot author — **not** `github-actions[bot]`. Setting `RELEASE_PR_AUTHOR: github-actions[bot]` would match nothing and silently stop every merge.
+
+Set `RELEASE_PR_AUTHOR` only to override the derivation — pin your PAT owner's login under `GH_PAT`, or pass `*` to disable the author check while keeping the fork and branch guards.
+
+**Can an outsider forge the author?** No. `author.login` is set by GitHub from the identity that opened the pull request; it is not attacker-supplied. A fork's `GITHUB_TOKEN` is an installation token scoped to that fork, so it cannot open a pull request in your repository at all — and the fork check rejects cross-repository pull requests before the author is even examined. The two guards are independent, and the fork check fails closed: a pull request whose fork status cannot be determined is refused rather than allowed.
+
+**What remains.** Someone who *already has push access* could add a workflow that has your own `github-actions` bot open a pull request on a release-please-shaped branch. That passes all three filters. `RELEASE_PR_AUTHOR` does not help — they would match it. This is the trust boundary of push access rather than something the workflow can close: anyone who can push a workflow can already run arbitrary code in CI. If that matters for your repository, require review on `.github/workflows/**` via CODEOWNERS, and prefer `AUTOMERGE_METHOD: auto` so branch protection still applies.
+
+### How the merge happens
+
+The automerge step uses `gh pr merge --rebase`, with the method chosen by `AUTOMERGE_METHOD`:
+
+- `auto` (default) queues the PR and lets GitHub merge it once all required status checks pass. This requires **Settings > General > Allow auto-merge** to be enabled on the repository.
+- `admin` force-merges immediately, bypassing branch protection and required status checks.
+
+There is **no automatic fallback between them**. If `auto` is selected and auto-merge is not enabled on the repository, the job fails with a message naming the setting to enable. This is deliberate: falling back to `--admin` would merge past the very checks App authentication makes run.
+
+The step merges **every** open release-please pull request targeting the current branch, so monorepos using `separate-pull-requests` (one pull request per component) are handled — not just the first one found.
+
+### Fine-grained PAT
 
 Create a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) scoped to the **current repository** with the following permissions:
 
@@ -65,7 +111,7 @@ Create a [fine-grained personal access token](https://docs.github.com/en/authent
 | Contents      | Read & Write | Push commits (manifest sync, rebase branch)       |
 | Pull requests | Read & Write | Enable auto-merge on release PRs                  |
 
-> If the repository does **not** have "Allow auto-merge" enabled, the PAT owner must be a **repository admin** for the `--admin` merge to succeed.
+> With `AUTOMERGE_METHOD: admin` the PAT owner must be a **repository admin** for the force-merge to succeed.
 
 ### Classic PAT
 
@@ -73,8 +119,10 @@ Alternatively, create a [classic token](https://docs.github.com/en/authenticatio
 
 ### Where to store it
 
-Add the token as a **repository secret** named `GH_PAT`:  
+Add the credential as **repository secrets** (`APP_CLIENT_ID` + `APP_PRIVATE_KEY`, or `GH_PAT`):  
 **Settings > Secrets and variables > Actions > New repository secret**
+
+If both are set, the App takes precedence — useful for verifying the switch before removing the PAT.
 
 ## Notes
 
@@ -157,6 +205,8 @@ Used when `ENABLE_PRERELEASE: true`. Identical structure to the release config b
 
 The examples cover the main release scenarios: a full setup with prerelease support, a release-only flow, and a build that attaches compiled binaries to the GitHub Release.
 
+> They use GitHub App credentials, the recommended mode. To use a personal access token instead, replace the two `APP_*` lines with <span v-pre>`GH_PAT: ${{ secrets.GH_PAT }}`</span> — nothing else changes. Both can be passed together during a migration; the App wins. See [Authentication](./05-authentication.md) for end-to-end setup of either.
+
 ### Simple example
 
 Full two-branch setup with `develop` for prereleases and `main` for stable releases. `AUTOMERGE_*: true` requires a PAT with sufficient permissions to bypass branch protection rules. `REBASE_PRERELEASE_BRANCH: true` keeps `develop` rebased onto `main` automatically after each stable release.
@@ -179,7 +229,8 @@ jobs:
       RELEASE_CONFIG_FILE: custom-release-config.json
       PRERELEASE_CONFIG_FILE: custom-prerelease-config.json
     secrets:
-      GH_PAT: ${{ secrets.GH_PAT }}
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
 ### Release-only workflow
@@ -199,7 +250,8 @@ jobs:
       TAG_MAJOR_AND_MINOR: true
       AUTOMERGE_RELEASE: true
     secrets:
-      GH_PAT: ${{ secrets.GH_PAT }}
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
 ### Attach build artifacts to the release
@@ -220,7 +272,8 @@ jobs:
       ENABLE_PRERELEASE: false
       RELEASE_ASSET_PATHS: "dist/my-app-linux-amd64,dist/my-app-darwin-amd64"
     secrets:
-      GH_PAT: ${{ secrets.GH_PAT }}
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
 **Option 2 — artifacts from a previous job** (`RELEASE_ARTIFACT_NAMES`): accepts a name or glob pattern — matching artifacts uploaded via `actions/upload-artifact` in the same run are downloaded automatically before being attached to the release.
@@ -249,7 +302,8 @@ jobs:
       ENABLE_PRERELEASE: false
       RELEASE_ARTIFACT_NAMES: "my-app-binaries"  # or a glob like "my-app-*"
     secrets:
-      GH_PAT: ${{ secrets.GH_PAT }}
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
 Both inputs can be combined when some files are local and others come from previous jobs.
