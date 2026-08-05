@@ -30,6 +30,17 @@ See [Modes](#modes) for how to choose.
 | ----------------- | ------------------------------------------------------------------------------------------ | -------- |
 | REGISTRY_USERNAME | Username for OCI registry authentication (uses `github.actor` automatically for `ghcr.io`) | No       |
 | REGISTRY_PASSWORD | Password for OCI registry authentication (uses `GITHUB_TOKEN` automatically for `ghcr.io`) | No       |
+| APP_CLIENT_ID     | GitHub App **Client ID** (not the numeric App ID). With `APP_PRIVATE_KEY`, chart-releaser authenticates as a GitHub App. See [Authentication](./05-authentication.md) | No       |
+| APP_PRIVATE_KEY   | GitHub App private key (PEM). Required alongside `APP_CLIENT_ID`                            | No       |
+| GH_PAT            | Personal access token, same purpose as the App credentials and resolved after them. Ignored in `local` mode | No       |
+
+> **Why supply App credentials here.** Releases created with `GITHUB_TOKEN` cannot fire `release:` triggers — GitHub's anti-recursion rule. If you have a workflow that should run when a chart release is published, chart-releaser needs an App token. Otherwise `GITHUB_TOKEN` is fine.
+>
+> `cr index --push` authenticates the `PAGES_BRANCH` push with the same token, so an App token or `GH_PAT` also lets **that** push trigger workflows. Harmless unless a workflow triggers on the pages branch — check before pointing one at it.
+>
+> Both apply to `chart-releaser` mode only; `local` mode does not use a GitHub credential beyond the registry login. The App token is also only minted when `CREATE_GITHUB_RELEASE` is `true` — with it `false` the workflow only packages charts and pushes them to the OCI registry, so there is nothing for a write-capable token to do.
+>
+> `APP_CLIENT_ID` and `APP_PRIVATE_KEY` must be supplied **together**. Setting only one fails the job rather than falling back to `GH_PAT` or `GITHUB_TOKEN`.
 
 ## Permissions
 

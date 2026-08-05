@@ -4,6 +4,12 @@ Complete, ready-to-use CI/CD pipeline compositions that combine multiple reusabl
 
 > These examples are intended as starting points. Adjust branch names, image names, chart repositories, SonarQube URLs, and secrets to match your project.
 
+> [!IMPORTANT]
+> **Two things to know before copying a pipeline that enables automerge.**
+>
+> 1. **`AUTOMERGE_METHOD` defaults to `auto`**, which requires **Settings → General → Allow auto-merge** to be enabled on the repository. There is no fallback: if it is off, the job fails with a message naming the setting. Set `AUTOMERGE_METHOD: admin` to force-merge past branch protection instead — deliberately, since it bypasses the checks that automation exists to respect.
+> 2. **The examples below wire `GH_PAT`, but GitHub App credentials are the recommended mode.** Replace <span v-pre>`GH_PAT: ${{ secrets.GH_PAT }}`</span> with `APP_CLIENT_ID` + `APP_PRIVATE_KEY` in any `secrets:` block — every workflow here accepts both, resolving App → `GH_PAT` → `GITHUB_TOKEN`. See [Authentication](./05-authentication.md) for end-to-end setup of all three modes.
+
 ---
 
 ## Simple App
@@ -668,7 +674,7 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
-> GitHub limitation: PRs opened with `GITHUB_TOKEN` don't auto-trigger PR CI checks — merge via automerge (`GH_PAT`) or manually. The dedicated-repo variants of both styles are shown in the [Update App Version Workflow](#update-app-version-workflow) templates below.
+> PRs opened with `GITHUB_TOKEN` don't trigger PR CI checks — a GitHub App token or a `GH_PAT` does, which is the main reason to supply one (see [Authentication](./05-authentication.md)). Under `GITHUB_TOKEN` alone, merge via automerge or manually. The dedicated-repo variants of both styles are shown in the [Update App Version Workflow](#update-app-version-workflow) templates below.
 
 ---
 
@@ -843,6 +849,26 @@ on:
         required: false
         type: string
         default: rc
+      CHART_DIR:
+        description: Directory holding the charts
+        required: false
+        type: string
+        default: ./charts
+      AUTOMERGE_PRERELEASE:
+        description: Automatically merge the PR when UPGRADE_TYPE is 'prerelease'
+        required: false
+        type: boolean
+        default: false
+      AUTOMERGE_RELEASE:
+        description: Automatically merge the PR when UPGRADE_TYPE is not 'prerelease'
+        required: false
+        type: boolean
+        default: false
+      AUTOMERGE_METHOD:
+        description: How the PR is merged — 'auto' (queue until checks pass) or 'admin' (force-merge)
+        required: false
+        type: string
+        default: auto
   workflow_dispatch:
     inputs:
       RUN_MODE:
@@ -878,6 +904,29 @@ on:
         required: false
         type: string
         default: rc
+      CHART_DIR:
+        description: Directory holding the charts
+        required: false
+        type: string
+        default: ./charts
+      AUTOMERGE_PRERELEASE:
+        description: Automatically merge the PR when UPGRADE_TYPE is 'prerelease'
+        required: false
+        type: boolean
+        default: false
+      AUTOMERGE_RELEASE:
+        description: Automatically merge the PR when UPGRADE_TYPE is not 'prerelease'
+        required: false
+        type: boolean
+        default: false
+      AUTOMERGE_METHOD:
+        description: How the PR is merged — 'auto' (queue until checks pass) or 'admin' (force-merge)
+        required: false
+        type: choice
+        options:
+        - auto
+        - admin
+        default: auto
 
 jobs:
   bump-chart:
@@ -892,7 +941,16 @@ jobs:
       APP_VERSION: ${{ inputs.APP_VERSION }}
       UPGRADE_TYPE: ${{ inputs.UPGRADE_TYPE }}
       PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
+      CHART_DIR: ${{ inputs.CHART_DIR }}
+      AUTOMERGE_PRERELEASE: ${{ inputs.AUTOMERGE_PRERELEASE }}
+      AUTOMERGE_RELEASE: ${{ inputs.AUTOMERGE_RELEASE }}
+      AUTOMERGE_METHOD: ${{ inputs.AUTOMERGE_METHOD }}
+    secrets:
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
+
+> **Declare every input the caller dispatches.** `update-helm-chart` in caller mode sends `RUN_MODE`, `CHART_NAME`, `APP_VERSION`, `CHART_DIR`, `UPGRADE_TYPE`, `PRERELEASE_IDENTIFIER`, `AUTOMERGE_PRERELEASE`, `AUTOMERGE_RELEASE` and `AUTOMERGE_METHOD`. GitHub rejects a dispatch carrying an input the target workflow does not declare (`422 Unexpected inputs provided`) rather than ignoring it, so a missing declaration breaks the dispatch. `AUTOMERGE_METHOD` is the one exception: the caller retries without it and warns, so older chart repositories keep working. See [Authentication](./05-authentication.md#automerge_method-across-the-dispatch).
 
 #### Direct style variant
 

@@ -22,16 +22,21 @@ The chart version and the app version are **decoupled on purpose**: an app relea
 | APP_VERSION           | string | Application version to set in `Chart.yaml` (appVersion). Leave empty to keep the current appVersion (chart-only release)                                           | No       | -                      |
 | UPGRADE_TYPE          | string | Which SemVer part to increment: `major`, `minor`, `patch`, or `prerelease`                        | No       | patch                  |
 | PRERELEASE_IDENTIFIER | string | Identifier used when `UPGRADE_TYPE=prerelease` (e.g. `rc`)                                        | No       | rc                     |
-| AUTOMERGE_PRERELEASE  | bool   | Automatically merge the PR when `UPGRADE_TYPE` is `prerelease` (requires `GH_PAT`)                | No       | false                  |
-| AUTOMERGE_RELEASE     | bool   | Automatically merge the PR when `UPGRADE_TYPE` is not `prerelease` (requires `GH_PAT`)            | No       | false                  |
+| AUTOMERGE_PRERELEASE  | bool   | Automatically merge the PR when `UPGRADE_TYPE` is `prerelease`                                    | No       | false                  |
+| AUTOMERGE_RELEASE     | bool   | Automatically merge the PR when `UPGRADE_TYPE` is not `prerelease`                                | No       | false                  |
+| AUTOMERGE_METHOD      | string | How the PR is merged when automerge is enabled: `auto` (queue until required checks pass, needs **Allow auto-merge**) or `admin` (merge now, bypassing branch protection) | No       | auto                   |
 | BASE_BRANCH           | string | Base branch to open the chart-update pull request against (called mode)                           | No       | main                   |
 | RUNS_ON               | string | Runner labels as JSON array                                                                       | No       | ["ubuntu-24.04"]       |
 
 ## Secrets
 
-| Secret | Description                                                                                                   | Required | Default |
-| ------ | ------------------------------------------------------------------------------------------------------------- | -------- | ------- |
-| GH_PAT | GitHub Personal Access Token (needed to trigger remote workflow / automerge, see [Token setup](#token-setup)) | No       | -       |
+| Secret          | Description                                                                                                                              | Required | Default |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------- |
+| APP_CLIENT_ID   | GitHub App **Client ID** (not the numeric App ID). With `APP_PRIVATE_KEY`, authenticates as a GitHub App — takes precedence over `GH_PAT`. See [Authentication](./05-authentication.md) | No       | -       |
+| APP_PRIVATE_KEY | GitHub App private key (PEM). Required alongside `APP_CLIENT_ID`                                                                          | No       | -       |
+| GH_PAT          | GitHub Personal Access Token. Legacy alternative, still supported (see [Token setup](#token-setup))                                       | No       | -       |
+
+> **Automerge is gated on the `AUTOMERGE_*` inputs, not on credentials.** Adding App credentials never enables merging by itself. If automerge is enabled and no credential is supplied, the job fails rather than silently skipping.
 
 ## Outputs
 
@@ -48,11 +53,32 @@ The chart version and the app version are **decoupled on purpose**: an app relea
 | pull-requests | write  | Create/update the chart update PR (called mode)          |
 | contents      | write  | Commit modified chart & docs (called and local modes)    |
 
-> In **caller mode** the reusable job runs with `permissions: {}` and dispatches the remote workflow using `GH_PAT` (not `GITHUB_TOKEN`), so no `GITHUB_TOKEN` scopes are required on the caller job. The permissions above apply to **called and local modes** (local mode does not open a PR, but the job declares both scopes).
+> In **caller mode** the reusable job runs with `permissions: {}` and dispatches the remote workflow using the App token or `GH_PAT` (never `GITHUB_TOKEN`), so no `GITHUB_TOKEN` scopes are required on the caller job. The permissions above apply to **called and local modes** (local mode does not open a PR, but the job declares both scopes).
 
 ## Token setup
 
-The `GH_PAT` secret is required in **caller mode** (to dispatch a workflow in another repository) and for **automerge** in both modes. It must be a GitHub **Personal Access Token** stored as a repository secret named `GH_PAT` in the repository that runs this workflow.
+A credential is required in **caller mode** (to dispatch a workflow in another repository) and for **automerge** in both modes. Use either a **GitHub App** (preferred) or a **Personal Access Token**, stored as repository secrets in the repository that runs this workflow.
+
+### GitHub App (recommended)
+
+Set `APP_CLIENT_ID` and `APP_PRIVATE_KEY`. Beyond automerge and dispatch, this also makes the chart update pull request trigger `pull_request` workflows, which `GITHUB_TOKEN` cannot — see [Authentication](./05-authentication.md).
+
+Required App repository permissions:
+
+| Mode | Permissions | Installed on |
+| ---- | ----------- | ------------ |
+| caller | Actions: Read & Write, Metadata: Read | the **chart** repository |
+| called / local | Contents: Read & Write, Pull requests: Read & Write, Metadata: Read | the **current** repository |
+
+In caller mode the token is minted scoped to `CHART_REPO` only, so the App must be installed on that repository's owner. `CHART_REPO` must be given as `owner/repository`; a bare repository name is rejected before any token is minted, since it would otherwise resolve the owner to the repository name.
+
+`APP_CLIENT_ID` and `APP_PRIVATE_KEY` must be supplied **together**. Setting only one fails the job rather than falling back to `GH_PAT` or `GITHUB_TOKEN`, which would silently authenticate as something other than the App.
+
+### `AUTOMERGE_METHOD` in caller mode
+
+Caller mode merges nothing itself — it dispatches to the chart repository, which merges in `called` mode. `AUTOMERGE_METHOD` is forwarded with the dispatch, so the choice stays with the caller.
+
+This needs the chart repository's entry-point workflow to declare an `AUTOMERGE_METHOD` input. If it does not, the dispatch is retried once without it and the job emits a `::warning::`; the chart repository's own default (`auto`) then applies. Add the input to that workflow to take control of the merge method from the app side — the [template](./90-global-workflows-examples.md#update-app-version-workflow) includes it.
 
 ### Caller mode
 
@@ -77,10 +103,12 @@ Add the token as a **repository secret** named `GH_PAT` in the **source (app) re
 
 ### Called mode — automerge
 
-The token is used for `gh pr merge --rebase` with either `--auto` or `--admin`:
+The token is used for `gh pr merge --rebase`, with the method chosen by `AUTOMERGE_METHOD`:
 
-- If the repository has **Settings > General > Allow auto-merge** enabled, the workflow uses `--auto` (the PR merges automatically once all required status checks pass).
-- Otherwise, it falls back to `--admin` which force-merges immediately, bypassing branch protection rules.
+- `auto` (default) queues the PR and lets GitHub merge it once all required status checks pass. This requires **Settings > General > Allow auto-merge** to be enabled on the repository.
+- `admin` force-merges immediately, bypassing branch protection and required status checks.
+
+There is **no automatic fallback between them**. If `auto` is selected and auto-merge is not enabled, the job fails with a message naming the setting to enable — falling back to `--admin` would merge past the very checks App authentication makes run.
 
 #### Fine-grained PAT (recommended)
 
@@ -117,9 +145,10 @@ Add the token as a **repository secret** named `GH_PAT` in the **chart repositor
   - `minor`: `1.2.3` → `1.3.0`
   - `patch`: `1.2.3` → `1.2.4`
   - `prerelease`: `1.2.3` → `1.2.4-rc` → `1.2.4-rc.1` → `1.2.4-rc.2` (from a stable version the patch is bumped first, then the prerelease counter increments)
-- **Automerge (mode `called`)**: If `AUTOMERGE_PRERELEASE: true` (when `UPGRADE_TYPE: prerelease`) or `AUTOMERGE_RELEASE: true` (otherwise), and a `GH_PAT` is provided, the workflow attempts to merge the PR automatically:
-  - If the repository has the *Allow auto-merge* setting enabled, uses `gh pr merge --auto` (merge triggers after required checks pass).
-  - Otherwise, uses `gh pr merge --admin` to force-merge immediately.
+- **Automerge (mode `called`)**: If `AUTOMERGE_PRERELEASE: true` (when `UPGRADE_TYPE: prerelease`) or `AUTOMERGE_RELEASE: true` (otherwise), the workflow merges the PR automatically. It is gated on those inputs alone — supplying credentials never enables it by itself, and if no credential is supplied the job **fails** rather than skipping silently.
+  - `AUTOMERGE_METHOD: auto` (default) uses `gh pr merge --auto`; the merge happens once required checks pass. Requires *Allow auto-merge* on the repository, and fails naming that setting if it is off.
+  - `AUTOMERGE_METHOD: admin` uses `gh pr merge --admin` to force-merge immediately, bypassing branch protection and required checks.
+  - There is **no automatic fallback** between them.
   - Merge strategy is `--rebase`.
 - Branch naming pattern (called mode): `<chart-name>-v<NEXT_VERSION>`.
 - Tooling requirements: `yq` and `docker` (for `jnorwood/helm-docs`). No longer requires `npx semver`.
@@ -129,9 +158,13 @@ Add the token as a **repository secret** named `GH_PAT` in the **chart repositor
 
 These examples illustrate both sides of the `workflow_call` pattern: the caller workflow that triggers the chart update in another repository, and the called workflow that applies the version bump locally.
 
+> They use GitHub App credentials, the recommended mode. To use a personal access token instead, replace the two `APP_*` lines with <span v-pre>`GH_PAT: ${{ secrets.GH_PAT }}`</span> — nothing else changes. In **caller mode** the App must be installed on the repository named by `CHART_REPO`, since the token is minted scoped to it. See [Authentication](./05-authentication.md) for end-to-end setup of either.
+
 ### Caller mode
 
-Dispatches the `update-app-version.yml` workflow in the remote chart repository via `gh workflow run`. The remote workflow receives `CHART_NAME`, `APP_VERSION`, `CHART_DIR`, `UPGRADE_TYPE`, `PRERELEASE_IDENTIFIER`, `AUTOMERGE_PRERELEASE`, and `AUTOMERGE_RELEASE` and runs in `called` mode, opening a PR that bumps the chart `version` and sets `appVersion`.
+Dispatches the `update-app-version.yml` workflow in the remote chart repository via `gh workflow run`. The remote workflow receives `CHART_NAME`, `APP_VERSION`, `CHART_DIR`, `UPGRADE_TYPE`, `PRERELEASE_IDENTIFIER`, `AUTOMERGE_PRERELEASE`, `AUTOMERGE_RELEASE` and `AUTOMERGE_METHOD`, and runs in `called` mode, opening a PR that bumps the chart `version` and sets `appVersion`.
+
+Every one of those must be declared as an input on the remote workflow — GitHub rejects a dispatch carrying an undeclared input (`422 Unexpected inputs provided`) instead of ignoring it. `AUTOMERGE_METHOD` is the exception: the dispatch is retried without it and warns, so chart repositories that predate it keep working.
 
 ```yaml
 jobs:
@@ -147,7 +180,8 @@ jobs:
       UPGRADE_TYPE: minor
       AUTOMERGE_RELEASE: true
     secrets:
-      GH_PAT: ${{ secrets.GH_PAT }}
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
 ### Caller mode – prerelease bump with automerge
@@ -169,7 +203,8 @@ jobs:
       PRERELEASE_IDENTIFIER: rc
       AUTOMERGE_PRERELEASE: true
     secrets:
-      GH_PAT: ${{ secrets.GH_PAT }}
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
 ### Called mode
@@ -192,7 +227,7 @@ jobs:
 
 ### Called mode – with automerge
 
-Same as above but with `AUTOMERGE_RELEASE: true` to automatically merge the PR after checks pass. Requires `GH_PAT` to be provided.
+Same as above but with `AUTOMERGE_RELEASE: true` to automatically merge the PR after checks pass. Requires a credential — App or PAT — and *Allow auto-merge* enabled on the repository, unless `AUTOMERGE_METHOD: admin` is set.
 
 ```yaml
 jobs:
@@ -208,7 +243,8 @@ jobs:
       UPGRADE_TYPE: minor
       AUTOMERGE_RELEASE: true
     secrets:
-      GH_PAT: ${{ secrets.GH_PAT }}
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
 ### Local mode – monorepo pipeline
