@@ -217,19 +217,23 @@ jobs:
       run: |
         # Normalize image name: lowercase and replace _ with -
         NORMALIZED_IMAGE=$(echo "$INPUT_IMAGE_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')
-        echo "NORMALIZED_IMAGE=$NORMALIZED_IMAGE" >> $GITHUB_OUTPUT
-        echo "REGISTRY=$(echo "$INPUT_IMAGE_NAME" | cut -d "/" -f 1 | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-        echo "LOWER_IMAGE=$(echo "$INPUT_IMAGE_NAME" | cut -d "/" -f 2- | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
-        if [[ "$INPUT_IMAGE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-          VERSION_TAG=$(echo "$INPUT_IMAGE_TAG" | sed 's/-.*$//')
-          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_OUTPUT
-          echo "PRERELEASE_TAG=$(echo "$INPUT_IMAGE_TAG" | sed -n 's/^[0-9.]*-\(.*\)$/\1/p')" >> $GITHUB_OUTPUT
-          echo "MAJOR_TAG=$(echo $VERSION_TAG | cut -d "." -f 1)" >> $GITHUB_OUTPUT
-          echo "MINOR_TAG=$(echo $VERSION_TAG | cut -d "." -f 2)" >> $GITHUB_OUTPUT
-          echo "PATCH_TAG=$(echo $VERSION_TAG | cut -d "." -f 3)" >> $GITHUB_OUTPUT
-        fi
-        echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-        echo "LOWER_BRANCH=$(echo "$INPUT_HEAD_REF" | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        {
+          echo "NORMALIZED_IMAGE=$NORMALIZED_IMAGE"
+          echo "REGISTRY=$(echo "$INPUT_IMAGE_NAME" | cut -d "/" -f 1 | tr '[:upper:]' '[:lower:]')"
+          echo "LOWER_IMAGE=$(echo "$INPUT_IMAGE_NAME" | cut -d "/" -f 2- | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')"
+
+          if [[ "$INPUT_IMAGE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            VERSION_TAG="${INPUT_IMAGE_TAG%%-*}"
+            echo "VERSION_TAG=$VERSION_TAG"
+            echo "PRERELEASE_TAG=$(echo "$INPUT_IMAGE_TAG" | sed -n 's/^[0-9.]*-\(.*\)$/\1/p')"
+            echo "MAJOR_TAG=$(echo "$VERSION_TAG" | cut -d "." -f 1)"
+            echo "MINOR_TAG=$(echo "$VERSION_TAG" | cut -d "." -f 2)"
+            echo "PATCH_TAG=$(echo "$VERSION_TAG" | cut -d "." -f 3)"
+          fi
+
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)"
+          echo "LOWER_BRANCH=$(echo "$INPUT_HEAD_REF" | sed 's/\//-/g' | tr '[:upper:]' '[:lower:]')"
+        } >> "$GITHUB_OUTPUT"
 
   build:
     name: Build application
@@ -426,9 +430,36 @@ jobs:
 
     - name: Create manifest list and push
       working-directory: /tmp/digests/${{ needs.infos.outputs.lower-image }}
+      env:
+        NORMALIZED_IMAGE: ${{ needs.infos.outputs.normalized-image }}
       run: |
-        docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-          $(printf '${{ needs.infos.outputs.normalized-image }}@sha256:%s ' *)
+        # Both lists have to reach imagetools as separate arguments: one
+        # `-t <tag>` pair per tag, then one reference per digest file in the
+        # working directory. Building them as arrays keeps that explicit
+        # instead of leaning on word-splitting.
+        mapfile -t TAG_ARGS < <(jq -r '.tags[] | "-t", .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+
+        # One reference per digest file in this directory. Built with a loop
+        # rather than `printf` with two placeholders - printf reuses its format
+        # string until the arguments run out, so it would pair the image name
+        # with the first digest and then pair the remaining digests with each
+        # other.
+        #
+        # nullglob so an empty directory yields nothing rather than the literal
+        # `*`, which would otherwise be pushed as `<image>@sha256:*`. The upload
+        # step uses `if-no-files-found: error`, so this is a backstop.
+        shopt -s nullglob
+        DIGEST_REFS=()
+        for digest in *; do
+          DIGEST_REFS+=("$NORMALIZED_IMAGE@sha256:$digest")
+        done
+
+        if [ "${#DIGEST_REFS[@]}" -eq 0 ]; then
+          echo "::error::No digest files found in $PWD, nothing to assemble into a manifest list"
+          exit 1
+        fi
+
+        docker buildx imagetools create "${TAG_ARGS[@]}" "${DIGEST_REFS[@]}"
 
     - name: Get image digest
       id: digest
@@ -436,7 +467,7 @@ jobs:
         DIGEST=$(docker buildx imagetools inspect --raw \
           "${{ needs.infos.outputs.normalized-image }}:${{ steps.meta.outputs.version }}" \
           | sha256sum | cut -d' ' -f1)
-        echo "value=sha256:${DIGEST}" >> $GITHUB_OUTPUT
+        echo "value=sha256:${DIGEST}" >> "$GITHUB_OUTPUT"
 
     - name: Inspect image
       run: |

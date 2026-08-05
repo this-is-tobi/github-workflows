@@ -37,7 +37,7 @@ Run a command inside a built Docker image, from either a registry reference or a
 - This pairs with `build-docker.yml` used with `PUSH: false`, letting you test an image **before** it is published rather than after.
 - `ENTRYPOINT` is needed whenever the image declares one that would otherwise swallow `COMMAND` — a shell, or a service start script. Without it, `COMMAND` is passed as arguments to the existing entrypoint.
 - `WORKSPACE_PATH` mounts a directory from the calling repository read-only, so test scripts can live next to the code they verify instead of being inlined into the workflow.
-- `COMMAND` and `RUN_ARGS` are word-split into argv, so they behave as they would on a shell command line.
+- `COMMAND` and `RUN_ARGS` are word-split into argv, so they behave as they would on a shell command line. Splitting is on whitespace only: quotes, globs and `$VAR` are **not** interpreted, and only the first line of a multi-line value is used. An argument that has to contain a space cannot be expressed here — put it in a script and call that instead.
 - The repository is only checked out when `WORKSPACE_PATH` is set.
 - This catches the class of breakage a successful `docker build` cannot: a tool that installed but does not execute, a binary that never reached `PATH`, a missing shared library.
 

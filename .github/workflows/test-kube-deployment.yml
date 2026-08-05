@@ -185,12 +185,15 @@ jobs:
           [ -z "$line" ] && continue
 
           read -r namespace release chart extra <<< "$line"
+          # `extra` holds any remaining helm flags for this prerequisite, so it
+          # is split into separate arguments rather than passed as one string.
+          read -ra extra_args <<< "$extra"
 
           echo "Installing $release ($chart) in namespace $namespace..."
           helm upgrade --install --wait \
             --namespace "$namespace" \
             --create-namespace \
-            $extra \
+            "${extra_args[@]}" \
             "$release" "$chart"
         done
       env:
@@ -201,11 +204,14 @@ jobs:
       run: |
         helm dependency build "$HELM_CHART"
 
-        HELM_CMD="helm upgrade --install --wait"
+        HELM_CMD=(helm upgrade --install --wait)
         if [ -n "$HELM_VALUES" ]; then
-          HELM_CMD="$HELM_CMD --values $HELM_VALUES"
+          HELM_CMD+=(--values "$HELM_VALUES")
         fi
-        $HELM_CMD $HELM_ARGS "$HELM_RELEASE" "$HELM_CHART"
+        # HELM_ARGS is a caller-supplied argv fragment, split once here.
+        read -ra HELM_EXTRA_ARGS <<< "$HELM_ARGS"
+
+        "${HELM_CMD[@]}" "${HELM_EXTRA_ARGS[@]}" "$HELM_RELEASE" "$HELM_CHART"
       env:
         HELM_CHART: ${{ inputs.HELM_CHART }}
         HELM_VALUES: ${{ inputs.HELM_VALUES }}

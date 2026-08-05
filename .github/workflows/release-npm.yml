@@ -279,11 +279,11 @@ jobs:
       continue-on-error: true
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
-        ARGS="--tag $TAG --access $ACCESS"
+        ARGS=(--tag "$TAG" --access "$ACCESS")
         if [ "$DRY_RUN" = "true" ]; then
-          ARGS="$ARGS --dry-run"
+          ARGS+=(--dry-run)
         fi
-        npm publish $ARGS
+        npm publish "${ARGS[@]}"
       env:
         TAG: ${{ inputs.TAG }}
         ACCESS: ${{ inputs.ACCESS }}
@@ -299,11 +299,11 @@ jobs:
       continue-on-error: true
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
-        ARGS="--tag $TAG --access $ACCESS"
+        ARGS=(--tag "$TAG" --access "$ACCESS")
         if [ "$DRY_RUN" = "true" ]; then
-          ARGS="$ARGS --dry-run"
+          ARGS+=(--dry-run)
         fi
-        yarn npm publish $ARGS
+        yarn npm publish "${ARGS[@]}"
       env:
         TAG: ${{ inputs.TAG }}
         ACCESS: ${{ inputs.ACCESS }}
@@ -319,11 +319,11 @@ jobs:
       continue-on-error: true
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
-        ARGS="--tag $TAG --access $ACCESS --no-git-checks"
+        ARGS=(--tag "$TAG" --access "$ACCESS" --no-git-checks)
         if [ "$DRY_RUN" = "true" ]; then
-          ARGS="$ARGS --dry-run"
+          ARGS+=(--dry-run)
         fi
-        pnpm publish $ARGS
+        pnpm publish "${ARGS[@]}"
       env:
         TAG: ${{ inputs.TAG }}
         ACCESS: ${{ inputs.ACCESS }}
@@ -339,11 +339,11 @@ jobs:
       continue-on-error: true
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
-        ARGS="--tag $TAG --access $ACCESS"
+        ARGS=(--tag "$TAG" --access "$ACCESS")
         if [ "$DRY_RUN" = "true" ]; then
-          ARGS="$ARGS --dry-run"
+          ARGS+=(--dry-run)
         fi
-        bun publish $ARGS
+        bun publish "${ARGS[@]}"
       env:
         TAG: ${{ inputs.TAG }}
         ACCESS: ${{ inputs.ACCESS }}
@@ -369,11 +369,11 @@ jobs:
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
         echo "Publishing with npm $(npm --version) via trusted publishing (OIDC)"
-        ARGS="--tag $TAG --access $ACCESS"
+        ARGS=(--tag "$TAG" --access "$ACCESS")
         if [ "$DRY_RUN" = "true" ]; then
-          ARGS="$ARGS --dry-run"
+          ARGS+=(--dry-run)
         fi
-        npm publish $ARGS
+        npm publish "${ARGS[@]}"
       env:
         TAG: ${{ inputs.TAG }}
         ACCESS: ${{ inputs.ACCESS }}

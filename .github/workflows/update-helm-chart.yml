@@ -201,7 +201,7 @@ jobs:
         fi
 
         # Remove trailing slashes
-        CHART_DIR=$(printf '%s' "$CHART_DIR" | sed 's:/*$::')
+        while [ "${CHART_DIR%/}" != "$CHART_DIR" ]; do CHART_DIR="${CHART_DIR%/}"; done
 
         echo "Trigger workflow '$WORKFLOW_NAME' in repository '$CHART_REPO' to update chart '$CHART_DIR/$CHART_NAME' with app version '$APP_VERSION'"
 
@@ -313,7 +313,7 @@ jobs:
         PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
       run: |
         # Remove trailing slashes
-        CHART_DIR=$(echo "$CHART_DIR" | sed 's:/*$::')
+        while [ "${CHART_DIR%/}" != "$CHART_DIR" ]; do CHART_DIR="${CHART_DIR%/}"; done
 
         if [ ! -f "$CHART_DIR/$CHART_NAME/Chart.yaml" ]; then
           echo "Chart.yaml not found in $CHART_DIR/$CHART_NAME"
@@ -414,12 +414,14 @@ jobs:
         docker run \
           --rm \
           --volume "$(pwd)/$CHART_DIR/$CHART_NAME:/helm-docs" \
-          -u $(id -u) \
+          -u "$(id -u)" \
           docker.io/jnorwood/helm-docs:latest
 
-        echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-        echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_OUTPUT
-        echo "BRANCH_NAME=$CHART_NAME-v$NEXT_VERSION" >> $GITHUB_OUTPUT
+        {
+          echo "CURRENT_VERSION=$CURRENT_VERSION"
+          echo "NEXT_VERSION=$NEXT_VERSION"
+          echo "BRANCH_NAME=$CHART_NAME-v$NEXT_VERSION"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Commit and push chart bump
       id: push-local

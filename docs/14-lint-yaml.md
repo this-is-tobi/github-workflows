@@ -23,6 +23,7 @@ Lint YAML files using `yamllint`. Scans a configurable path for YAML files and r
 - When `CONFIG_FILE` is provided and the file exists, it is passed via `--config-file`; otherwise `yamllint` uses its built-in default rules.
 - `STRICT: true` adds `--strict` to the `yamllint` invocation, causing warnings to be treated as errors.
 - Scans the path specified by `SCAN_PATH` (defaults to the repository root `.`).
+- `SCAN_PATH` is **one path**, passed to `yamllint` as a single argument. Whitespace is part of the value, not a separator — `SCAN_PATH: "./charts ./docs"` looks for a directory literally named `charts ./docs`, it does not scan two paths. Run the workflow twice, or point it at a common parent.
 
 ## Examples
 

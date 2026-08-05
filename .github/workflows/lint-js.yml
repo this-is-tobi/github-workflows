@@ -139,7 +139,7 @@ jobs:
           esac
         fi
         echo "Resolved runtime version: $RESOLVED_VERSION"
-        echo "runtime-version=${RESOLVED_VERSION}" >> $GITHUB_OUTPUT
+        echo "runtime-version=${RESOLVED_VERSION}" >> "$GITHUB_OUTPUT"
 
         # Check for existing ESLint config
         HAS_CONFIG="false"
@@ -149,13 +149,13 @@ jobs:
           HAS_CONFIG="true"
         fi
         echo "ESLint config exists: $HAS_CONFIG"
-        echo "has-eslint-config=${HAS_CONFIG}" >> $GITHUB_OUTPUT
+        echo "has-eslint-config=${HAS_CONFIG}" >> "$GITHUB_OUTPUT"
 
         # Detect package file
         if [ -f "package.json" ]; then
-          echo "package-file=package.json" >> $GITHUB_OUTPUT
+          echo "package-file=package.json" >> "$GITHUB_OUTPUT"
         else
-          echo "package-file=" >> $GITHUB_OUTPUT
+          echo "package-file=" >> "$GITHUB_OUTPUT"
         fi
 
   lint:
@@ -291,30 +291,31 @@ jobs:
         ESLINT_CONFIG_FILE: ${{ inputs.ESLINT_CONFIG_FILE }}
         LINT_PATHS: ${{ inputs.LINT_PATHS }}
       run: |
-        CONFIG_FLAG=""
+        CONFIG_FLAG=()
         # Match the detection step: only use --config when the file actually exists
         if [ -n "$ESLINT_CONFIG_FILE" ] && [ -f "$ESLINT_CONFIG_FILE" ]; then
-          CONFIG_FLAG="--config $ESLINT_CONFIG_FILE"
+          CONFIG_FLAG=(--config "$ESLINT_CONFIG_FILE")
         fi
 
-        # Accept comma- or space-separated paths (shell word-splitting only
-        # handles whitespace, so normalize commas to spaces first)
-        LINT_PATHS="${LINT_PATHS//,/ }"
+        # Accept comma- or space-separated paths: normalize commas to spaces,
+        # then split once into an array so paths reach ESLint as distinct
+        # arguments rather than relying on word-splitting at the call site.
+        read -ra LINT_PATH_ARGS <<< "${LINT_PATHS//,/ }"
 
         # Run ESLint and capture exit code
         EXIT_CODE=0
         case "${{ needs.detect-setup.outputs.package-manager }}" in
           npm)
-            npx eslint $CONFIG_FLAG $LINT_PATHS || EXIT_CODE=$?
+            npx eslint "${CONFIG_FLAG[@]}" "${LINT_PATH_ARGS[@]}" || EXIT_CODE=$?
             ;;
           pnpm)
-            pnpm exec eslint $CONFIG_FLAG $LINT_PATHS || EXIT_CODE=$?
+            pnpm exec eslint "${CONFIG_FLAG[@]}" "${LINT_PATH_ARGS[@]}" || EXIT_CODE=$?
             ;;
           yarn)
-            yarn eslint $CONFIG_FLAG $LINT_PATHS || EXIT_CODE=$?
+            yarn eslint "${CONFIG_FLAG[@]}" "${LINT_PATH_ARGS[@]}" || EXIT_CODE=$?
             ;;
           bun)
-            bunx eslint $CONFIG_FLAG $LINT_PATHS || EXIT_CODE=$?
+            bunx eslint "${CONFIG_FLAG[@]}" "${LINT_PATH_ARGS[@]}" || EXIT_CODE=$?
             ;;
         esac
 
