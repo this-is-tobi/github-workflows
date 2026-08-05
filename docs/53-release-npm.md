@@ -50,7 +50,7 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 - `DRY_RUN` appends `--dry-run` to the publish command to validate packaging without uploading. Note: Yarn Berry's `yarn npm publish` does not support `--dry-run`, so `DRY_RUN: true` is not supported with `PACKAGE_MANAGER: yarn`.
 - `FAIL_ON_ERROR: false` sets `continue-on-error: true` on the publish step, useful when some packages in a matrix may already be published.
 - Dependency caches are keyed by package manager, OS, architecture, and the combined hash of all lock files.
-- `FAIL_ON_ERROR` is enforced by an explicit gate step at the end of the job, not by `continue-on-error`. An expression there (`${{ !inputs.FAIL_ON_ERROR }}`) silently resolves to `true` even when the input is set, which makes the gate a no-op — the step fails, the job reports success, and the only trace is a `failure` annotation in the run summary. Reports, artifacts and cleanup still run before the gate fires.
+- `FAIL_ON_ERROR` is enforced by an explicit gate step at the end of the job, not by `continue-on-error`. An expression there (<span v-pre>`${{ !inputs.FAIL_ON_ERROR }}`</span>) silently resolves to `true` even when the input is set, which makes the gate a no-op — the step fails, the job reports success, and the only trace is a `failure` annotation in the run summary. Reports, artifacts and cleanup still run before the gate fires.
 
 ### Trusted publishing (OIDC)
 

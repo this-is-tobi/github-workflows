@@ -54,7 +54,7 @@ Run end-to-end Playwright tests across a dynamic matrix of browsers. Handles Jav
 - **PRE_COMMAND** runs after dependency installation and before tests. Use it for build steps, environment setup scripts, or `npx playwright install --with-deps` for bundled browsers.
 
 - **FAIL_ON_ERROR** set to `false` allows tests to report results without blocking the pipeline. The step outcome is still visible in the Actions UI.
-- `FAIL_ON_ERROR` is enforced by an explicit gate step at the end of the job, not by `continue-on-error`. An expression there (`${{ !inputs.FAIL_ON_ERROR }}`) silently resolves to `true` even when the input is set, which makes the gate a no-op — the step fails, the job reports success, and the only trace is a `failure` annotation in the run summary. Reports, artifacts and cleanup still run before the gate fires.
+- `FAIL_ON_ERROR` is enforced by an explicit gate step at the end of the job, not by `continue-on-error`. An expression there (<span v-pre>`${{ !inputs.FAIL_ON_ERROR }}`</span>) silently resolves to `true` even when the input is set, which makes the gate a no-op — the step fails, the job reports success, and the only trace is a `failure` annotation in the run summary. Reports, artifacts and cleanup still run before the gate fires.
 
 ## Examples
 
