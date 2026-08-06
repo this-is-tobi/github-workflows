@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.1](https://github.com/this-is-tobi/github-workflows/compare/v0.22.0...v0.22.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **lint-helm:** stop hardcoding 'charts' as the helm-docs scan directory ([ceaa55f](https://github.com/this-is-tobi/github-workflows/commit/ceaa55fcb57c1740564e3babaacfbe71f3d47511))
+
 ## [0.22.0](https://github.com/this-is-tobi/github-workflows/compare/v0.21.0...v0.22.0) (2026-08-06)
 
 
