@@ -137,7 +137,7 @@ Add the token as a **repository secret** named `GH_PAT` in the **chart repositor
 
 - `RUN_MODE=caller`: Validates `CHART_REPO` is provided, then invokes `gh workflow run <WORKFLOW_NAME>` in the target repo, forwarding: `CHART_NAME`, `APP_VERSION`, `CHART_DIR`, `UPGRADE_TYPE`, `PRERELEASE_IDENTIFIER`, `AUTOMERGE_PRERELEASE`, `AUTOMERGE_RELEASE`, and forcing `RUN_MODE=called` in the remote execution.
 - `RUN_MODE=called`: Reads current chart `version` from `charts/<CHART_NAME>/Chart.yaml` (via `yq`), computes `NEXT_VERSION` using Release Please-compatible logic, updates `version` (and `appVersion` when `APP_VERSION` is provided), regenerates docs with `helm-docs`, and creates/updates a PR containing the bump.
-- `RUN_MODE=local`: Same bump as `called`, but **commits directly on the current branch** instead of opening a PR, and exposes `chart-version` / `commit-sha` outputs so downstream jobs in the same pipeline can publish the chart (chain with `release-helm.yml` `MODE: local` + `CHECKOUT_REF`). Notes:
+- `RUN_MODE=local`: Same bump as `called`, but **commits directly on the current branch** instead of opening a PR, and exposes `chart-version` / `commit-sha` outputs so downstream jobs in the same pipeline can publish the chart (chain with [`release-helm-local.yml`](./52-release-helm-local.md)'s `CHECKOUT_REF`). Notes:
   - The push is authenticated with `GITHUB_TOKEN`, and such pushes **never trigger new workflow runs** — no CD loop; release the chart in the same run using the outputs.
   - Direct pushes require the branch to accept them (no "require a pull request" protection rule for `github-actions[bot]`); if your branch is protected, use `called` mode with automerge instead.
   - Leave `APP_VERSION` empty for a **chart-only release** (bumps `version`, keeps `appVersion`).
@@ -277,14 +277,13 @@ jobs:
       PRERELEASE_IDENTIFIER: rc
 
   release-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm-local.yml@v0
     needs:
     - bump-chart
     permissions:
       contents: read
       packages: write
     with:
-      MODE: local
       CHART_NAME: my-service
       # Package exactly the bump commit pushed by the previous job
       CHECKOUT_REF: ${{ needs.bump-chart.outputs.commit-sha }}

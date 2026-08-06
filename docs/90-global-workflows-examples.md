@@ -203,6 +203,8 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
+> To add SLSA provenance, an SBOM and/or cosign signing to `build-docker`, compose an `attest` job after it rather than looking for inputs on `build-docker.yml` itself — see [`build-docker.yml` → Attestation and signing](./30-build-docker.md#attestation-and-signing-attest-dockeryml).
+
 ---
 
 ## Monorepo App
@@ -369,7 +371,7 @@ jobs:
 
 ### CD Pipeline
 
-A single release-please run covers the whole monorepo. When a new release is created, all service images are rebuilt with the release version tag and the Helm chart is bumped. This example bumps a chart in an **external** charts repository via `update-helm-chart` (caller mode); if the chart instead lives **inside** the monorepo (e.g. `charts/my-app`), release it in the same pipeline with `release-helm` in `local` mode — see [Releasing an in-repo chart (local mode)](#releasing-an-in-repo-chart-local-mode) below.
+A single release-please run covers the whole monorepo. When a new release is created, all service images are rebuilt with the release version tag and the Helm chart is bumped. This example bumps a chart in an **external** charts repository via `update-helm-chart` (caller mode); if the chart instead lives **inside** the monorepo (e.g. `charts/my-app`), release it in the same pipeline with `release-helm-local.yml` — see [Releasing an in-repo chart (local mode)](#releasing-an-in-repo-chart-local-mode) below.
 
 ```yaml
 name: CD
@@ -483,6 +485,8 @@ jobs:
       GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
+> `build-docker` here is a **matrix** job (`api`/`client`/`docs`). To attest these images, don't matrix an `attest` job the same way and reference `needs.build-docker.outputs.digest` — GitHub collapses matrix job outputs to a single value, so it would silently attest the wrong image for at least two of the three. Add one explicit, non-matrixed `attest-<service>` job per service instead — see [`build-docker.yml` → Matrix builds](./30-build-docker.md#matrix-builds) for the full pattern.
+
 ### Releasing an in-repo chart (local mode)
 
 When the Helm chart is part of the monorepo (e.g. `charts/my-app`) rather than a separate charts repository, keep **two decoupled version streams**:
@@ -490,7 +494,7 @@ When the Helm chart is part of the monorepo (e.g. `charts/my-app`) rather than a
 - the **app** version, driven by release-please (`release-app`);
 - the **chart** version, driven by `update-helm-chart` in `local` mode — bumped when the app releases (with the new `appVersion` injected), or on its own for chart-only changes.
 
-`chart-releaser`'s tag-based change detection is unreliable here (the tag namespace is full of app tags like `v1.2.3`), so the chart is published by `release-helm` in **`local` mode**, which simply packages the committed `Chart.yaml` and pushes it to the OCI registry.
+`chart-releaser`'s tag-based change detection is unreliable here (the tag namespace is full of app tags like `v1.2.3`), so the chart is published by **`release-helm-local.yml`**, which simply packages the committed `Chart.yaml` and pushes it to the OCI registry.
 
 **App release path** — replace the `bump-chart` (caller mode) job of the CD pipeline above with this pair: after each app release, the chart is bumped on its own lifecycle (`prerelease` on `develop`, `patch` on `main` — the existing prerelease `x.y.z-rc.n` graduates automatically), committed directly on the branch, and published in the same run:
 
@@ -514,14 +518,13 @@ jobs:
       PRERELEASE_IDENTIFIER: rc
 
   release-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm-local.yml@v0
     needs:
     - bump-chart
     permissions:
       contents: read
       packages: write
     with:
-      MODE: local
       CHARTS_DIR: ./charts
       CHART_NAME: my-app
       # Package exactly the bump commit pushed by update-helm-chart
@@ -580,7 +583,7 @@ jobs:
       PRERELEASE_IDENTIFIER: rc
 
   release-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm-local.yml@v0
     needs:
     - chart-infos
     - bump-chart
@@ -590,7 +593,6 @@ jobs:
       contents: read
       packages: write
     with:
-      MODE: local
       CHARTS_DIR: ./charts
       CHART_NAME: my-app
       # Empty when bump-chart was skipped -> packages the pushed commit as-is
@@ -621,7 +623,7 @@ jobs:
 
 The chart bump logic handles the whole train natively: `0.4.1-alpha.3` → (push to `beta`) `0.4.1-beta` → `0.4.1-beta.1` → (push to `main`) `0.4.1`. On the ArgoCD side, point each environment at the matching stream with a semver constraint on `targetRevision`: stable environments use e.g. `1.x` (semver ranges exclude prereleases by default), pre-production environments use a prerelease-inclusive range such as `>=0.0.0-0`, and the per-train identifiers (`-alpha.n`, `-beta.n`) keep the streams distinguishable.
 
-The chart is then pullable with `helm pull oci://ghcr.io/<owner>/<repo>/my-app --version <version>`. See [`release-helm.yml` → Modes](./51-release-helm.md#modes) and [`update-helm-chart.yml`](./52-update-helm-chart.md) for the full details.
+The chart is then pullable with `helm pull oci://ghcr.io/<owner>/<repo>/my-app --version <version>`. See [`release-helm-local.yml`](./52-release-helm-local.md) and [`update-helm-chart.yml`](./53-update-helm-chart.md) for the full details.
 
 ---
 
@@ -629,21 +631,21 @@ The chart is then pullable with `helm pull oci://ghcr.io/<owner>/<repo>/my-app -
 
 Whatever the topology, releasing a chart is always the **same two building blocks**:
 
-1. **The bump brain** — [`update-helm-chart.yml`](./52-update-helm-chart.md) computes the next chart version on the chart's own lifecycle. The *style* knob is its mode: `called` opens a **pull request** (release-please style, human gate or automerge) while `local` **commits directly** and the release continues in the same run.
-2. **The publisher** — [`release-helm.yml`](./51-release-helm.md) in `local` mode packages the committed `Chart.yaml` and pushes it to the OCI registry. Direct style feeds it the bump commit via `CHECKOUT_REF`; PR style lets the merge trigger a chart CD workflow whose guard job detects the already-bumped version and publishes as-is.
+1. **The bump brain** — [`update-helm-chart.yml`](./53-update-helm-chart.md) computes the next chart version on the chart's own lifecycle. The *style* knob is its mode: `called` opens a **pull request** (release-please style, human gate or automerge) while `local` **commits directly** and the release continues in the same run.
+2. **The publisher** — [`release-helm-local.yml`](./52-release-helm-local.md) packages the committed `Chart.yaml` and pushes it to the OCI registry. Direct style feeds it the bump commit via `CHECKOUT_REF`; PR style lets the merge trigger a chart CD workflow whose guard job detects the already-bumped version and publishes as-is.
 
 **The repo that hosts the chart owns the style** — in a monorepo the app repo's CD picks the mode; with a dedicated chart repository its entry-point workflow does. The topology only changes *where* the two jobs run:
 
-| Release style                       | Monorepo (chart in app repo)                                                                                            | Dedicated chart repository                                                                                                                                   |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **PR-gated** (release-please style) | App CD → `update-helm-chart` (`called`, PR on same repo) → merge triggers the chart CD guard → `release-helm` (`local`) | App CD → `update-helm-chart` (`caller`) → chart repo entry-point (`called`, PR) → merge triggers the chart CD → `release-helm` (`local` or `chart-releaser`) |
-| **Direct** (in-pipeline)            | App CD → `update-helm-chart` (`local`) → `release-helm` (`local`, same run)                                             | App CD → `update-helm-chart` (`caller`) → chart repo entry-point (`local`) → `release-helm` (`local`, same run)                                              |
+| Release style                       | Monorepo (chart in app repo)                                                                                                    | Dedicated chart repository                                                                                                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PR-gated** (release-please style) | App CD → `update-helm-chart` (`called`, PR on same repo) → merge triggers the chart CD guard → `release-helm-local`             | App CD → `update-helm-chart` (`caller`) → chart repo entry-point (`called`, PR) → merge triggers the chart CD → `release-helm-local` or `release-helm` (chart-releaser) |
+| **Direct** (in-pipeline)            | App CD → `update-helm-chart` (`local`) → `release-helm-local`, same run                                                          | App CD → `update-helm-chart` (`caller`) → chart repo entry-point (`local`) → `release-helm-local`, same run                                                            |
 
 Shared guarantees across all four quadrants:
 
 - Chart and app versions stay **decoupled** (`appVersion` tracks the app; chart `version` follows its own stream, including chart-only releases with `APP_VERSION` empty).
 - Loop safety is identical: direct bump commits are pushed with `GITHUB_TOKEN` and never retrigger workflows; PR merges (human or PAT automerge) do trigger the chart CD, whose guard prevents any re-bump.
-- `release-helm`'s `chart-releaser` mode remains the classic alternative for dedicated chart repositories that want auto-detection, GitHub Releases and a `gh-pages` `index.yaml` on top of the OCI push.
+- [`release-helm.yml`](./51-release-helm.md) (chart-releaser) remains the classic alternative for dedicated chart repositories that want auto-detection, GitHub Releases and a `gh-pages` `index.yaml` on top of the OCI push.
 
 The **monorepo direct** flow is shown [above](#releasing-an-in-repo-chart-local-mode); the **monorepo PR-gated** variant only swaps the `bump-chart` job (the publisher stays the chart CD guard workflow shown above, which the merged PR triggers):
 
@@ -792,7 +794,7 @@ jobs:
 
 Triggered on push to `main`. chart-releaser detects which charts had their version bumped and pushes them to the OCI registry (optionally creating GitHub Releases with `CREATE_GITHUB_RELEASE: true`).
 
-> Harmonized alternative: instead of chart-releaser's tag-based detection, you can reuse the exact same guard + `release-helm` `local` chart CD as the monorepo (`on: push: paths: charts/**` — see [Helm Chart Release Patterns](#helm-chart-release-patterns)). Keep `chart-releaser` mode when you want auto-detection across many charts, GitHub Releases, or a classic `gh-pages` `index.yaml`.
+> Harmonized alternative: instead of chart-releaser's tag-based detection, you can reuse the exact same guard + `release-helm-local.yml` chart CD as the monorepo (`on: push: paths: charts/**` — see [Helm Chart Release Patterns](#helm-chart-release-patterns)). Keep `release-helm.yml` (chart-releaser) when you want auto-detection across many charts, GitHub Releases, or a classic `gh-pages` `index.yaml`.
 
 ```yaml
 name: CD
@@ -972,14 +974,13 @@ jobs:
       PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
 
   release-chart:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm-local.yml@v0
     needs:
     - bump-chart
     permissions:
       contents: read
       packages: write
     with:
-      MODE: local
       CHART_NAME: ${{ inputs.CHART_NAME }}
       # Package exactly the bump commit pushed by update-helm-chart
       CHECKOUT_REF: ${{ needs.bump-chart.outputs.commit-sha }}
