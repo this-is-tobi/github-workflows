@@ -112,6 +112,21 @@ jobs:
         else
           DETECTED_PM=$(walk_pm)
         fi
+
+        # Constrained to the four known managers before it leaves this step.
+        # walk_pm reads the `packageManager` field out of a repository's
+        # package.json, so on a pull request this value is attacker-controlled -
+        # and it is consumed downstream by shell `case` statements. Pinning it to
+        # an allowlist here means those consumers can only ever receive one of
+        # four literals, whatever they do with it.
+        case "$DETECTED_PM" in
+          npm|pnpm|yarn|bun) ;;
+          *)
+            echo "::error::Unsupported package manager '$DETECTED_PM'. Expected one of npm, pnpm, yarn, bun - check the 'packageManager' field in package.json, or set the PACKAGE_MANAGER input."
+            exit 1
+            ;;
+        esac
+
         echo "Package manager detected: $DETECTED_PM"
         echo "package-manager=${DETECTED_PM}" >> "$GITHUB_OUTPUT"
 
@@ -215,24 +230,32 @@ jobs:
     - name: Setup ESLint config (if not exists)
       if: ${{ needs.detect-setup.outputs.has-eslint-config == 'false' }}
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        # Same reason as the lint step below: values reach the shell through
+        # `env:` rather than being interpolated into the script body, so the
+        # shell parses a variable reference instead of whatever the value
+        # happens to contain. PKG_MANAGER is allowlisted in detect-setup too.
+        PKG_MANAGER: ${{ needs.detect-setup.outputs.package-manager }}
+        PACKAGE_FILE: ${{ needs.detect-setup.outputs.package-file }}
+        ESLINT_CONFIG: ${{ inputs.ESLINT_CONFIG }}
       run: |
         # Check if ESLint is already in package.json
-        echo "Checking for ESLint in package file: ${{ needs.detect-setup.outputs.package-file }}"
-        if ! grep -q '"eslint"' ${{ needs.detect-setup.outputs.package-file }} 2>/dev/null; then
+        echo "Checking for ESLint in package file: $PACKAGE_FILE"
+        if ! grep -q '"eslint"' "$PACKAGE_FILE" 2>/dev/null; then
           # Install ESLint and config
-          echo "Installing ESLint and config: ${{ inputs.ESLINT_CONFIG }}"
-          case "${{ needs.detect-setup.outputs.package-manager }}" in
+          echo "Installing ESLint and config: $ESLINT_CONFIG"
+          case "$PKG_MANAGER" in
             npm)
-              npm install --save-dev eslint ${{ inputs.ESLINT_CONFIG }}
+              npm install --save-dev eslint "$ESLINT_CONFIG"
               ;;
             pnpm)
-              pnpm add -D eslint ${{ inputs.ESLINT_CONFIG }}
+              pnpm add -D eslint "$ESLINT_CONFIG"
               ;;
             yarn)
-              yarn add -D eslint ${{ inputs.ESLINT_CONFIG }}
+              yarn add -D eslint "$ESLINT_CONFIG"
               ;;
             bun)
-              bun add -d eslint ${{ inputs.ESLINT_CONFIG }}
+              bun add -d eslint "$ESLINT_CONFIG"
               ;;
           esac
         fi
@@ -290,6 +313,11 @@ jobs:
       env:
         ESLINT_CONFIG_FILE: ${{ inputs.ESLINT_CONFIG_FILE }}
         LINT_PATHS: ${{ inputs.LINT_PATHS }}
+        # Read through `env:` rather than interpolated into the shell body, the
+        # convention lint-deps, release-npm and test-playwright already follow.
+        # The value is allowlisted in detect-setup, so this is the second of two
+        # independent guards rather than the only one.
+        PKG_MANAGER: ${{ needs.detect-setup.outputs.package-manager }}
       run: |
         CONFIG_FLAG=()
         # Match the detection step: only use --config when the file actually exists
@@ -304,7 +332,7 @@ jobs:
 
         # Run ESLint and capture exit code
         EXIT_CODE=0
-        case "${{ needs.detect-setup.outputs.package-manager }}" in
+        case "$PKG_MANAGER" in
           npm)
             npx eslint "${CONFIG_FLAG[@]}" "${LINT_PATH_ARGS[@]}" || EXIT_CODE=$?
             ;;

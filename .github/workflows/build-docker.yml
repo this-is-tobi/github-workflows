@@ -463,15 +463,48 @@ jobs:
 
     - name: Get image digest
       id: digest
+      env:
+        NORMALIZED_IMAGE: ${{ needs.infos.outputs.normalized-image }}
+        IMAGE_VERSION: ${{ steps.meta.outputs.version }}
+        DIGESTS_DIR: /tmp/digests/${{ needs.infos.outputs.lower-image }}
       run: |
-        DIGEST=$(docker buildx imagetools inspect --raw \
-          "${{ needs.infos.outputs.normalized-image }}:${{ steps.meta.outputs.version }}" \
-          | sha256sum | cut -d' ' -f1)
+        set -euo pipefail
+
+        # This digest is what the attest job cosign-signs and mints SLSA
+        # provenance for, under this repository's OIDC identity. It is resolved
+        # from a MUTABLE tag, which is a time-of-check/time-of-use gap: between
+        # the push above and this inspect, anyone able to write that tag - a
+        # second concurrent run of this workflow, or another repository in the
+        # org holding packages:write - can repoint it, and we would sign their
+        # image as ours.
+        #
+        # So the resolved manifest is checked against what this run actually
+        # pushed: its children must be exactly the per-platform digests in the
+        # digests directory. A repointed tag resolves to a different child set
+        # and fails here instead of being signed.
+        RAW=$(docker buildx imagetools inspect --raw "$NORMALIZED_IMAGE:$IMAGE_VERSION")
+        DIGEST=$(printf '%s' "$RAW" | sha256sum | cut -d' ' -f1)
+
+        mapfile -t EXPECTED < <(find "$DIGESTS_DIR" -maxdepth 1 -type f -printf '%f\n' | sort)
+        mapfile -t RESOLVED < <(
+          printf '%s' "$RAW" |
+            jq -r '(.manifests // [])[] | select((.annotations["vnd.docker.reference.type"] // "") == "") | .digest' |
+            sed 's/^sha256://' | sort
+        )
+
+        if [ "${EXPECTED[*]}" != "${RESOLVED[*]}" ]; then
+          echo "::error::'$NORMALIZED_IMAGE:$IMAGE_VERSION' does not resolve to the image this run pushed, so it will not be signed or attested. Expected children [${EXPECTED[*]}], resolved [${RESOLVED[*]}]. The tag was most likely rewritten by a concurrent run or another writer between the push and this check - add a 'concurrency:' group to the calling workflow if two runs can push the same tag."
+          exit 1
+        fi
+
         echo "value=sha256:${DIGEST}" >> "$GITHUB_OUTPUT"
 
     - name: Inspect image
+      env:
+        NORMALIZED_IMAGE: ${{ needs.infos.outputs.normalized-image }}
+        IMAGE_VERSION: ${{ steps.meta.outputs.version }}
       run: |
-        docker buildx imagetools inspect ${{ needs.infos.outputs.normalized-image }}:${{ steps.meta.outputs.version }}
+        docker buildx imagetools inspect "$NORMALIZED_IMAGE:$IMAGE_VERSION"
 
   attest:
     if: ${{ inputs.PUSH && (inputs.PROVENANCE || inputs.SBOM || inputs.SIGN) }}

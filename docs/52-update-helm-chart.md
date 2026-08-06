@@ -19,9 +19,10 @@ The chart version and the app version are **decoupled on purpose**: an app relea
 | CHART_REPO            | string | Target chart repository (`owner/repo`) when in caller mode                                        | No       | -                      |
 | CHART_DIR             | string | Directory containing the Helm charts (in `CHART_REPO`)                                            | No       | charts                 |
 | CHART_NAME            | string | Name of the chart to update (in `CHART_DIR`)                                                      | Yes      | -                      |
-| APP_VERSION           | string | Application version to set in `Chart.yaml` (appVersion). Leave empty to keep the current appVersion (chart-only release)                                           | No       | -                      |
+| APP_VERSION           | string | Application version to set in `Chart.yaml` (appVersion). Leave empty to keep the current appVersion (chart-only release). When set, must match `^[A-Za-z0-9][A-Za-z0-9.+_-]*$` | No       | -                      |
 | UPGRADE_TYPE          | string | Which SemVer part to increment: `major`, `minor`, `patch`, or `prerelease`                        | No       | patch                  |
-| PRERELEASE_IDENTIFIER | string | Identifier used when `UPGRADE_TYPE=prerelease` (e.g. `rc`)                                        | No       | rc                     |
+| PRERELEASE_IDENTIFIER | string | Identifier used when `UPGRADE_TYPE=prerelease` (e.g. `rc`). Must match `^[A-Za-z0-9-]+$`          | No       | rc                     |
+| HELM_DOCS_VERSION     | string | Version of helm-docs used to regenerate the chart README. Pinned rather than tracking `:latest`   | No       | v1.14.2                |
 | AUTOMERGE_PRERELEASE  | bool   | Automatically merge the PR when `UPGRADE_TYPE` is `prerelease`                                    | No       | false                  |
 | AUTOMERGE_RELEASE     | bool   | Automatically merge the PR when `UPGRADE_TYPE` is not `prerelease`                                | No       | false                  |
 | AUTOMERGE_METHOD      | string | How the PR is merged when automerge is enabled: `auto` (queue until required checks pass, needs **Allow auto-merge**) or `admin` (merge now, bypassing branch protection) | No       | auto                   |

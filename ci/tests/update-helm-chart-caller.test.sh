@@ -57,6 +57,19 @@ test_validate_rejects_missing_chart_repo() {
   assert_output_contains "CHART_REPO is required"
 }
 
+test_validate_rejects_chart_repo_with_a_trailing_newline_payload() {
+  validate_env
+  # `grep -Eq` matched line by line, so a well-formed first line let anything
+  # follow it. The owner is split off this value and handed to the token mint.
+  export CHART_REPO='my-org/helm-charts
+evil'
+
+  run_block "$VALIDATE"
+
+  assert_status 1 "a multi-line CHART_REPO must not pass validation"
+  assert_output_contains "CHART_REPO must be"
+}
+
 test_validate_rejects_chart_repo_without_owner() {
   validate_env
   # Without a slash both ${CHART_REPO%%/*} and ${CHART_REPO##*/} yield the same
@@ -66,7 +79,7 @@ test_validate_rejects_chart_repo_without_owner() {
   run_block "$VALIDATE"
 
   assert_status 1
-  assert_output_contains "must be 'owner/repository'"
+  assert_output_contains "CHART_REPO must be"
 }
 
 test_validate_rejects_chart_repo_with_extra_path_segments() {
@@ -76,7 +89,7 @@ test_validate_rejects_chart_repo_with_extra_path_segments() {
   run_block "$VALIDATE"
 
   assert_status 1
-  assert_output_contains "must be 'owner/repository'"
+  assert_output_contains "CHART_REPO must be"
 }
 
 test_validate_rejects_unknown_automerge_method() {
