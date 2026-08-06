@@ -44,15 +44,12 @@ See [Modes](#modes) for how to choose.
 
 ## Permissions
 
-Grant these on the **caller** job depending on the mode:
+| Scope    | Access | Description                          |
+| -------- | ------ | ------------------------------------- |
+| contents | write  | Always — see the note below           |
+| packages | write  | Always — push charts to the OCI registry (`ghcr.io`) |
 
-| Scope    | Access | When                                                                                                    |
-| -------- | ------ | ------------------------------------------------------------------------------------------------------- |
-| packages | write  | Always — push charts to the OCI registry (`ghcr.io`)                                                    |
-| contents | read   | `local` mode — checkout only                                                                            |
-| contents | write  | `chart-releaser` mode with `CREATE_GITHUB_RELEASE: true` — create releases/tags and update `index.yaml` |
-
-> The reusable workflow declares one job per mode; only the job matching `MODE` runs. In `chart-releaser` mode grant `contents: write` (harmless if `CREATE_GITHUB_RELEASE` is left `false`); in `local` mode `contents: read` is sufficient.
+> The reusable workflow declares one job per mode (`release` for `chart-releaser`, `release-local` for `local`); only the job matching `MODE` actually runs. GitHub validates both jobs' declared permissions statically regardless of `MODE`, though — granting only `contents: read` fails the run at startup even in `local` mode, where `write` goes otherwise unused at runtime. Always grant `contents: write`.
 
 ## Modes
 
@@ -188,7 +185,7 @@ jobs:
     needs:
     - bump-chart
     permissions:
-      contents: read
+      contents: write
       packages: write
     with:
       MODE: local
