@@ -18,9 +18,6 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | BUILD_SECRET_GITHUB_TOKEN | string | Which credential to expose as a `github_token=<token>` build secret, readable at `/run/secrets/github_token`. Raises the GitHub API rate limit for tools resolving releases during the build (mise, aqua, ubi). One of `none`, `app`, `pat`, `job-token` — see [Build secret credential](#build-secret-credential) | No | none |
 | CACHE               | boolean | Enable Docker build cache (uses GitHub Actions cache backend)                             | No       | false            |
 | CACHE_MODE          | string  | Buildx cache export mode: `max` (all intermediate layers) or `min` (final image only)    | No       | max              |
-| PROVENANCE          | boolean | Generate SLSA provenance attestation for the image                                        | No       | false            |
-| SBOM                | boolean | Generate SBOM attestation for the image                                                   | No       | false            |
-| SIGN                | boolean | Sign the image digest with cosign keyless signing                                         | No       | false            |
 | BUILD_AMD64         | boolean | Build for amd64                                                                           | No       | true             |
 | BUILD_ARM64         | boolean | Build for arm64                                                                           | No       | true             |
 | USE_QEMU            | boolean | Use QEMU emulator for arm64                                                               | No       | false            |
@@ -68,14 +65,12 @@ See [Authentication](./05-authentication.md#what-build-docker-actually-injects).
 
 ## Permissions
 
-| Scope        | Access | Description                            |
-| ------------ | ------ | -------------------------------------- |
-| packages     | write  | Push images to GHCR when applicable    |
-| contents     | read   | Read repository to build context       |
-| id-token     | write  | Required to sign attestations via OIDC |
-| attestations | write  | Required to create GitHub attestations |
+| Scope    | Access | Description                          |
+| -------- | ------ | ------------------------------------- |
+| packages | write  | Push images to GHCR when applicable   |
+| contents | read   | Read repository to build context      |
 
-> GitHub statically validates permissions against every job declared in a called reusable workflow, including the `attest` job — even when it's skipped at runtime because `PROVENANCE`/`SBOM`/`SIGN` are all `false`. Callers must always grant `id-token: write` and `attestations: write`, or the workflow fails to even start with `Error calling workflow ... is only allowed 'attestations: none, id-token: none'`.
+This workflow never needs `id-token`/`attestations` — it has no nested call that requests them. Attestation is a separate, explicit composition step; see [Attestation and signing](#attestation-and-signing-attest-dockeryml) below.
 
 ## Notes 
 
@@ -86,7 +81,7 @@ See [Authentication](./05-authentication.md#what-build-docker-actually-injects).
 - Registry login logic: uses GitHub token for `ghcr.io`, otherwise uses provided credentials via secrets.
 - Digest artifacts are uploaded and merged for multi-arch images.
 - Manifest list is created and pushed after build.
-- The workflow exposes three outputs: `digest` (the SHA256 digest of the pushed manifest), `image` (the normalized image name) and `artifact-prefix` (the tarball artifact prefix used when `PUSH` is `false`). The first two are designed to be consumed by `attest-docker.yml` for provenance and SBOM attestations.
+- The workflow exposes three outputs: `digest` (the SHA256 digest of the pushed manifest), `image` (the normalized image name) and `artifact-prefix` (the tarball artifact prefix used when `PUSH` is `false`). The first two are designed to be consumed by a following [`attest-docker.yml`](#attestation-and-signing-attest-dockeryml) call.
 - Prerelease versions (containing `-alpha`, `-beta`, `-rc`, etc.) are detected and handled appropriately.
 - Short SHA tag is automatically added for traceability.
 - Branch-based tags exclude `main` and `develop` branches.
@@ -102,14 +97,106 @@ See [Authentication](./05-authentication.md#what-build-docker-actually-injects).
 - A reusable workflow's jobs run on their own runners, so an image loaded into the build job's Docker daemon is **not** visible to the caller's test job. The tarball artifact is what bridges the two.
 - **Artifact naming**: one artifact per architecture, named `<artifact-prefix>-amd64` / `<artifact-prefix>-arm64`, each containing a single `image.tar`. Use the `artifact-prefix` output rather than hardcoding the name — it is derived from the normalized image name (e.g. `ghcr.io/my-org/my_image` -> `image-my-image`).
 - The tarball embeds the image under `<IMAGE_NAME>:<IMAGE_TAG>`, so after `docker load -i image.tar` the image is directly runnable under that reference.
-- The `merge` job (manifest list creation) and the `attest` job are **skipped** when `PUSH` is `false` — there is nothing in a registry to merge or attest. Consequently the `digest` output is empty, so downstream steps consuming it (notably `attest-docker.yml`) must not be wired to a non-pushing build.
+- The `merge` job (manifest list creation) is **skipped** when `PUSH` is `false` — there is nothing in a registry to merge. Consequently the `digest` output is empty, so a following [`attest-docker.yml`](#attestation-and-signing-attest-dockeryml) call must not be wired to a non-pushing build.
 - Two workflows in this repository consume the tarball artifact directly, so a non-pushed image can still be fully validated: `scan-trivy.yml` via its `IMAGE_ARTIFACT` input (Trivy tarball mode) and `test-kube-deployment.yml` via its `IMAGE_ARTIFACTS` input (`kind load image-archive`). Attestation is the one thing that genuinely cannot work without a push, since attestations are bound to a registry digest.
 - **Multi-arch**: with `USE_QEMU: false` (native runners), building both architectures produces two independent single-arch tarballs — one per runner — which is usually what you want, since a test job can only run one architecture anyway.
 - **Unsupported combination**: `PUSH: false` + `USE_QEMU: true` + both `BUILD_AMD64` and `BUILD_ARM64`. The `docker` exporter cannot write a multi-platform manifest list to a tarball, so the workflow fails fast in the `infos` job with an explicit error. Either use native runners (`USE_QEMU: false`) or build a single architecture at a time.
 - **Registry login** is skipped when `PUSH` is `false`, unless the image targets `ghcr.io` (where credentials always resolve from the job token) or `REGISTRY_USERNAME` is provided. This means a non-GHCR image can be built without any registry credentials, while private base images can still be pulled by passing the secrets anyway.
-- The caller still needs to grant `packages: write`, `id-token: write` and `attestations: write` even with `PUSH: false`, because GitHub validates permissions statically against every job declared in the reusable workflow — including the ones skipped at runtime.
-- When `PROVENANCE`, `SBOM` or `SIGN` is enabled, attestation runs as an additional job after the image is built and merged. Internally, this delegates to the `attest-docker.yml` reusable workflow so that attestation logic is maintained in a single place. This is especially useful when using `build-docker.yml` in a **matrix strategy**, where outputs from individual matrix jobs cannot easily be passed to a separate `attest-docker.yml` call. By attesting within the same workflow, each matrix combination attests its own image automatically.
-- The dedicated `attest-docker.yml` workflow can also be called separately after building — this is useful when you need more control over the attestation step or when not using a matrix.
+
+## Attestation and signing (`attest-docker.yml`)
+
+This workflow has no built-in attestation path — it never declares a nested call requesting `id-token`/`attestations`, so a caller that only builds and pushes never needs to grant them. Provenance, SBOM and cosign signing are entirely [`attest-docker.yml`](./31-attest-docker.md)'s responsibility, composed as a second, explicit job fed by this workflow's `digest`/`image` outputs:
+
+```yaml
+jobs:
+  build:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+    with:
+      IMAGE_NAME: ghcr.io/my-org/my-image
+      IMAGE_TAG: 1.2.3
+      IMAGE_CONTEXT: ./
+      IMAGE_DOCKERFILE: ./Dockerfile
+
+  attest:
+    uses: this-is-tobi/github-workflows/.github/workflows/attest-docker.yml@v0
+    needs:
+    - build
+    permissions:
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ${{ needs.build.outputs.image }}
+      DIGEST: ${{ needs.build.outputs.digest }}
+      PROVENANCE: true
+      SBOM: true
+```
+
+Only the `attest` job needs `id-token`/`attestations` — `build` never does, regardless of how many images a pipeline builds or whether any of them get attested.
+
+### Matrix builds
+
+A matrix `build` job cannot feed a single matrix-shaped `attest` job: `needs.<job>.outputs.<name>` collapses to one value across all matrix combinations (GitHub's documented behavior — the last combination to finish wins), so an `attest` job matrixed the same way would silently attest the wrong image, or the same one twice, for every combination but the last. There is no `id`/index correlation between an upstream and downstream matrix.
+
+The correct pattern is one explicit, non-matrixed `build`/`attest` job **pair per image** — more to write than a matrix, but each pair is independently correct and only grants the extra permissions where they're actually used:
+
+```yaml
+jobs:
+  build-frontend:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+    with:
+      IMAGE_NAME: ghcr.io/my-org/frontend
+      IMAGE_TAG: 1.2.3
+      IMAGE_CONTEXT: ./apps/frontend
+      IMAGE_DOCKERFILE: ./apps/frontend/Dockerfile
+
+  attest-frontend:
+    uses: this-is-tobi/github-workflows/.github/workflows/attest-docker.yml@v0
+    needs:
+    - build-frontend
+    permissions:
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ${{ needs.build-frontend.outputs.image }}
+      DIGEST: ${{ needs.build-frontend.outputs.digest }}
+      PROVENANCE: true
+      SBOM: true
+
+  build-backend:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
+    permissions:
+      packages: write
+      contents: read
+    with:
+      IMAGE_NAME: ghcr.io/my-org/backend
+      IMAGE_TAG: 1.2.3
+      IMAGE_CONTEXT: ./apps/backend
+      IMAGE_DOCKERFILE: ./apps/backend/Dockerfile
+
+  attest-backend:
+    uses: this-is-tobi/github-workflows/.github/workflows/attest-docker.yml@v0
+    needs:
+    - build-backend
+    permissions:
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      IMAGE_NAME: ${{ needs.build-backend.outputs.image }}
+      DIGEST: ${{ needs.build-backend.outputs.digest }}
+      PROVENANCE: true
+      SBOM: true
+```
+
+If only *some* images need attestation, this pattern also means only those images' jobs carry the extra permissions — the others stay at `packages: write` + `contents: read`, unlike a shared matrix where every combination would need to grant the same superset regardless of which images actually use it.
 
 ## Examples
 
@@ -126,8 +213,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3
@@ -149,8 +234,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: ${{ github.sha }}
@@ -171,8 +254,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: pr-${{ github.event.pull_request.number }}
@@ -193,8 +274,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: pr-${{ github.event.pull_request.number }}
@@ -241,8 +320,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: ${{ github.sha }}
@@ -276,8 +353,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: ${{ github.sha }}
@@ -286,8 +361,6 @@ jobs:
       PUSH: true
       CACHE: true
       LATEST_TAG: ${{ github.ref_name == 'main' }}
-      PROVENANCE: true
-      SBOM: true
 ```
 
 ### Testing both architectures without pushing
@@ -301,8 +374,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3
@@ -350,8 +421,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: registry.example.com/my-org/my-image
       IMAGE_TAG: 1.2.3
@@ -373,8 +442,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-image
       IMAGE_TAG: 1.2.3
@@ -391,117 +458,4 @@ RUN --mount=type=secret,id=GITHUB_TOKEN \
     my-tool --token "$(cat /run/secrets/GITHUB_TOKEN)"
 ```
 
-### Signing
-
-`SIGN: true` signs the pushed manifest digest with [cosign](https://docs.sigstore.dev/) keyless signing, using the workflow's OIDC identity — no key material to store or rotate. It composes with `PROVENANCE` and `SBOM`; any combination of the three runs the same `attest` job.
-
-```yaml
-jobs:
-  build:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
-    permissions:
-      packages: write
-      contents: read
-      id-token: write
-      attestations: write
-    with:
-      IMAGE_NAME: ghcr.io/my-org/my-image
-      IMAGE_TAG: 1.2.3
-      IMAGE_CONTEXT: ./
-      IMAGE_DOCKERFILE: ./Dockerfile
-      PROVENANCE: true
-      SBOM: true
-      SIGN: true
-```
-
-Verify a signed image with:
-
-```sh
-cosign verify ghcr.io/my-org/my-image:1.2.3 \
-  --certificate-identity-regexp '^https://github.com/my-org/' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
-```
-
-### Provenance and SBOM attestations
-
-Attestation can be enabled directly in the build workflow by setting `PROVENANCE` and/or `SBOM` to `true`. This is particularly convenient when building **multiple images in a matrix**, as each matrix job attests its own image without needing to wire outputs to a separate workflow. Note that the caller must grant the additional `id-token: write` and `attestations: write` permissions.
-
-```yaml
-jobs:
-  build:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
-    permissions:
-      packages: write
-      contents: read
-      id-token: write
-      attestations: write
-    with:
-      IMAGE_NAME: ghcr.io/my-org/my-app
-      IMAGE_TAG: ${{ needs.release.outputs.version }}
-      IMAGE_CONTEXT: ./
-      IMAGE_DOCKERFILE: ./Dockerfile
-      LATEST_TAG: true
-      PROVENANCE: true
-      SBOM: true
-```
-
-### Matrix build with built-in attestation
-
-When building multiple images in a matrix, outputs from individual matrix jobs cannot be forwarded to a separate `attest-docker.yml` call. Enabling attestation directly solves this:
-
-```yaml
-jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-        - image: ghcr.io/my-org/frontend
-          context: ./apps/frontend
-          dockerfile: ./apps/frontend/Dockerfile
-        - image: ghcr.io/my-org/backend
-          context: ./apps/backend
-          dockerfile: ./apps/backend/Dockerfile
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
-    permissions:
-      packages: write
-      contents: read
-      id-token: write
-      attestations: write
-    with:
-      IMAGE_NAME: ${{ matrix.image }}
-      IMAGE_TAG: 1.2.3
-      IMAGE_CONTEXT: ${{ matrix.context }}
-      IMAGE_DOCKERFILE: ${{ matrix.dockerfile }}
-      PROVENANCE: true
-      SBOM: true
-```
-
-```yaml
-jobs:
-  build:
-    uses: this-is-tobi/github-workflows/.github/workflows/build-docker.yml@v0
-    permissions:
-      packages: write
-      contents: read
-      id-token: write
-      attestations: write
-    with:
-      IMAGE_NAME: ghcr.io/my-org/my-image
-      IMAGE_TAG: 1.2.3
-      IMAGE_CONTEXT: ./
-      IMAGE_DOCKERFILE: ./Dockerfile
-
-  attest:
-    uses: this-is-tobi/github-workflows/.github/workflows/attest-docker.yml@v0
-    needs:
-    - build
-    permissions:
-      packages: write
-      id-token: write
-      attestations: write
-    with:
-      IMAGE_NAME: ${{ needs.build.outputs.image }}
-      DIGEST: ${{ needs.build.outputs.digest }}
-      PROVENANCE: true
-      SBOM: true
-```
+Attestation and signing examples (provenance, SBOM, cosign signing, matrix builds) now live in [Attestation and signing](#attestation-and-signing-attest-dockeryml) above, since they're composed via a separate `attest-docker.yml` job rather than inputs on this workflow.

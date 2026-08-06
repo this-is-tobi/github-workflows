@@ -65,8 +65,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-app
       IMAGE_TAG: pr-${{ github.event.pull_request.number }}
@@ -226,8 +224,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-app
       IMAGE_TAG: ${{ needs.release.outputs.version }}
@@ -341,8 +337,6 @@ jobs:
     permissions:
       packages: write
       contents: read
-      id-token: write
-      attestations: write
     with:
       IMAGE_NAME: ghcr.io/my-org/my-app
       IMAGE_TAG: ${{ needs.release.outputs.version }}
@@ -461,8 +455,6 @@ build:
   permissions:
     packages: write
     contents: read
-    id-token: write
-    attestations: write
   with:
     IMAGE_NAME: ghcr.io/my-org/my-app
     IMAGE_CONTEXT: ./
@@ -560,7 +552,7 @@ Supplying **neither** is a supported configuration, not an error: that is Mode 1
 | `pat`       | App token, else `GH_PAT`; **fails** if neither | Whatever you granted the PAT                              | You                           |
 | `job-token` | App token, else `GH_PAT`, else `GITHUB_TOKEN`  | **Nothing** — the calling job's whole `permissions:` block | Nobody; it cannot be narrowed |
 
-A job calling `build-docker.yml` normally grants `packages: write`, `id-token: write` and `attestations: write`, so `job-token` can hand a registry-push credential to everything in the build. A compromised transitive build dependency could publish an image with it. The workflow emits a `::warning::` whenever that mode actually falls through to the job token.
+A job calling `build-docker.yml` normally grants `packages: write`, so `job-token` can hand a registry-push credential to everything in the build. A compromised transitive build dependency could publish an image with it. The workflow emits a `::warning::` whenever that mode actually falls through to the job token.
 
 **Can't `GITHUB_TOKEN` just be narrowed for this?** No. Its permissions are fixed when the job starts, from the `permissions:` block intersected with what the caller granted, and there is no API to attenuate it for a single step. The build job needs `packages: write` to push the image, so that is what the token carries. Minting a separate, narrower App token is the only way to inject something read-only — which is exactly what `app` does.
 
