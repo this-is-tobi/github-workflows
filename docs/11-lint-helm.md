@@ -8,6 +8,7 @@ Comprehensive Helm chart validation with two parallel jobs: chart structure lint
 | ----------------- | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------- |
 | HELM_DOCS_VERSION | string  | Version (image tag) of `jnorwood/helm-docs`                                              | No       | v1.14.2          |
 | CT_CONF_PATH      | string  | Path to the chart-testing configuration file                                             | Yes      | -                |
+| CHARTS_DIR        | string  | Directory scanned by `helm-docs` for the `lint-docs` job. Should match, or contain, the `chart-dirs` configured in `CT_CONF_PATH` - e.g. a chart's own directory for a monorepo with a single chart at its root. | No       | charts           |
 | LINT_CHARTS       | boolean | Whether to run the chart linting job                                                     | No       | true             |
 | LINT_DOCS         | boolean | Whether to run the chart docs linting job                                                | No       | true             |
 | RUNS_ON           | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
@@ -22,7 +23,7 @@ Comprehensive Helm chart validation with two parallel jobs: chart structure lint
 
 - **Two conditional jobs for flexible validation:**
   - **`lint-charts`**: Uses `helm/chart-testing-action` with `ct lint` to validate chart structure, syntax, dependencies, best practices, and version increment requirements. Runs only if `LINT_CHARTS=true`.
-  - **`lint-docs`**: Uses `jnorwood/helm-docs` with a read-only volume mount of the charts directory. If committed documentation is out of date, helm-docs' attempt to regenerate files fails against the read-only mount, causing the job to fail. Runs only if `LINT_DOCS=true`.
+  - **`lint-docs`**: Uses `jnorwood/helm-docs` with a read-only volume mount of `CHARTS_DIR`. If committed documentation is out of date, helm-docs' attempt to regenerate files fails against the read-only mount, causing the job to fail. Runs only if `LINT_DOCS=true`.
 - Set `LINT_CHARTS=false` to skip chart structure validation (useful for docs-only changes).
 - Set `LINT_DOCS=false` to skip documentation validation (useful for chart logic changes without doc updates).
 - Chart-testing requires a configuration file (typically `.github/ct.yaml`) to define linting rules, target branch, chart directories, and validation options.
@@ -84,6 +85,21 @@ jobs:
       CT_CONF_PATH: .github/ct.yaml
       LINT_CHARTS: false
       LINT_DOCS: true
+```
+
+### Monorepo with a single chart at its root
+
+For a chart living directly at e.g. `helm/Chart.yaml` rather than nested under `charts/<name>/`, point `CHARTS_DIR` at it and set `chart-dirs: [.]` in the chart-testing config so `ct lint` discovers it too.
+
+```yaml
+jobs:
+  lint-helm:
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-helm.yml@v0
+    permissions:
+      contents: read
+    with:
+      CT_CONF_PATH: .github/ct.yaml
+      CHARTS_DIR: helm
 ```
 
 ### Charts-only validation
