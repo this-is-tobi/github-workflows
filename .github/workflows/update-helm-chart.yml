@@ -244,7 +244,7 @@ jobs:
 
         case "$dispatch_output" in
           *"Unexpected inputs provided"*)
-            echo "::warning::'$WORKFLOW_NAME' in '$CHART_REPO' does not declare an AUTOMERGE_METHOD input, so the chart repository's own default applies instead of '$AUTOMERGE_METHOD'. Add the input to that workflow to control the merge method from here - see docs/52-update-helm-chart.md."
+            echo "::warning::'$WORKFLOW_NAME' in '$CHART_REPO' does not declare an AUTOMERGE_METHOD input, so the chart repository's own default applies instead of '$AUTOMERGE_METHOD'. Add the input to that workflow to control the merge method from here - see docs/53-update-helm-chart.md."
             gh workflow --repo "$CHART_REPO" run "$WORKFLOW_NAME" "${DISPATCH_ARGS[@]}"
             ;;
           *)
