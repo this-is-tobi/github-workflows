@@ -48,6 +48,14 @@ on:
         required: false
         type: string
         default: rc
+      HELM_DOCS_VERSION:
+        description: >-
+          Version of helm-docs used to regenerate the chart README (e.g.
+          'v1.14.2'). Pinned rather than tracking ':latest', so a new upstream
+          release cannot silently change what this job runs against your chart.
+        required: false
+        type: string
+        default: v1.14.2
       AUTOMERGE_PRERELEASE:
         description: Automatically merge the PR when UPGRADE_TYPE is 'prerelease' (requires APP_CLIENT_ID/APP_PRIVATE_KEY or GH_PAT)
         required: false
@@ -139,8 +147,12 @@ jobs:
           exit 1
         fi
 
-        if ! printf '%s' "$CHART_REPO" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'; then
-          echo "::error::CHART_REPO must be 'owner/repository', got '$CHART_REPO'. A value without a slash would mint a token for an owner named after the repository."
+        # bash `=~` rather than `grep -Eq`: grep applies the pattern per line, so
+        # `owner/repo` followed by a newline and anything at all would have
+        # passed. bash anchors to the whole string and no character class here
+        # contains a newline.
+        if [[ ! "$CHART_REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+          echo "::error::CHART_REPO must be a single-line 'owner/repository', got '$CHART_REPO'. A value without a slash would mint a token for an owner named after the repository."
           exit 1
         fi
 
@@ -263,6 +275,8 @@ jobs:
     - name: Validate inputs
       env:
         AUTOMERGE_METHOD: ${{ inputs.AUTOMERGE_METHOD }}
+        APP_VERSION: ${{ inputs.APP_VERSION }}
+        PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
       run: |
         set -euo pipefail
 
@@ -278,6 +292,27 @@ jobs:
             exit 1
             ;;
         esac
+
+        # Both values are written into Chart.yaml, and PRERELEASE_IDENTIFIER
+        # additionally becomes part of the chart version and the pull request's
+        # branch name. They are written with `yq` + `strenv()` so neither can be
+        # interpreted as a program, but they are still constrained here: a value
+        # that is not version-shaped is a caller mistake worth failing on, and
+        # the two guards are independent on purpose.
+        # Matched with bash `=~` rather than `grep -Eq`: grep applies the pattern
+        # per line, so a value whose FIRST line is well-formed passes however
+        # many lines follow it. bash anchors `^`/`$` to the whole string, and a
+        # newline is in neither character class, so a multi-line value is
+        # rejected outright.
+        if [ -n "$APP_VERSION" ] && [[ ! "$APP_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9.+_-]*$ ]]; then
+          echo "::error::APP_VERSION must be a single-line version string matching '^[A-Za-z0-9][A-Za-z0-9.+_-]*\$', got '$APP_VERSION'"
+          exit 1
+        fi
+
+        if [[ ! "$PRERELEASE_IDENTIFIER" =~ ^[A-Za-z0-9-]+$ ]]; then
+          echo "::error::PRERELEASE_IDENTIFIER must match '^[A-Za-z0-9-]+\$', got '$PRERELEASE_IDENTIFIER'"
+          exit 1
+        fi
 
     # Only 'called' mode consumes this token, for the pull request and the
     # merge. 'local' mode pushes with the checkout credential on purpose (see
@@ -311,6 +346,7 @@ jobs:
         APP_VERSION: ${{ inputs.APP_VERSION }}
         UPGRADE_TYPE: ${{ inputs.UPGRADE_TYPE }}
         PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
+        HELM_DOCS_VERSION: ${{ inputs.HELM_DOCS_VERSION }}
       run: |
         # Remove trailing slashes
         while [ "${CHART_DIR%/}" != "$CHART_DIR" ]; do CHART_DIR="${CHART_DIR%/}"; done
@@ -403,19 +439,27 @@ jobs:
         echo "Update chart from version '$CURRENT_VERSION' to '$NEXT_VERSION'"
 
         echo "Update chart files..."
-        # Empty APP_VERSION = chart-only release: the chart version bumps on
-        # its own lifecycle and the current appVersion is left untouched
+        # Written with yq, not sed. Both values reach this step from workflow
+        # inputs, and a sed replacement is a *program*: a `/` in the value closes
+        # the s/// command and what follows is parsed as further sed commands -
+        # including GNU sed's `e`, which executes its argument through a shell.
+        # `strenv()` passes the value through the environment as a string, so it
+        # can only ever be stored, never interpreted. The inputs are validated
+        # too (see "Validate inputs"); this is the half that cannot be bypassed.
+        export NEXT_VERSION
         if [ -n "$APP_VERSION" ]; then
-          sed -i "s/^appVersion: .*/appVersion: $APP_VERSION/" "$CHART_DIR/$CHART_NAME/Chart.yaml"
+          # Empty APP_VERSION = chart-only release: the chart version bumps on
+          # its own lifecycle and the current appVersion is left untouched
+          yq -i '.appVersion = strenv(APP_VERSION)' "$CHART_DIR/$CHART_NAME/Chart.yaml"
         fi
-        sed -i "s/^version: .*/version: $NEXT_VERSION/" "$CHART_DIR/$CHART_NAME/Chart.yaml"
+        yq -i '.version = strenv(NEXT_VERSION)' "$CHART_DIR/$CHART_NAME/Chart.yaml"
 
         echo "Generate chart documentation..."
         docker run \
           --rm \
           --volume "$(pwd)/$CHART_DIR/$CHART_NAME:/helm-docs" \
           -u "$(id -u)" \
-          docker.io/jnorwood/helm-docs:latest
+          "docker.io/jnorwood/helm-docs:$HELM_DOCS_VERSION"
 
         {
           echo "CURRENT_VERSION=$CURRENT_VERSION"
