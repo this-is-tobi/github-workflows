@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.22.0](https://github.com/this-is-tobi/github-workflows/compare/v0.21.0...v0.22.0) (2026-08-06)
+
+
+### Features
+
+* **auth:** support GitHub App tokens and gate automerge explicitly ([5019093](https://github.com/this-is-tobi/github-workflows/commit/5019093b4b5f77122b6a8a63ecf09e0627598883))
+
+
+### Bug Fixes
+
+* **workflows:** close injection and integrity gaps found by security review ([bf07c4e](https://github.com/this-is-tobi/github-workflows/commit/bf07c4ea1892afdfe35037adfdabd3008d547e35))
+* **workflows:** quote shell expansions and enforce shellcheck ([d7c23cf](https://github.com/this-is-tobi/github-workflows/commit/d7c23cfe2ada4f2c9308f2d8b2901f223932746f))
+
+
+### Dependencies
+
+* **deps:** update actions/attest to v4.2.2 ([172029b](https://github.com/this-is-tobi/github-workflows/commit/172029b2ea207462d75b674d3b0a5530581712ca))
+* **deps:** update dorny/paths-filter to v4.0.3 ([276ddd5](https://github.com/this-is-tobi/github-workflows/commit/276ddd52518b3c07cf4f1e9d9ab23e14e5098284))
+* **deps:** update sonarsource/sonarqube-quality-gate-action to v1.2.1 ([00402b1](https://github.com/this-is-tobi/github-workflows/commit/00402b13a55ebcef540dce4ac14b3d5a6f4a34a9))
+
 ## [0.21.0](https://github.com/this-is-tobi/github-workflows/compare/v0.20.0...v0.21.0) (2026-08-04)
 
 
