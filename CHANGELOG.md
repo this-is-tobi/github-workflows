@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.22.2](https://github.com/this-is-tobi/github-workflows/compare/v0.22.1...v0.22.2) (2026-08-07)
+
+
+### Code Refactoring
+
+* **build-docker:** drop built-in attestation, compose explicitly ([f7f4aa7](https://github.com/this-is-tobi/github-workflows/commit/f7f4aa7251bb0ee7a5015fb0d27231f4670b01bb))
+* **release-helm:** split local-mode release into a dedicated workflow ([46256e5](https://github.com/this-is-tobi/github-workflows/commit/46256e5ca48462651b1b6aff10309b0859bccc75))
+
+
+### Dependencies
+
+* **deps:** update actions/attest-build-provenance to v4.2.2 ([770496f](https://github.com/this-is-tobi/github-workflows/commit/770496fac9e278950dd39544d3e7ff5de86d2ad4))
+
 ## [0.22.1](https://github.com/this-is-tobi/github-workflows/compare/v0.22.0...v0.22.1) (2026-08-06)
 
 
