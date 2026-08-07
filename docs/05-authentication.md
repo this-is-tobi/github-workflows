@@ -421,6 +421,9 @@ Checklist for this one:
 | Secrets stored in | the repository running this job, not the chart repository |
 | Token scope       | `CHART_REPO` only — never the current repository          |
 | `CHART_REPO` form | `owner/repository` — a bare name fails validation          |
+| Branch dispatched | `BASE_BRANCH` (default `main`), passed as `gh workflow run --ref` |
+
+The dispatch always passes `--ref` explicitly instead of letting `gh workflow run` resolve `CHART_REPO`'s default branch itself: that resolution goes through a GraphQL `defaultBranchRef` query, which this token's `Actions: Read and write`-only scope can't satisfy. See [Troubleshooting](#troubleshooting) below.
 
 #### `AUTOMERGE_METHOD` across the dispatch
 
@@ -519,7 +522,7 @@ That block controls `GITHUB_TOKEN`. An App token's authority comes from what the
 | Symptom                                               | Cause                                                                  | Fix                                                                            |
 | ----------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `Input required and not supplied: private-key`        | Secrets not passed through the calling job's `secrets:` block          | Reusable workflows do not inherit secrets automatically — pass them explicitly |
-| `Resource not accessible by integration`              | The App lacks the permission, or is not installed on the repository    | Check the **installation**, not job `permissions:`                             |
+| `Resource not accessible by integration`              | The App lacks the permission, or is not installed on the repository    | Check the **installation**, not job `permissions:` — if it mentions `defaultBranchRef`, see the row below instead |
 | `HttpError: Not Found` when minting                   | App not installed on the owner/repository requested                    | Install it, or correct `CHART_REPO`                                            |
 | Automerge fails asking for 'Allow auto-merge'         | `AUTOMERGE_METHOD=auto` with the repository setting off                | Enable it in Settings → General, or set `AUTOMERGE_METHOD: admin`              |
 | `Automerge is enabled but no credential was supplied` | `AUTOMERGE_*` is true with no App or PAT                               | Supply credentials, or set `AUTOMERGE_*: false`                                |
@@ -528,6 +531,7 @@ That block controls `GITHUB_TOKEN`. An App token's authority comes from what the
 | `APP_CLIENT_ID and APP_PRIVATE_KEY must be supplied together` | One of the two is missing, empty, or misspelled at the call site | Pass both, or neither — see [Both App secrets or neither](#both-app-secrets-or-neither) |
 | `CHART_REPO must be 'owner/repository'`               | `CHART_REPO` given without an owner, e.g. `helm-charts`                | Use the full `owner/repo` form                                                 |
 | Caller mode warns that `AUTOMERGE_METHOD` is not declared | The chart repository's entry-point workflow predates the input     | Add `AUTOMERGE_METHOD` to its `workflow_dispatch`/`workflow_call` inputs        |
+| `unable to determine default branch for <repo>: GraphQL: Resource not accessible by integration (repository.defaultBranchRef)` | Caller mode's dispatch resolved `CHART_REPO`'s default branch via GraphQL, which needs more than `Actions: Read and write` | Already fixed by always passing `--ref BASE_BRANCH`; if `CHART_REPO`'s default branch isn't `main`, set `BASE_BRANCH` explicitly |
 
 ### Both App secrets or neither
 
