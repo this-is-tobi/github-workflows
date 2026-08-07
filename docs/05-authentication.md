@@ -567,7 +567,7 @@ Preference order: **`app` → `pat` (read-only) → `none`.** Reach for `job-tok
 **App tokens and PATs both trigger workflows** — that is the point, and it is also the risk. `GITHUB_TOKEN` is the only mode this section does not apply to. Three rules the workflows follow, worth knowing if you modify them:
 
 - **`actions/checkout` keeps `GITHUB_TOKEN`.** These workflows push tags, prerelease branches and chart bumps with `git`. Under a credential that can trigger workflows, those pushes would re-enter the caller's CD pipeline. Only the steps that genuinely need the elevated credential receive it.
-- **The chart bump commit carries `[skip ci]`.** In `local` mode the chart bump is pushed straight to the branch CD triggers on. `[skip ci]` is read from the commit message, so it holds regardless of which credential pushed — the one guard that does not depend on token choice.
+- **The chart bump commit deliberately carries no skip-ci marker.** In `local` mode the chart bump is pushed straight to the branch CD triggers on, but it stays on `GITHUB_TOKEN` — the same rule as above, not a separate one. A skip-ci marker would add nothing there (`GITHUB_TOKEN` already can't trigger a new run, on `push` or `pull_request`) while causing real harm: it's matched on the commit message alone, regardless of which credential wrote it, so it would also suppress checks on any pull request a human later opens FROM that branch — a `develop` → `main` promotion, for instance, would get zero checks until a new commit landed.
 - **`release-helm.yml` pushes the pages branch with the same token it creates releases with.** Supplying either elevated credential lets that push trigger workflows too, not only the release creation. Check nothing triggers on your `PAGES_BRANCH` first.
 
 ### What the checkout rule does *not* cover
@@ -578,7 +578,7 @@ Keeping `GITHUB_TOKEN` on `actions/checkout` bounds **`git` pushes only**. Anyth
 | ---------------------------------------------- | -------------------- | --------------------------- |
 | `git push` of the `v1` / `v1.2` tags           | Checkout's token     | No                          |
 | `git push` of the prerelease branch            | Checkout's token     | No                          |
-| `git push` of the `local`-mode chart bump      | Checkout's token     | No — and `[skip ci]` on top |
+| `git push` of the `local`-mode chart bump      | Checkout's token     | No                          |
 | release-please's `vX.Y.Z` tag and Release      | App token / `GH_PAT` | **Yes**                     |
 | The release pull request                       | App token / `GH_PAT` | **Yes** — this is the point |
 | The chart update pull request                  | App token / `GH_PAT` | **Yes** — this is the point |
