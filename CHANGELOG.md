@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.22.3](https://github.com/this-is-tobi/github-workflows/compare/v0.22.2...v0.22.3) (2026-08-07)
+
+
+### Bug Fixes
+
+* **release-app:** neutralize checkout's credential before the manifest-sync push ([da59096](https://github.com/this-is-tobi/github-workflows/commit/da59096681f553818c72a58ef64458ec58af74c1))
+* **release-app:** unshallow before rebasing the prerelease branch onto the release branch ([4f9b29c](https://github.com/this-is-tobi/github-workflows/commit/4f9b29c8a4ac623eeee61d10312254b0a8151e58))
+* **update-helm-chart:** drop the skip-ci marker from the local-mode chart-bump commit ([05bd83a](https://github.com/this-is-tobi/github-workflows/commit/05bd83a416d9779940d4c439e0341c4ca68d5927))
+* **update-helm-chart:** pass --ref explicitly in caller-mode dispatch ([0397d73](https://github.com/this-is-tobi/github-workflows/commit/0397d737bbaf1d74895fe9532e819878e698a666))
+
 ## [0.22.2](https://github.com/this-is-tobi/github-workflows/compare/v0.22.1...v0.22.2) (2026-08-07)
 
 
