@@ -26,7 +26,7 @@ The chart version and the app version are **decoupled on purpose**: an app relea
 | AUTOMERGE_PRERELEASE  | bool   | Automatically merge the PR when `UPGRADE_TYPE` is `prerelease`                                    | No       | false                  |
 | AUTOMERGE_RELEASE     | bool   | Automatically merge the PR when `UPGRADE_TYPE` is not `prerelease`                                | No       | false                  |
 | AUTOMERGE_METHOD      | string | How the PR is merged when automerge is enabled: `auto` (queue until required checks pass, needs **Allow auto-merge**) or `admin` (merge now, bypassing branch protection) | No       | auto                   |
-| BASE_BRANCH           | string | Base branch to open the chart-update pull request against (called mode)                           | No       | main                   |
+| BASE_BRANCH           | string | Base branch: to open the chart-update pull request against (called mode), or the branch the `workflow_dispatch` targets in `CHART_REPO` (caller mode) | No       | main                   |
 | RUNS_ON               | string | Runner labels as JSON array                                                                       | No       | ["ubuntu-24.04"]       |
 
 ## Secrets
@@ -135,7 +135,7 @@ Add the token as a **repository secret** named `GH_PAT` in the **chart repositor
 
 ## Notes
 
-- `RUN_MODE=caller`: Validates `CHART_REPO` is provided, then invokes `gh workflow run <WORKFLOW_NAME>` in the target repo, forwarding: `CHART_NAME`, `APP_VERSION`, `CHART_DIR`, `UPGRADE_TYPE`, `PRERELEASE_IDENTIFIER`, `AUTOMERGE_PRERELEASE`, `AUTOMERGE_RELEASE`, and forcing `RUN_MODE=called` in the remote execution.
+- `RUN_MODE=caller`: Validates `CHART_REPO` is provided, then invokes `gh workflow run <WORKFLOW_NAME> --ref <BASE_BRANCH>` in the target repo, forwarding: `CHART_NAME`, `APP_VERSION`, `CHART_DIR`, `UPGRADE_TYPE`, `PRERELEASE_IDENTIFIER`, `AUTOMERGE_PRERELEASE`, `AUTOMERGE_RELEASE`, and forcing `RUN_MODE=called` in the remote execution. `--ref` is always explicit — see the note below the caller mode example for why.
 - `RUN_MODE=called`: Reads current chart `version` from `charts/<CHART_NAME>/Chart.yaml` (via `yq`), computes `NEXT_VERSION` using Release Please-compatible logic, updates `version` (and `appVersion` when `APP_VERSION` is provided), regenerates docs with `helm-docs`, and creates/updates a PR containing the bump.
 - `RUN_MODE=local`: Same bump as `called`, but **commits directly on the current branch** instead of opening a PR, and exposes `chart-version` / `commit-sha` outputs so downstream jobs in the same pipeline can publish the chart (chain with [`release-helm-local.yml`](./52-release-helm-local.md)'s `CHECKOUT_REF`). Notes:
   - The push is authenticated with `GITHUB_TOKEN`, and such pushes **never trigger new workflow runs** — no CD loop; release the chart in the same run using the outputs.
@@ -184,6 +184,8 @@ jobs:
       APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
 ```
+
+> The dispatch always targets `BASE_BRANCH` explicitly (`--ref`) rather than letting `gh workflow run` resolve `CHART_REPO`'s default branch itself: that resolution goes through a GraphQL `defaultBranchRef` query, which fails for a token scoped to `Actions: Read and write` only (`unable to determine default branch for <repo>: GraphQL: Resource not accessible by integration (repository.defaultBranchRef)`). If `CHART_REPO`'s default branch isn't `main`, set `BASE_BRANCH` explicitly — this applies with either credential, App or `GH_PAT`.
 
 ### Caller mode – prerelease bump with automerge
 
