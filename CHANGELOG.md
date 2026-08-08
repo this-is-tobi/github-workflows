@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.0](https://github.com/this-is-tobi/github-workflows/compare/v0.23.0...v0.24.0) (2026-08-08)
+
+
+### Features
+
+* **release-helm:** make the OCI push an opt-in distribution channel ([7fb32b3](https://github.com/this-is-tobi/github-workflows/commit/7fb32b37f439ac350d1023b5965538068b600a7a))
+
 ## [0.23.0](https://github.com/this-is-tobi/github-workflows/compare/v0.22.4...v0.23.0) (2026-08-08)
 
 
