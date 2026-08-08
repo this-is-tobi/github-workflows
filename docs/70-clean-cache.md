@@ -1,70 +1,113 @@
 # `clean-cache.yml`
 
-Delete GitHub Actions caches related to a PR/branch and optionally delete a single image from GHCR when an image reference is provided.
+Delete GitHub Actions caches belonging to a pull request or a branch.
+
+For container images, see [clean-images](./71-clean-images.md).
 
 ## Inputs
 
-| Input                     | Type    | Description                                                                              | Required | Default          |
-| ------------------------- | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------- |
-| PR_NUMBER                 | number  | ID number of the pull request associated with the cache                                  | No       | -                |
-| BRANCH_NAME               | string  | Branch name associated with the cache                                                    | No       | -                |
-| IMAGE                     | string  | Image reference to delete (e.g., `ghcr.io/owner/repo/service:pr-123`)                    | No       | -                |
-| CLEAN_GH_CACHE            | boolean | Whether to clean GitHub Actions cache                                                    | No       | true             |
-| CLEAN_GHCR_IMAGE          | boolean | Whether to delete the specified image from ghcr.io                                       | No       | false            |
-| CLEAN_ORPHANED_GHCR_IMAGE | boolean | Whether to delete orphaned SHA-only images from ghcr.io                                  | No       | false            |
-| RUNS_ON                   | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
+| Input       | Type   | Description                                                                              | Required | Default          |
+| ----------- | ------ | ------------------------------------------------------------------------------------------ | -------- | ---------------- |
+| PR_NUMBER   | number | ID number of the pull request whose caches should be deleted                             | No       | -                |
+| BRANCH_NAME | string | Branch name whose caches should be deleted                                               | No       | -                |
+| RUNS_ON     | string | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`) | No       | ["ubuntu-24.04"] |
 
 ## Permissions
 
-| Scope    | Access | Description                                        |
-| -------- | ------ | -------------------------------------------------- |
-| packages | write  | Required to delete GHCR container package versions |
-| actions  | write  | Manage Actions caches via cache API                |
+| Scope   | Access | Description                         |
+| ------- | ------ | ----------------------------------- |
+| actions | write  | Manage Actions caches via cache API |
+
+## When to trigger this workflow
+
+A scheduled sweep is the recommended trigger.
+
+Triggering on `pull_request: closed` looks natural but stops working as soon as pull requests are merged with `AUTOMERGE_METHOD: admin` — the only option when **Allow auto-merge** cannot be enabled on the repository (see [global workflow examples](./90-global-workflows-examples.md)).
+
+`admin` merges **without waiting for checks**. The cleanup therefore fires at merge time, while the pull request's build is still writing its caches: it finds only some of them, or none, and exits 0. The run is green despite having done nothing, and caches accumulate with no failing signal to reveal it.
+
+A scheduled sweep, run once the builds have settled, cannot lose that race and collects whatever earlier runs left behind. It is idempotent: a second pass over an already-clean pull request prints `No cache keys found` and exits 0.
+
+If the repository does have auto-merge and uses `AUTOMERGE_METHOD: auto`, the merge happens only once checks pass — a `pull_request: closed` trigger then becomes a useful low-latency complement.
 
 ## Notes
 
-- Cache deletion logic picks `BRANCH_NAME` if provided; otherwise derives a PR ref from `PR_NUMBER`.
-- Use `CLEAN_GH_CACHE`, `CLEAN_GHCR_IMAGE`, and `CLEAN_ORPHANED_GHCR_IMAGE` to control which cleanup operations run.
-- Image deletion job (`cleanup-image`) only runs when `CLEAN_GHCR_IMAGE: true` and `IMAGE` is supplied.
-- Orphaned image cleanup (`cleanup-orphaned-image`) deletes SHA-only tagged images (7–40 character hex SHAs) when `CLEAN_ORPHANED_GHCR_IMAGE: true`.
-- Multi-arch manifest cleanup is handled automatically when deleting images.
-- Uses GitHub CLI (`gh`) for improved API interactions and error handling.
-- `IMAGE` must include a tag (e.g. `ghcr.io/my-org/my-image:pr-123`); images are deleted via the GitHub Packages API.
+- At least one of `PR_NUMBER` or `BRANCH_NAME` is needed; with neither, the job is skipped.
+- A pull request's caches are scoped to `refs/pull/<N>/merge`, never to `refs/heads/<branch>` — the latter only holds caches written by a `push`-triggered workflow. When both inputs are supplied, **both refs are swept**.
+- A failed deletion — a key evicted between the listing and the delete, for instance by a concurrent run — is logged without failing the job; the remaining keys are still processed.
+- The number of keys actually deleted is reported at the end of the job.
 
 ## Examples
 
-The examples below show how to clean workflow caches and optionally delete orphaned Docker images, covering both targeted and broad cleanup strategies.
+### Scheduled sweep (recommended)
 
-### Clean cache and delete specific image
-
-Purges the Actions cache entries associated with PR #123 and deletes the specific tagged image from GHCR. Both operations run because `CLEAN_GH_CACHE: true` and `CLEAN_GHCR_IMAGE: true`; omit either flag to skip that operation.
+Reconciles recently closed pull requests once a day. The `list-closed-prs` job is the only one needing `pull-requests: read`.
 
 ```yaml
+name: Clean cache
+
+on:
+  schedule:
+  - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      LOOKBACK_DAYS:
+        description: How far back to reconcile closed pull requests
+        required: false
+        type: number
+        default: 3
+
 jobs:
-  cleanup:
+  list-closed-prs:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      prs: ${{ steps.list.outputs.prs }}
+    steps:
+    - id: list
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        # The `schedule` trigger has no `inputs` context.
+        LOOKBACK_DAYS: ${{ inputs.LOOKBACK_DAYS || 3 }}
+      run: |
+        set -euo pipefail
+        CUTOFF=$(date -u -d "$LOOKBACK_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ)
+        PRS=$(gh pr list -R "$REPO" --state closed --limit 100 \
+          --json number,headRefName,closedAt \
+          | jq -c --arg c "$CUTOFF" \
+            '[.[] | select(.closedAt >= $c) | {number, headRefName}]')
+        echo "prs=$PRS" >> "$GITHUB_OUTPUT"
+
+  sweep-caches:
+    needs: list-closed-prs
+    # An empty matrix vector is a workflow error, not an empty run.
+    if: ${{ needs.list-closed-prs.outputs.prs != '[]' }}
     uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@v0
     permissions:
       actions: write
-      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.list-closed-prs.outputs.prs) }}
     with:
-      PR_NUMBER: 123
-      IMAGE: ghcr.io/this-is-tobi/tools/debug:pr-123
-      CLEAN_GH_CACHE: true
-      CLEAN_GHCR_IMAGE: true
+      PR_NUMBER: ${{ matrix.pr.number }}
+      BRANCH_NAME: ${{ matrix.pr.headRefName }}
 ```
 
-### Clean orphaned SHA-only images
-
-Removes all GHCR image versions tagged only with a 7–40 character hex SHA — leftover build artifacts from deleted branches. `CLEAN_GH_CACHE: false` skips cache deletion so only registry cleanup runs. Provide the image name without a tag; the workflow discovers and deletes all matching SHA-only versions.
+### Clean the caches of a deleted branch
 
 ```yaml
+on:
+  delete:
+
 jobs:
-  cleanup-orphans:
+  cleanup:
+    if: ${{ github.event.ref_type == 'branch' }}
     uses: this-is-tobi/github-workflows/.github/workflows/clean-cache.yml@v0
     permissions:
-      packages: write
+      actions: write
     with:
-      IMAGE: ghcr.io/this-is-tobi/tools/debug
-      CLEAN_GH_CACHE: false
-      CLEAN_ORPHANED_GHCR_IMAGE: true
+      BRANCH_NAME: ${{ github.event.ref }}
 ```
