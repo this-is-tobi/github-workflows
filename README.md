@@ -14,6 +14,10 @@ __Example:__
 jobs:
   example:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     with:
       SONAR_URL: "https://sonarqube.example.com"
     secrets:
@@ -68,8 +72,9 @@ For more details, see:
 - [Release Apps using release-please and optional automerge (`release-app.yml`)](./.github/workflows/release-app.yml)
 - [Release Helm charts using chart-releaser (`release-helm.yml`)](./.github/workflows/release-helm.yml)
 - [Release a monorepo Helm chart to an OCI registry (`release-helm-local.yml`)](./.github/workflows/release-helm-local.yml)
+- [Bump a Helm chart hosted in this repository (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
+- [Trigger a Helm chart bump in a separate repository (`dispatch-helm-chart.yml`)](./.github/workflows/dispatch-helm-chart.yml)
 - [Publish packages to any NPM-compatible registry (`release-npm.yml`)](./.github/workflows/release-npm.yml)
-- [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
 
 **Deploy**
 
@@ -93,10 +98,12 @@ For more details, see:
 - [Lint Helm Schema](./docs/12-lint-helm-schema.md) *- Helm chart values JSON schema validation*
 - [Lint JavaScript](./docs/13-lint-js.md) *- JavaScript/TypeScript linting with ESLint*
 - [Lint YAML](./docs/14-lint-yaml.md) *- YAML linting with yamllint*
+- [Lint Dependencies](./docs/15-lint-deps.md) *- Dependency policy and audit checks*
 - [Test Helm Charts](./docs/20-test-chart.md) *- Helm chart installation testing*
 - [Test JavaScript](./docs/21-test-vitest.md) *- JavaScript/TypeScript testing with Vitest*
 - [Test Kube Deployment](./docs/22-test-kube-deployment.md) *- Kubernetes deployment testing with Kind*
 - [Test Playwright](./docs/23-test-playwright.md) *- End-to-end Playwright testing across browsers*
+- [Test Docker](./docs/24-test-docker.md) *- Run a command inside a Docker image (registry or tarball)*
 - [Build Docker](./docs/30-build-docker.md) *- Docker image building and registry pushing*
 - [Attest Docker](./docs/31-attest-docker.md) *- SLSA provenance and SBOM attestations for Docker images*
 - [Scan SonarQube](./docs/40-scan-sonarqube.md) *- Code quality analysis with SonarQube*
@@ -105,10 +112,12 @@ For more details, see:
 - [Release App](./docs/50-release-app.md) *- Application releases using release-please*
 - [Release Helm](./docs/51-release-helm.md) *- Helm chart releases with chart-releaser*
 - [Release Helm (local)](./docs/52-release-helm-local.md) *- Monorepo Helm chart releases without chart-releaser*
-- [Update Helm Chart](./docs/53-update-helm-chart.md) *- Helm chart version bumping*
-- [Release NPM](./docs/54-release-npm.md) *- NPM package publishing with multi-runtime and multi-registry support*
+- [Update Helm Chart](./docs/53-update-helm-chart.md) *- Helm chart version bumping, in this repository*
+- [Dispatch Helm Chart](./docs/54-dispatch-helm-chart.md) *- Trigger a chart bump in a separate chart repository*
+- [Release NPM](./docs/55-release-npm.md) *- NPM package publishing with multi-runtime and multi-registry support*
 - [ArgoCD Preview](./docs/60-argocd-preview.md) *- Preview environment deployment with ArgoCD*
 - [Preview Comment](./docs/61-preview-comment.md) *- Post or update PR comments with preview environment URLs*
-- [Clean Cache](./docs/70-clean-cache.md) *- GitHub Actions cache and GHCR image cleanup*
-- [Label PR](./docs/71-labeler-pr.md) *- Automatic pull request labeling*
+- [Clean Cache](./docs/70-clean-cache.md) *- GitHub Actions cache cleanup*
+- [Clean Images](./docs/71-clean-images.md) *- GHCR container image cleanup*
+- [Label PR](./docs/80-labeler-pr.md) *- Automatic pull request labeling*
 - [CI/CD Examples](./docs/90-global-workflows-examples.md) *- Complete CI/CD pipeline examples*

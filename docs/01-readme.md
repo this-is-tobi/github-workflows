@@ -72,8 +72,9 @@ For more details, see:
 - [Release Apps using release-please and optional automerge (`release-app.yml`)](../.github/workflows/release-app.yml)
 - [Release Helm charts using chart-releaser (`release-helm.yml`)](../.github/workflows/release-helm.yml)
 - [Release a monorepo Helm chart to an OCI registry (`release-helm-local.yml`)](../.github/workflows/release-helm-local.yml)
+- [Bump a Helm chart hosted in this repository (`update-helm-chart.yml`)](../.github/workflows/update-helm-chart.yml)
+- [Trigger a Helm chart bump in a separate repository (`dispatch-helm-chart.yml`)](../.github/workflows/dispatch-helm-chart.yml)
 - [Publish packages to any NPM-compatible registry (`release-npm.yml`)](../.github/workflows/release-npm.yml)
-- [Update or trigger Helm chart app version bump (`update-helm-chart.yml`)](../.github/workflows/update-helm-chart.yml)
 
 **Deploy**
 
@@ -82,5 +83,6 @@ For more details, see:
 
 **Utility**
 
-- [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](../.github/workflows/clean-cache.yml)
+- [Delete GitHub action caches belonging to a pull request or branch (`clean-cache.yml`)](../.github/workflows/clean-cache.yml)
+- [Delete GHCR container images by tag, and collect orphaned ones (`clean-images.yml`)](../.github/workflows/clean-images.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](../.github/workflows/label-pr.yml)
