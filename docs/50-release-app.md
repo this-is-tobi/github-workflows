@@ -247,7 +247,7 @@ Worth knowing:
 - **The floating `v<major>`/`v<major>.<minor>` tags from `TAG_MAJOR_AND_MINOR` are unaffected.** Immutability locks only tags carrying a published release, and release-please only ever creates releases on `v<major>.<minor>.<patch>`.
 
 > [!WARNING]
-> [`release-helm.yml`](./51-release-helm.md) with `CREATE_GITHUB_RELEASE: true` is **not** compatible with immutable releases: `chart-releaser` creates the release and then attaches the chart `.tgz` in two separate API calls, with no draft option ([helm/chart-releaser#591](https://github.com/helm/chart-releaser/issues/591)). The default mode (`CREATE_GITHUB_RELEASE: false`, OCI publishing only) is unaffected.
+> [`release-helm.yml`](./51-release-helm.md) with `CREATE_GITHUB_RELEASE: true` is **not** compatible with immutable releases: `chart-releaser` creates the release and then attaches the chart `.tgz` in two separate API calls, with no draft option ([helm/chart-releaser#591](https://github.com/helm/chart-releaser/issues/591)). Publishing charts to an OCI registry instead (`PUBLISH_OCI: true`, `CREATE_GITHUB_RELEASE: false`) creates no GitHub Release and is unaffected.
 
 ## Examples
 

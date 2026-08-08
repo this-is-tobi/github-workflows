@@ -263,6 +263,7 @@ jobs:
       contents: write
       packages: write
     with:
+      PUBLISH_OCI: true
       CHARTS_DIR: ./charts
     secrets:
       APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
@@ -374,6 +375,7 @@ jobs:
       contents: write
       packages: write
     with:
+      PUBLISH_OCI: true
       CHARTS_DIR: ./charts
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
