@@ -23,6 +23,7 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 | PRERELEASE_MANIFEST_FILE | string  | Release-please manifest file for prerelease branch                                                                                                                                               | No       | .release-please-manifest-rc.json |
 | RELEASE_ASSET_PATHS      | string  | Comma-separated list of local file paths to upload as release assets (e.g., `dist/app-linux-amd64,dist/app-darwin-amd64`)                                                                        | No       | -                                |
 | RELEASE_ARTIFACT_NAMES   | string  | Artifact name or glob pattern matching one or more artifacts (uploaded by previous jobs via `actions/upload-artifact`) to download and attach to the release (e.g., `my-binaries` or `my-app-*`) | No       | -                                |
+| PUBLISH_DRAFT_RELEASE    | boolean | Publish the GitHub Release once the assets have been attached. Enable together with `"draft": true` and `"force-tag-creation": true` in the release-please config to stay compatible with [immutable releases](#immutable-releases)                | No       | false                            |
 | RUNS_ON                  | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                                                                                         | No       | ["ubuntu-24.04"]                 |
 
 ## Secrets
@@ -134,6 +135,7 @@ If both are set, the App takes precedence — useful for verifying the switch be
 - If `AUTOMERGE_*` is enabled and a PAT is provided, attempts to automerge the release PR.
 - Optionally rebases `PRERELEASE_BRANCH` onto `RELEASE_BRANCH` after a release when `REBASE_PRERELEASE_BRANCH: true` (only when `ENABLE_PRERELEASE: true`).
 - `RELEASE_ASSET_PATHS` uploads files that are already present on the runner filesystem. `RELEASE_ARTIFACT_NAMES` accepts a name or glob pattern — the matching artifacts are downloaded via `actions/download-artifact` before being attached to the release; both inputs can be used together.
+- `PUBLISH_DRAFT_RELEASE: true` publishes the release after the assets have been attached. It is a no-op when the release is not a draft, so the step is safe to re-run. See [immutable releases](#immutable-releases).
 
 ## Configuration
 
@@ -200,6 +202,52 @@ Used when `ENABLE_PRERELEASE: true`. Identical structure to the release config b
   ".": "0.0.1"
 }
 ```
+
+## Immutable releases
+
+[Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) freeze a GitHub Release the moment it is published: assets can no longer be added, changed or removed, and the associated tag can no longer be moved or deleted. The only ordering GitHub supports is therefore **create as a draft → attach the assets → publish**.
+
+This only matters if you attach assets, through `RELEASE_ASSET_PATHS` or `RELEASE_ARTIFACT_NAMES`. Without assets the workflow is already compatible and there is nothing to change.
+
+Three changes are needed, two of them in your own release-please config:
+
+```jsonc
+{
+  "packages": {
+    ".": {
+      // Create the release as a draft, so assets can still be attached to it.
+      "draft": true,
+      // GitHub does not create the git tag until a draft is published, and
+      // release-please needs the tag to resolve the previous release.
+      "force-tag-creation": true
+    }
+  }
+}
+```
+
+```yaml
+jobs:
+  release:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    with:
+      RELEASE_ARTIFACT_NAMES: my-app-binaries
+      PUBLISH_DRAFT_RELEASE: true
+```
+
+Worth knowing:
+
+- **`PUBLISH_DRAFT_RELEASE` is an explicit opt-in.** release-please's `draft` option is also the documented way to hold a release back for manual publication, so this workflow never publishes a draft unless asked to.
+- **The step is idempotent.** An already-published release is left untouched, so the step is safe to re-run.
+- **`release:` events fire later.** A draft fires nothing; `release: published`/`released` comes from the publish step, once the assets are attached. Check the triggers of any workflow that reacts to your releases.
+- **A mid-run failure leaves a draft**, which you can publish with `gh release edit <tag> --draft=false` or by re-running. That is exactly what this setup buys you: without it, on a repository with immutable releases, a failed asset upload leaves a published, incomplete release that is **unrecoverable** — the tag name stays burned even after deleting the release.
+- **The floating `v<major>`/`v<major>.<minor>` tags from `TAG_MAJOR_AND_MINOR` are unaffected.** Immutability locks only tags carrying a published release, and release-please only ever creates releases on `v<major>.<minor>.<patch>`.
+
+> [!WARNING]
+> [`release-helm.yml`](./51-release-helm.md) with `CREATE_GITHUB_RELEASE: true` is **not** compatible with immutable releases: `chart-releaser` creates the release and then attaches the chart `.tgz` in two separate API calls, with no draft option ([helm/chart-releaser#591](https://github.com/helm/chart-releaser/issues/591)). The default mode (`CREATE_GITHUB_RELEASE: false`, OCI publishing only) is unaffected.
 
 ## Examples
 

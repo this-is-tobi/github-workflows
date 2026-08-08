@@ -48,6 +48,11 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 - Detects charts via `git diff` from the latest git tag and only releases charts whose `Chart.yaml` version was bumped compared to the previous release; requires SemVer chart versions and `fetch-depth: 0` (the workflow sets it).
 - Charts can be pulled using: `helm pull oci://ghcr.io/<owner>/<repo>/<chart-name> --version <version>`
 
+> [!WARNING]
+> **`CREATE_GITHUB_RELEASE: true` is not compatible with [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).** `chart-releaser` creates the GitHub Release and then attaches the chart `.tgz` in two separate API calls, with no way to go through a draft; on a repository with immutable releases enabled the second call is rejected and the release is left incomplete. Upstream support is tracked in [helm/chart-releaser#591](https://github.com/helm/chart-releaser/issues/591).
+>
+> The default mode (`CREATE_GITHUB_RELEASE: false`, packaging + OCI publishing only) creates no GitHub Release and is unaffected.
+
 ## Examples
 
 The examples show releasing to the default GitHub Packages (ghcr.io) OCI registry, publishing to a custom registry with explicit credentials, a minimal setup that relies entirely on workflow defaults, and opting into GitHub Releases.
