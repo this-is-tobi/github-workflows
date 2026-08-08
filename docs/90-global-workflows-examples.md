@@ -1009,7 +1009,7 @@ jobs:
 
 ## JS Library / npm Package
 
-A TypeScript or JavaScript package without Docker images or Helm charts. The CD pipeline focuses solely on versioning and changelog generation.
+A TypeScript or JavaScript package without Docker images or Helm charts. release-please handles the version and changelog, then the package is actually shipped — to npm via [`release-npm.yml`](./55-release-npm.md), or as a bundled CLI attached to the GitHub Release, or both.
 
 ### CI Pipeline
 
@@ -1106,7 +1106,7 @@ jobs:
 
 ### CD Pipeline
 
-Triggered on push to `develop` or `main`. release-please manages the CHANGELOG and version tag; no build or push step is required since publishing to npm happens outside this workflow.
+Triggered on push to `develop` or `main`. release-please manages the CHANGELOG and version tag; once the release PR merges, the package is published to npm.
 
 ```yaml
 name: CD
@@ -1135,4 +1135,95 @@ jobs:
       REBASE_PRERELEASE_BRANCH: true
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
+
+  publish-npm:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-npm.yml@v0
+    if: ${{ needs.release.outputs.release-created == 'true' }}
+    needs:
+    - release
+    permissions:
+      contents: read
+      # Required for trusted publishing (OIDC). Harmless when NPM_TOKEN is used
+      # instead, and it must be granted here as well as inside the reusable
+      # workflow - permissions are explicit at every level of the call chain.
+      id-token: write
+    with:
+      BUILD_COMMAND: npm run build
+      # The prerelease branch must not publish under 'latest', or a develop
+      # build would become what `npm install <pkg>` resolves to.
+      TAG: ${{ github.ref_name == 'main' && 'latest' || 'next' }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```
+
+> `release-npm.yml` publishes the version already committed in `package.json` — which is exactly what release-please just bumped, since the job is gated on `release-created` and runs on the merge commit. Nothing re-computes the version.
+>
+> With a [trusted publisher](./55-release-npm.md#trusted-publishing-oidc) configured on npmjs.com for **this `cd.yml` file** (npm validates the entry-point workflow, not the reusable one it calls), the `secrets:` block can be dropped entirely — `id-token: write` is enough.
+
+### CD Pipeline — CLI distributed as a release asset
+
+For a package that ships an executable rather than (or alongside) a library, bundle the CLI and attach it to the GitHub Release. The build job runs **before** `release-app`, which downloads the artifact by name and uploads it as a release asset in the same run.
+
+```yaml
+name: CD
+
+on:
+  push:
+    branches:
+    - main
+  workflow_dispatch:
+
+jobs:
+  build-cli:
+    name: Bundle CLI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        cache: npm
+    - run: npm ci
+    # e.g. esbuild --bundle --platform=node --outfile=dist/cli.js src/cli.ts
+    - run: npm run build:cli
+    - uses: actions/upload-artifact@v7
+      with:
+        name: cli-bundle
+        path: dist/cli.js
+
+  release:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    needs:
+    - build-cli
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    with:
+      ENABLE_PRERELEASE: false
+      RELEASE_BRANCH: main
+      AUTOMERGE_RELEASE: true
+      # Downloaded from this run and attached to the GitHub Release
+      RELEASE_ARTIFACT_NAMES: cli-bundle
+    secrets:
+      GH_PAT: ${{ secrets.GH_PAT }}
+
+  publish-npm:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-npm.yml@v0
+    if: ${{ needs.release.outputs.release-created == 'true' }}
+    needs:
+    - release
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      BUILD_COMMAND: npm run build
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+> `build-cli` is a `needs:` of `release`, not the other way round: `RELEASE_ARTIFACT_NAMES` resolves artifacts from the **current run**, so the bundle has to exist before release-app looks for it. It runs on every push, including those that produce no release — the cost of one bundle step, in exchange for not splitting the release across two runs.
+>
+> **On a repository with [immutable releases](./50-release-app.md#immutable-releases) enabled**, attaching assets requires the draft flow: add `PUBLISH_DRAFT_RELEASE: true` here, plus `"draft": true` and `"force-tag-creation": true` in `release-please-config.json`. Without it the asset upload is rejected, because the release is already published by the time it runs.
