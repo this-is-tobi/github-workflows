@@ -655,7 +655,7 @@ Shared guarantees across all four quadrants:
 
 - Chart and app versions stay **decoupled** (`appVersion` tracks the app; chart `version` follows its own stream, including chart-only releases with `APP_VERSION` empty).
 - Loop safety is identical: direct bump commits are pushed with `GITHUB_TOKEN` and never retrigger workflows; PR merges (human or PAT automerge) do trigger the chart CD, whose guard prevents any re-bump.
-- [`release-helm.yml`](./51-release-helm.md) (chart-releaser) remains the classic alternative for dedicated chart repositories that want auto-detection, GitHub Releases and a `gh-pages` `index.yaml` on top of the OCI push.
+- [`release-helm.yml`](./51-release-helm.md) (chart-releaser) remains the classic alternative for dedicated chart repositories that want auto-detection, and lets you pick the distribution channel: an OCI push (`PUBLISH_OCI: true`), a `gh-pages` `index.yaml` with GitHub Releases (`CREATE_GITHUB_RELEASE: true`), or both.
 
 The **monorepo direct** flow is shown [above](#releasing-an-in-repo-chart-local-mode); the **monorepo PR-gated** variant only swaps the `bump-chart` job (the publisher stays the chart CD guard workflow shown above, which the merged PR triggers):
 
@@ -804,7 +804,7 @@ jobs:
 
 ### CD Pipeline
 
-Triggered on push to `main`. chart-releaser detects which charts had their version bumped and pushes them to the OCI registry (optionally creating GitHub Releases with `CREATE_GITHUB_RELEASE: true`).
+Triggered on push to `main`. chart-releaser detects which charts had their version bumped and ships them through whichever channel you enable — `PUBLISH_OCI: true` for the OCI registry, `CREATE_GITHUB_RELEASE: true` for GitHub Releases plus a `gh-pages` `index.yaml`, or both. At least one is required.
 
 > Harmonized alternative: instead of chart-releaser's tag-based detection, you can reuse the exact same guard + `release-helm-local.yml` chart CD as the monorepo (`on: push: paths: charts/**` — see [Helm Chart Release Patterns](#helm-chart-release-patterns)). Keep `release-helm.yml` (chart-releaser) when you want auto-detection across many charts, GitHub Releases, or a classic `gh-pages` `index.yaml`.
 
@@ -824,6 +824,7 @@ jobs:
       contents: write
       packages: write
     with:
+      PUBLISH_OCI: true
       CHARTS_DIR: ./charts
       HELM_REPOS: "bitnami=https://charts.bitnami.com/bitnami,jetstack=https://charts.jetstack.io"
 ```

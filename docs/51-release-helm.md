@@ -1,6 +1,11 @@
 # `release-helm.yml`
 
-Release Helm charts to an OCI registry (e.g. `ghcr.io`) using [`chart-releaser-action`](https://github.com/helm/chart-releaser-action), which auto-detects charts whose version changed since the last git tag, packages them, pushes them to the OCI registry, and optionally (`CREATE_GITHUB_RELEASE: true`) creates GitHub Releases + tags and maintains a classic `index.yaml` Helm repo on a pages branch. Best for a **dedicated charts repository**, where the repository's git tags belong to the charts.
+Release Helm charts using [`chart-releaser-action`](https://github.com/helm/chart-releaser-action), which auto-detects charts whose version changed since the last git tag and packages them. From there, two **independent distribution channels** can be enabled — see [Distribution channels](#distribution-channels):
+
+- `PUBLISH_OCI: true` — push the packages to an OCI registry (e.g. `ghcr.io`).
+- `CREATE_GITHUB_RELEASE: true` — attach them to a GitHub Release per chart and maintain a classic `index.yaml` Helm repo on a pages branch.
+
+Both default to `false` and **at least one must be enabled**, otherwise the run fails. Best for a **dedicated charts repository**, where the repository's git tags belong to the charts.
 
 For a **monorepo** — a chart living alongside application code, where the tag namespace is dominated by app tags and chart-releaser's "latest tag" change detection is unreliable — use [`release-helm-local.yml`](./52-release-helm-local.md) instead. The two are separate workflow files rather than one workflow with a mode switch: each declares only the permissions its own logic needs, so a monorepo caller never has to grant `contents: write` for a chart-releaser code path it will never run. See [`release-helm-local.yml`](./52-release-helm-local.md#why-a-separate-workflow) for the full reasoning.
 
@@ -9,6 +14,7 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 | Input                 | Type    | Description                                                                                                                     | Required | Default          |
 | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- |
 | CHARTS_DIR            | string  | Directory containing the Helm charts                                                                                              | No       | ./charts         |
+| PUBLISH_OCI           | boolean | Push the packaged charts to the OCI registry (see `REGISTRY`/`REPOSITORY`). Independent of `CREATE_GITHUB_RELEASE`; at least one of the two must be enabled | No       | false            |
 | CREATE_GITHUB_RELEASE | boolean | Also create a GitHub Release and git tag per changed chart and update `index.yaml` on the pages branch. Requires the pages branch to already exist. | No       | false            |
 | PAGES_BRANCH          | string  | Branch that receives `index.yaml` when `CREATE_GITHUB_RELEASE` is `true`. Must already exist.                                    | No       | gh-pages         |
 | HELM_REPOS            | string  | Helm repositories to add for chart dependencies (name=url, comma-separated). Optional; skipped if empty.                          | No       | -                |
@@ -20,8 +26,8 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 
 | Secret            | Description                                                                                | Required |
 | ----------------- | ------------------------------------------------------------------------------------------ | -------- |
-| REGISTRY_USERNAME | Username for OCI registry authentication (uses `github.actor` automatically for `ghcr.io`) | No       |
-| REGISTRY_PASSWORD | Password for OCI registry authentication (uses `GITHUB_TOKEN` automatically for `ghcr.io`) | No       |
+| REGISTRY_USERNAME | Username for OCI registry authentication (uses `github.actor` automatically for `ghcr.io`). **Required** with `PUBLISH_OCI: true` when `REGISTRY` is not `ghcr.io` | No       |
+| REGISTRY_PASSWORD | Password for OCI registry authentication (uses `GITHUB_TOKEN` automatically for `ghcr.io`). **Required** alongside `REGISTRY_USERNAME` under the same conditions | No       |
 | APP_CLIENT_ID     | GitHub App **Client ID** (not the numeric App ID). With `APP_PRIVATE_KEY`, chart-releaser authenticates as a GitHub App. See [Authentication](./05-authentication.md) | No       |
 | APP_PRIVATE_KEY   | GitHub App private key (PEM). Required alongside `APP_CLIENT_ID`                            | No       |
 | GH_PAT            | Personal access token, same purpose as the App credentials and resolved after them | No       |
@@ -30,7 +36,7 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 >
 > `cr index --push` authenticates the `PAGES_BRANCH` push with the same token, so an App token or `GH_PAT` also lets **that** push trigger workflows. Harmless unless a workflow triggers on the pages branch — check before pointing one at it.
 >
-> The App token is only minted when `CREATE_GITHUB_RELEASE` is `true` — with it `false` the workflow only packages charts and pushes them to the OCI registry, so there is nothing for a write-capable token to do.
+> The App token is only minted when `CREATE_GITHUB_RELEASE` is `true` — with it `false` nothing in the run writes through that token (chart-releaser only packages, and the OCI push authenticates against the registry instead), so there is nothing for a write-capable token to do.
 >
 > `APP_CLIENT_ID` and `APP_PRIVATE_KEY` must be supplied **together**. Setting only one fails the job rather than falling back to `GH_PAT` or `GITHUB_TOKEN`.
 
@@ -38,12 +44,34 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 
 | Scope    | Access | Description                                                            |
 | -------- | ------ | ------------------------------------------------------------------------ |
-| packages | write  | Push charts to the OCI registry (`ghcr.io`)                              |
+| packages | write  | Push charts to the OCI registry (`ghcr.io`) when `PUBLISH_OCI` is `true`  |
 | contents | write  | Create releases/tags and update `index.yaml` when `CREATE_GITHUB_RELEASE` is `true` (harmless to grant unconditionally if left `false`) |
+
+> **On the unused grant.** The workflow declares both scopes on its job, and GitHub Actions' `permissions:` key accepts no expressions — so `packages: write` is granted even with `PUBLISH_OCI: false`, where nothing uses it. Narrowing it would mean splitting the two channels into separate workflow files, doubling the file count to remove a scope that no step in that configuration ever calls.
+
+## Distribution channels
+
+The workflow packages charts once and can ship them through two channels, enabled independently:
+
+| | `PUBLISH_OCI: true` | `CREATE_GITHUB_RELEASE: true` |
+| --- | --- | --- |
+| Consumers run | `helm pull oci://<registry>/<repo>/<chart>` | `helm repo add <name> https://<owner>.github.io/<repo>` |
+| Needs | Helm 3.8+ | any Helm 3 |
+| Repo prerequisites | none | the `PAGES_BRANCH` (default `gh-pages`) must already exist |
+| Private charts | registry auth | GitHub Release assets follow repo visibility |
+| Extra permission used | `packages: write` | `contents: write` |
+| [Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) | compatible (creates no GitHub Release) | **not compatible** — see the warning below |
+
+Enabling both is fine and publishes the same packages through both paths.
+
+**Both left `false` fails the run.** The workflow would otherwise package charts, publish them nowhere, and still report success — a green run that shipped nothing is harder to notice than a red one, so the validation step stops it up front with a message naming both inputs.
 
 ## Notes
 
-- **CREATE_GITHUB_RELEASE behavior**: When `false` (the default), the workflow only packages changed charts and pushes them to the OCI registry — **no GitHub Pages branch is required**. When `true`, it additionally creates a GitHub Release and git tag for each changed chart and updates `index.yaml` on the pages branch (e.g. `gh-pages`); this **requires that pages branch to already exist**.
+- **CREATE_GITHUB_RELEASE behavior**: When `true`, creates a GitHub Release and git tag for each changed chart and updates `index.yaml` on the pages branch (e.g. `gh-pages`); this **requires that pages branch to already exist**. When `false`, no GitHub Pages branch is required.
+- **PUBLISH_OCI behavior**: When `true`, logs in to `REGISTRY` and pushes each packaged chart. The login is skipped entirely when `false`, so no registry credential is read or needed.
+- **Registry credentials are validated up front**: with `PUBLISH_OCI: true` and a `REGISTRY` other than `ghcr.io`, missing `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` fail the run with an explicit message rather than reaching `helm registry login` with an empty password and failing on an opaque authentication error.
+- **Credentials are cleared afterwards**: a `helm registry logout` step runs whenever the login succeeded, including after a failed push. Hosted runners are ephemeral so this is a no-op there, but `RUNS_ON` also supports self-hosted runners, where Helm's registry config would otherwise outlive the job.
 - **HELM_REPOS is optional**: The "add repos" step is skipped when `HELM_REPOS` is empty. Provide it when your charts pull dependencies from external repositories.
 - Detects charts via `git diff` from the latest git tag and only releases charts whose `Chart.yaml` version was bumped compared to the previous release; requires SemVer chart versions and `fetch-depth: 0` (the workflow sets it).
 - Charts can be pulled using: `helm pull oci://ghcr.io/<owner>/<repo>/<chart-name> --version <version>`
@@ -51,15 +79,15 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 > [!WARNING]
 > **`CREATE_GITHUB_RELEASE: true` is not compatible with [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).** `chart-releaser` creates the GitHub Release and then attaches the chart `.tgz` in two separate API calls, with no way to go through a draft; on a repository with immutable releases enabled the second call is rejected and the release is left incomplete. Upstream support is tracked in [helm/chart-releaser#591](https://github.com/helm/chart-releaser/issues/591).
 >
-> The default mode (`CREATE_GITHUB_RELEASE: false`, packaging + OCI publishing only) creates no GitHub Release and is unaffected.
+> The OCI channel on its own (`PUBLISH_OCI: true`, `CREATE_GITHUB_RELEASE: false`) creates no GitHub Release and is unaffected — so on a repository with immutable releases enabled, that is the channel to use.
 
 ## Examples
 
-The examples show releasing to the default GitHub Packages (ghcr.io) OCI registry, publishing to a custom registry with explicit credentials, a minimal setup that relies entirely on workflow defaults, and opting into GitHub Releases.
+Every example enables at least one distribution channel — the workflow fails if both are left `false`. They cover OCI on the default `ghcr.io` registry, OCI on a custom registry with explicit credentials, the classic GitHub Pages repo on its own, and both channels together.
 
-### Simple example
+### OCI registry (GitHub Packages)
 
-With default settings, packages the changed charts and pushes them to the OCI registry (no GitHub Pages branch needed). External repositories are optionally pre-registered via `HELM_REPOS`.
+Packages the changed charts and pushes them to `ghcr.io`. No GitHub Pages branch needed. External repositories are optionally pre-registered via `HELM_REPOS`.
 
 ```yaml
 jobs:
@@ -69,13 +97,14 @@ jobs:
       contents: write
       packages: write
     with:
+      PUBLISH_OCI: true
       CHARTS_DIR: ./charts
       HELM_REPOS: "bitnami=https://charts.bitnami.com/bitnami,jetstack=https://charts.jetstack.io"
 ```
 
 ### Custom OCI registry
 
-To push charts to a registry other than `ghcr.io`, supply credentials as secrets:
+To push charts to a registry other than `ghcr.io`, supply credentials as secrets — they are required, and the run fails up front without them:
 
 ```yaml
 jobs:
@@ -85,6 +114,7 @@ jobs:
       contents: write
       packages: write
     with:
+      PUBLISH_OCI: true
       CHARTS_DIR: ./charts
       REGISTRY: registry.example.com
       REPOSITORY: my-org/helm-charts
@@ -93,22 +123,9 @@ jobs:
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 ```
 
-### Minimal (GitHub Packages only)
+### Classic Helm repo only (no OCI)
 
-When all defaults are acceptable (ghcr.io, charts in `./charts`, no external repos):
-
-```yaml
-jobs:
-  release-charts:
-    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
-    permissions:
-      contents: write
-      packages: write
-```
-
-### Also create GitHub Releases (classic Helm repo)
-
-Set `CREATE_GITHUB_RELEASE: true` to additionally create GitHub Releases and git tags and maintain an `index.yaml`-based Helm repo on the pages branch. The `PAGES_BRANCH` (default `gh-pages`) **must already exist** in the repository.
+Creates a GitHub Release and git tag per chart and maintains an `index.yaml` Helm repo on the pages branch, without pushing anything to an OCI registry. Consumers use `helm repo add`. The `PAGES_BRANCH` (default `gh-pages`) **must already exist** in the repository.
 
 ```yaml
 jobs:
@@ -118,6 +135,23 @@ jobs:
       contents: write
       packages: write
     with:
+      CREATE_GITHUB_RELEASE: true
+      PAGES_BRANCH: gh-pages
+```
+
+### Both channels
+
+Publishes the same packages to the OCI registry *and* through the classic pages repo:
+
+```yaml
+jobs:
+  release-charts:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm.yml@v0
+    permissions:
+      contents: write
+      packages: write
+    with:
+      PUBLISH_OCI: true
       CREATE_GITHUB_RELEASE: true
       PAGES_BRANCH: gh-pages
 ```
