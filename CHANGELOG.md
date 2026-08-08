@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.4](https://github.com/this-is-tobi/github-workflows/compare/v0.22.3...v0.22.4) (2026-08-08)
+
+
+### Code Refactoring
+
+* **clean-cache:** move container image cleanup to clean-images.yml ([d4f6c6b](https://github.com/this-is-tobi/github-workflows/commit/d4f6c6bb9c9740ec25d67c48073051abeee1a745))
+* **update-helm-chart:** move cross-repository dispatch to its own workflow ([a090325](https://github.com/this-is-tobi/github-workflows/commit/a09032567a64a3cc0e520b024e8468afd5b5f729))
+
 ## [0.22.3](https://github.com/this-is-tobi/github-workflows/compare/v0.22.2...v0.22.3) (2026-08-07)
 
 
