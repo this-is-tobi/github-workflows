@@ -45,7 +45,7 @@ jobs:
         PR_NUMBER: ${{ inputs.PR_NUMBER }}
 
     - name: Comment PR
-      uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b # v3.0.1
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
       with:
         message: |
           🤖 Hey !
@@ -53,7 +53,10 @@ jobs:
           A preview of the application is available at: ${{ steps.generate-url.outputs.APP_URL }}
 
           *Please be patient, deployment may take a few minutes.*
-        comment-tag: preview
+        header: preview
+        # The same PR_NUMBER the preview URL above is built from, so the comment
+        # cannot land on a different pull request than the one it advertises.
+        number_force: ${{ inputs.PR_NUMBER }}
 
   preview-sync:
     name: Redeploy preview app
