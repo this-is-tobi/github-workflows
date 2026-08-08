@@ -154,6 +154,7 @@ jobs:
       contents: read
       security-events: write
       pull-requests: write
+      packages: read
     with:
       IMAGE: registry.example.com/my-org/my-image:1.2.3
       FORMAT: table
