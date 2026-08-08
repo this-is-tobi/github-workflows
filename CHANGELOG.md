@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/this-is-tobi/github-workflows/compare/v0.22.4...v0.23.0) (2026-08-08)
+
+
+### Features
+
+* **release-app:** support repositories with immutable releases ([fd458f8](https://github.com/this-is-tobi/github-workflows/commit/fd458f85e1ace142b43b57d33b6c8bfe2117587d))
+
 ## [0.22.4](https://github.com/this-is-tobi/github-workflows/compare/v0.22.3...v0.22.4) (2026-08-08)
 
 
