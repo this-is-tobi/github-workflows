@@ -81,8 +81,10 @@ jobs:
         } > /tmp/comment-body.md
 
     - name: Comment PR
-      uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b # v3.0.1
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
       with:
-        file-path: /tmp/comment-body.md
-        comment-tag: ${{ inputs.COMMENT_TAG }}
-        pr-number: ${{ inputs.PR_NUMBER }}
+        path: /tmp/comment-body.md
+        header: ${{ inputs.COMMENT_TAG }}
+        # Not `number`: that one is only a fallback the event payload overrides,
+        # and the caller naming a pull request has to be what decides.
+        number_force: ${{ inputs.PR_NUMBER }}

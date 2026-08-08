@@ -26,7 +26,7 @@ Supports multiple services, a `<pr_number>` placeholder in URLs, optional label 
 
 - The `<pr_number>` placeholder in every service URL value is replaced with the actual `PR_NUMBER` input before the comment is posted.
 - When `LABEL` is set, the entire job is skipped unless the PR carries that label — useful for on-demand preview environments that are only deployed when a specific label is applied.
-- `COMMENT_TAG` is passed to `thollander/actions-comment-pull-request` which finds an existing comment with the same tag and edits it. This means re-running the workflow (e.g., after redeploying) updates the comment in-place instead of spamming the thread.
+- `COMMENT_TAG` becomes the comment header used by `marocchino/sticky-pull-request-comment`, which finds an existing comment carrying the same header and edits it. This means re-running the workflow (e.g., after redeploying) updates the comment in-place instead of spamming the thread.
 - The comment body is written to a temp file to correctly handle multiline `MESSAGE_FOOTER` values.
 - The `SERVICES` value is a JSON string, not a YAML map — it must be passed as a single-quoted JSON string in the `with:` block.
 
