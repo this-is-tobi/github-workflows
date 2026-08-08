@@ -132,6 +132,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     with:
       REGISTRY_URL: "https://npm.pkg.github.com"
       SCOPE: "@my-org"

@@ -15,6 +15,8 @@ The nested job 'release' is requesting 'contents: write', but is only allowed 'c
 
 Splitting into two files means each one only ever declares the permissions its own job needs — this workflow needs `contents: read`, full stop, because it never creates a git tag, release or pages commit.
 
+The same reasoning splits [`dispatch-helm-chart.yml`](./54-dispatch-helm-chart.md) out of [`update-helm-chart.yml`](./53-update-helm-chart.md). `ci/tests/permission-union.test.sh` now enforces the rule, so a future workflow cannot quietly reintroduce the shape.
+
 ## Inputs
 
 | Input         | Type   | Description                                                                                                                                              | Required | Default          |
