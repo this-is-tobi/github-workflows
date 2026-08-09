@@ -60,6 +60,7 @@ For more details, see:
 
 - [Build docker images and optionally push it to a registry (`build-docker.yml`)](../.github/workflows/build-docker.yml)
 - [Generate and attach security attestations to a Docker image (`attest-docker.yml`)](../.github/workflows/attest-docker.yml)
+- [Sign and attest published Helm charts (`attest-helm.yml`)](../.github/workflows/attest-helm.yml)
 
 **Scan**
 
