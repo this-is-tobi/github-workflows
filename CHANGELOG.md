@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/this-is-tobi/github-workflows/compare/v0.24.0...v0.25.0) (2026-08-09)
+
+
+### Features
+
+* **release-helm:** sign and attest charts on both distribution channels ([279c3dc](https://github.com/this-is-tobi/github-workflows/commit/279c3dce027589c57ffc3ef5b95e94ee2a819e6a))
+
 ## [0.24.0](https://github.com/this-is-tobi/github-workflows/compare/v0.23.0...v0.24.0) (2026-08-08)
 
 
