@@ -60,6 +60,7 @@ For more details, see:
 
 - [Build docker images and optionally push it to a registry (`build-docker.yml`)](./.github/workflows/build-docker.yml)
 - [Generate and attach security attestations to a Docker image (`attest-docker.yml`)](./.github/workflows/attest-docker.yml)
+- [Sign and attest published Helm charts (`attest-helm.yml`)](./.github/workflows/attest-helm.yml)
 
 **Scan**
 
@@ -112,6 +113,7 @@ For more details, see:
 - [Release App](./docs/50-release-app.md) *- Application releases using release-please*
 - [Release Helm](./docs/51-release-helm.md) *- Helm chart releases with chart-releaser*
 - [Release Helm (local)](./docs/52-release-helm-local.md) *- Monorepo Helm chart releases without chart-releaser*
+- [Attest Helm](./docs/56-attest-helm.md) *- Cosign signatures and SLSA provenance for charts published to an OCI registry*
 - [Update Helm Chart](./docs/53-update-helm-chart.md) *- Helm chart version bumping, in this repository*
 - [Dispatch Helm Chart](./docs/54-dispatch-helm-chart.md) *- Trigger a chart bump in a separate chart repository*
 - [Release NPM](./docs/55-release-npm.md) *- NPM package publishing with multi-runtime and multi-registry support*
