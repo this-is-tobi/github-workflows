@@ -161,7 +161,6 @@ jobs:
       AUTOMERGE_RELEASE: true
       PRERELEASE_BRANCH: develop
       RELEASE_BRANCH: main
-      REBASE_PRERELEASE_BRANCH: true
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
 
@@ -201,7 +200,27 @@ jobs:
       PRERELEASE_IDENTIFIER: rc
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
+
+  # Last job: hand `develop` the release commit `main` just gained, so its next
+  # rc is computed from the released state instead of a frozen one.
+  #
+  # `needs:` must list every job that COMMITS to `main`. Here only `release`
+  # does - the chart bump lands in the other repository - so `needs: [release]`
+  # is both correct and minimal. Adding jobs that commit nothing only makes the
+  # sync skippable when they fail.
+  sync-prerelease-branch:
+    uses: this-is-tobi/github-workflows/.github/workflows/sync-prerelease-branch.yml@v0
+    needs:
+    - release
+    if: ${{ github.ref_name == 'main' && needs.release.outputs.release-created == 'true' }}
+    permissions:
+      contents: write
+    with:
+      RELEASE_BRANCH: main
+      PRERELEASE_BRANCH: develop
 ```
+
+> Leaving `sync-prerelease-branch` out is the one omission this library cannot make loud at the point it happens — but [`release-app.yml`](./50-release-app.md#prerelease-sync-assertion) asserts the result on the next `develop` run and fails there, rather than letting a version land below what `main` published. See [`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md) for when it is and is not needed.
 
 > To add SLSA provenance, an SBOM and/or cosign signing to `build-docker`, compose an `attest` job after it rather than looking for inputs on `build-docker.yml` itself — see [`build-docker.yml` → Attestation and signing](./30-build-docker.md#attestation-and-signing-attest-dockeryml).
 
@@ -398,7 +417,6 @@ env:
   AUTOMERGE_RELEASE: true
   PRERELEASE_BRANCH: develop
   RELEASE_BRANCH: main
-  REBASE_PRERELEASE_BRANCH: true
 
 jobs:
   expose-vars:
@@ -413,7 +431,6 @@ jobs:
       AUTOMERGE_RELEASE: ${{ env.AUTOMERGE_RELEASE }}
       PRERELEASE_BRANCH: ${{ env.PRERELEASE_BRANCH }}
       RELEASE_BRANCH: ${{ env.RELEASE_BRANCH }}
-      REBASE_PRERELEASE_BRANCH: ${{ env.REBASE_PRERELEASE_BRANCH }}
     steps:
     - name: Exposing env vars
       run: echo "Exposing env vars"
@@ -432,7 +449,6 @@ jobs:
       AUTOMERGE_RELEASE: ${{ needs.expose-vars.outputs.AUTOMERGE_RELEASE == 'true' }}
       PRERELEASE_BRANCH: ${{ needs.expose-vars.outputs.PRERELEASE_BRANCH }}
       RELEASE_BRANCH: ${{ needs.expose-vars.outputs.RELEASE_BRANCH }}
-      REBASE_PRERELEASE_BRANCH: ${{ needs.expose-vars.outputs.REBASE_PRERELEASE_BRANCH == 'true' }}
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
 
@@ -486,6 +502,21 @@ jobs:
       PRERELEASE_IDENTIFIER: rc
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
+
+  # See the note under the Simple App pipeline: only `release` commits to
+  # `main` here too, since the chart lives in another repository. The in-repo
+  # chart variant below needs one more entry.
+  sync-prerelease-branch:
+    uses: this-is-tobi/github-workflows/.github/workflows/sync-prerelease-branch.yml@v0
+    needs:
+    - expose-vars
+    - release
+    if: ${{ github.ref_name == 'main' && needs.release.outputs.release-created == 'true' }}
+    permissions:
+      contents: write
+    with:
+      RELEASE_BRANCH: main
+      PRERELEASE_BRANCH: develop
 ```
 
 > `build-docker` here is a **matrix** job (`api`/`client`/`docs`). To attest these images, don't matrix an `attest` job the same way and reference `needs.build-docker.outputs.digest` — GitHub collapses matrix job outputs to a single value, so it would silently attest the wrong image for at least two of the three. Add one explicit, non-matrixed `attest-<service>` job per service instead — see [`build-docker.yml` → Matrix builds](./30-build-docker.md#matrix-builds) for the full pattern.
@@ -532,6 +563,25 @@ jobs:
       CHART_NAME: my-app
       # Package exactly the bump commit pushed by update-helm-chart
       CHECKOUT_REF: ${{ needs.bump-chart.outputs.commit-sha }}
+
+  # THIS is the shape that makes the sync mandatory. `bump-chart` commits the
+  # released chart version to `main` AFTER the release job, so it must be in
+  # `needs:` - otherwise `develop` keeps a Chart.yaml frozen at the last release
+  # candidate and its next bump lands BELOW what `main` just published.
+  #
+  # `release-chart` is deliberately absent: it publishes, it does not commit,
+  # and listing it would let a failed publish skip the sync.
+  sync-prerelease-branch:
+    uses: this-is-tobi/github-workflows/.github/workflows/sync-prerelease-branch.yml@v0
+    needs:
+    - release
+    - bump-chart
+    if: ${{ github.ref_name == 'main' && needs.release.outputs.release-created == 'true' }}
+    permissions:
+      contents: write
+    with:
+      RELEASE_BRANCH: main
+      PRERELEASE_BRANCH: develop
 ```
 
 > The bump commit is pushed with `GITHUB_TOKEN`, and such pushes never trigger new workflow runs — no CD loop, which is precisely why the chart must be released in the same run via the `commit-sha` output.
@@ -693,6 +743,8 @@ jobs:
 ## Helm Charts Repository
 
 A repository whose sole purpose is to host and release Helm charts. No application code is built.
+
+> **No `sync-prerelease-branch` job here.** This shape is single-branch: chart bumps arrive as pull requests against `main`, and `release-helm.yml` writes only to the pages branch — nothing lands on a release branch behind a prerelease branch's back. Add the job only if you run a genuine two-branch flow in a chart repository. See [`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md#by-repository-shape).
 
 ### CI Pipeline
 
@@ -1134,7 +1186,6 @@ jobs:
       AUTOMERGE_RELEASE: true
       PRERELEASE_BRANCH: develop
       RELEASE_BRANCH: main
-      REBASE_PRERELEASE_BRANCH: true
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
 
@@ -1156,6 +1207,21 @@ jobs:
       TAG: ${{ github.ref_name == 'main' && 'latest' || 'next' }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # A package with no chart and no image still needs this: release-please's
+  # release commit bumps package.json and CHANGELOG.md on `main`, and `develop`
+  # edits both on its own rc cycle. Skip it and the two diverge until the next
+  # promotion conflicts.
+  sync-prerelease-branch:
+    uses: this-is-tobi/github-workflows/.github/workflows/sync-prerelease-branch.yml@v0
+    needs:
+    - release
+    if: ${{ github.ref_name == 'main' && needs.release.outputs.release-created == 'true' }}
+    permissions:
+      contents: write
+    with:
+      RELEASE_BRANCH: main
+      PRERELEASE_BRANCH: develop
 ```
 
 > `release-npm.yml` publishes the version already committed in `package.json` — which is exactly what release-please just bumped, since the job is gated on `release-created` and runs on the merge commit. Nothing re-computes the version.

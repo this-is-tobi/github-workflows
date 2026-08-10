@@ -16,7 +16,6 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 | RELEASE_PR_AUTHOR        | string  | Optional hardening: only act on release pull requests opened by this login — see [Which pull requests are eligible](#which-pull-requests-are-eligible)                                            | No       | ""                               |
 | PRERELEASE_BRANCH        | string  | Branch to create the prerelease on                                                                                                                                                               | No       | develop                          |
 | RELEASE_BRANCH           | string  | Branch to create the release on                                                                                                                                                                  | No       | main                             |
-| REBASE_PRERELEASE_BRANCH | boolean | Rebase prerelease branch on release after release                                                                                                                                                | No       | false                            |
 | RELEASE_CONFIG_FILE      | string  | Release-please config file for release branch                                                                                                                                                    | No       | release-please-config.json       |
 | RELEASE_MANIFEST_FILE    | string  | Release-please manifest file for release branch                                                                                                                                                  | No       | .release-please-manifest.json    |
 | PRERELEASE_CONFIG_FILE   | string  | Release-please config file for prerelease branch                                                                                                                                                 | No       | release-please-config-rc.json    |
@@ -133,9 +132,26 @@ If both are set, the App takes precedence — useful for verifying the switch be
 - On `PRERELEASE_BRANCH` (default `develop`), uses the files specified by `PRERELEASE_CONFIG_FILE` and `PRERELEASE_MANIFEST_FILE` (only when `ENABLE_PRERELEASE: true`).
 - If `TAG_MAJOR_AND_MINOR: true`, tags `v<major>` and `v<major>.<minor>` after a release is created.
 - If `AUTOMERGE_*` is enabled and a PAT is provided, attempts to automerge the release PR.
-- Optionally rebases `PRERELEASE_BRANCH` onto `RELEASE_BRANCH` after a release when `REBASE_PRERELEASE_BRANCH: true` (only when `ENABLE_PRERELEASE: true`).
+- **Asserts** that `PRERELEASE_BRANCH` holds everything published on `RELEASE_BRANCH`, before any version is computed — see [Prerelease sync assertion](#prerelease-sync-assertion). The rebase itself belongs to [`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md).
 - `RELEASE_ASSET_PATHS` uploads files that are already present on the runner filesystem. `RELEASE_ARTIFACT_NAMES` accepts a name or glob pattern — the matching artifacts are downloaded via `actions/download-artifact` before being attached to the release; both inputs can be used together.
 - `PUBLISH_DRAFT_RELEASE: true` publishes the release after the assets have been attached. It is a no-op when the release is not a draft, so the step is safe to re-run. See [immutable releases](#immutable-releases).
+
+## Prerelease sync assertion
+
+On a `PRERELEASE_BRANCH` run (and only with `ENABLE_PRERELEASE: true`), the workflow checks **before computing any version** that the prerelease branch holds everything the release branch published. Nothing to configure: both branch names are already inputs.
+
+This is the invariant every version computed here depends on: *the prerelease branch is the release branch plus only the unreleased work*. When it holds, release-please and any chart bump start from the released state. When it does not, they start from wherever the branch was frozen, and emit versions **below** the ones already published — silently.
+
+What keeps the invariant true is a job the **caller** schedules ([`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md)), and no workflow can verify it was wired up. The assertion therefore catches every way it can break: job missing, incomplete `needs:`, a failed sync, a force-push, or a pipeline shape nobody anticipated.
+
+On failure the run stops with the number of missing commits and what to do. Two possible causes:
+
+- **The sync job is missing, or its `needs:` does not cover the whole pipeline.** This is the case to fix.
+- **A release pipeline is still running on the release branch.** The default `concurrency` group is keyed on the branch, so a prerelease run can start during a release: re-running once it completes is enough.
+
+> The assertion uses a GitHub API `compare` call rather than `git merge-base --is-ancestor`: ancestry needs real history, and `actions/checkout` leaves the clone shallow — the git form would have to unshallow the repository on every prerelease run.
+
+> A repository that has not created `RELEASE_BRANCH` yet has nothing to compare against: the assertion does nothing rather than blocking its first prereleases.
 
 ## Configuration
 
@@ -257,7 +273,7 @@ The examples cover the main release scenarios: a full setup with prerelease supp
 
 ### Simple example
 
-Full two-branch setup with `develop` for prereleases and `main` for stable releases. `AUTOMERGE_*: true` requires a PAT with sufficient permissions to bypass branch protection rules. `REBASE_PRERELEASE_BRANCH: true` keeps `develop` rebased onto `main` automatically after each stable release.
+Full two-branch setup with `develop` for prereleases and `main` for stable releases. `AUTOMERGE_*: true` requires a PAT with sufficient permissions to bypass branch protection rules. Keeping `develop` rebased onto `main` after each stable release is [`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md)'s job.
 
 ```yaml
 jobs:
@@ -272,7 +288,6 @@ jobs:
       TAG_MAJOR_AND_MINOR: true
       AUTOMERGE_PRERELEASE: true
       AUTOMERGE_RELEASE: true
-      REBASE_PRERELEASE_BRANCH: true
       # Optional: customize config and manifest files
       RELEASE_CONFIG_FILE: custom-release-config.json
       PRERELEASE_CONFIG_FILE: custom-prerelease-config.json
