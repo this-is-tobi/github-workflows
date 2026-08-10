@@ -101,7 +101,10 @@ jobs:
       contents: write
       packages: write
     with:
+      # OCI only: attest-helm.yml signs OCI artifacts, and `published-charts`
+      # is populated by that channel alone
       PUBLISH_OCI: true
+      CREATE_GITHUB_RELEASE: false
 
   attest-charts:
     uses: this-is-tobi/github-workflows/.github/workflows/attest-helm.yml@v0

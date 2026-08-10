@@ -263,7 +263,9 @@ jobs:
       contents: write
       packages: write
     with:
-      PUBLISH_OCI: true
+      # Classic channel left at its default: it is the one that creates the
+      # GitHub Releases, so the only one the credentials below do anything for
+      # (under GITHUB_TOKEN they would fire no `release:` trigger)
       CHARTS_DIR: ./charts
     secrets:
       APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
@@ -375,7 +377,8 @@ jobs:
       contents: write
       packages: write
     with:
-      PUBLISH_OCI: true
+      # Classic channel left at its default: it is the one that creates the
+      # GitHub Releases, so the only one the token below does anything for
       CHARTS_DIR: ./charts
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
