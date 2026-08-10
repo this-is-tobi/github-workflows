@@ -116,6 +116,7 @@ For more details, see:
 - [Attest Helm](./docs/56-attest-helm.md) *- Cosign signatures and SLSA provenance for charts published to an OCI registry*
 - [Update Helm Chart](./docs/53-update-helm-chart.md) *- Helm chart version bumping, in this repository*
 - [Dispatch Helm Chart](./docs/54-dispatch-helm-chart.md) *- Trigger a chart bump in a separate chart repository*
+- [Sync Prerelease Branch](./docs/57-sync-prerelease-branch.md) *- Re-synchronise the prerelease branch after a release (place the job last)*
 - [Release NPM](./docs/55-release-npm.md) *- NPM package publishing with multi-runtime and multi-registry support*
 - [ArgoCD Preview](./docs/60-argocd-preview.md) *- Preview environment deployment with ArgoCD*
 - [Preview Comment](./docs/61-preview-comment.md) *- Post or update PR comments with preview environment URLs*
