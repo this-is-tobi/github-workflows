@@ -2,10 +2,10 @@
 
 Release Helm charts using [`chart-releaser-action`](https://github.com/helm/chart-releaser-action), which auto-detects charts whose version changed since the last git tag and packages them. From there, two **independent distribution channels** can be enabled — see [Distribution channels](#distribution-channels):
 
-- `PUBLISH_OCI: true` — push the packages to an OCI registry (e.g. `ghcr.io`).
-- `CREATE_GITHUB_RELEASE: true` — attach them to a GitHub Release per chart and maintain a classic `index.yaml` Helm repo on a pages branch.
+- `CREATE_GITHUB_RELEASE` (**`true` by default**) — attach the packages to a GitHub Release per chart and maintain a classic `index.yaml` Helm repo on a pages branch.
+- `PUBLISH_OCI` (`false` by default) — push the packages to an OCI registry (e.g. `ghcr.io`).
 
-Both default to `false` and **at least one must be enabled**, otherwise the run fails. Best for a **dedicated charts repository**, where the repository's git tags belong to the charts.
+**At least one must be enabled**, otherwise the run fails. The classic channel is on by default because this workflow serves a **dedicated charts repository**, where the git tags belong to the charts: it is chart-releaser's native output and the only one any Helm 3 can consume. It does assume the `PAGES_BRANCH` (`gh-pages` by default) **already exists** — see [Pages branch prerequisite](#pages-branch-prerequisite), and [Private repositories](#private-repositories-prefer-the-oci-channel) before enabling it on a private repo.
 
 For a **monorepo** — a chart living alongside application code, where the tag namespace is dominated by app tags and chart-releaser's "latest tag" change detection is unreliable — use [`release-helm-local.yml`](./52-release-helm-local.md) instead. The two are separate workflow files rather than one workflow with a mode switch: each declares only the permissions its own logic needs, so a monorepo caller never has to grant `contents: write` for a chart-releaser code path it will never run. See [`release-helm-local.yml`](./52-release-helm-local.md#why-a-separate-workflow) for the full reasoning.
 
@@ -14,8 +14,8 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 | Input                 | Type    | Description                                                                                                                     | Required | Default          |
 | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- |
 | CHARTS_DIR            | string  | Directory containing the Helm charts                                                                                              | No       | ./charts         |
+| CREATE_GITHUB_RELEASE | boolean | Create a GitHub Release and git tag per changed chart and update `index.yaml` on the pages branch. Requires the pages branch to already exist. Default channel of a dedicated charts repository. | No       | true             |
 | PUBLISH_OCI           | boolean | Push the packaged charts to the OCI registry (see `REGISTRY`/`REPOSITORY`). Independent of `CREATE_GITHUB_RELEASE`; at least one of the two must be enabled | No       | false            |
-| CREATE_GITHUB_RELEASE | boolean | Also create a GitHub Release and git tag per changed chart and update `index.yaml` on the pages branch. Requires the pages branch to already exist. | No       | false            |
 | PAGES_BRANCH          | string  | Branch that receives `index.yaml` when `CREATE_GITHUB_RELEASE` is `true`. Must already exist.                                    | No       | gh-pages         |
 | SIGN_CHART            | boolean | GPG-sign each packaged chart, producing the `.prov` file `helm verify` checks. Requires `CREATE_GITHUB_RELEASE`, `SIGNING_KEY_ID` and the GPG secrets — see [Signing](#signing) | No       | false            |
 | SIGNING_KEY_ID        | string  | Identity of the GPG key to sign with, as it appears in the keyring (e.g. `Jane Doe <jane@example.com>`). Required with `SIGN_CHART`                | No       | -                |
@@ -57,18 +57,47 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 
 The workflow packages charts once and can ship them through two channels, enabled independently:
 
-| | `PUBLISH_OCI: true` | `CREATE_GITHUB_RELEASE: true` |
+| | `CREATE_GITHUB_RELEASE` (default `true`) | `PUBLISH_OCI` (default `false`) |
 | --- | --- | --- |
-| Consumers run | `helm pull oci://<registry>/<repo>/<chart>` | `helm repo add <name> https://<owner>.github.io/<repo>` |
-| Needs | Helm 3.8+ | any Helm 3 |
-| Repo prerequisites | none | the `PAGES_BRANCH` (default `gh-pages`) must already exist |
-| Private charts | registry auth | GitHub Release assets follow repo visibility |
-| Extra permission used | `packages: write` | `contents: write` |
-| [Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) | compatible (creates no GitHub Release) | **not compatible** — see the warning below |
+| Consumers run | `helm repo add <name> https://<owner>.github.io/<repo>` | `helm pull oci://<registry>/<repo>/<chart>` |
+| Needs | any Helm 3 | Helm 3.8+ |
+| Repo prerequisites | the `PAGES_BRANCH` (default `gh-pages`) must already exist | none |
+| Private charts | GitHub Release assets follow repo visibility, but the pages site is public — see below | registry auth |
+| Extra permission used | `contents: write` | `packages: write` |
+| [Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) | **not compatible** — see the warning below | compatible (creates no GitHub Release) |
 
 Enabling both is fine and publishes the same packages through both paths.
 
-**Both left `false` fails the run.** The workflow would otherwise package charts, publish them nowhere, and still report success — a green run that shipped nothing is harder to notice than a red one, so the validation step stops it up front with a message naming both inputs.
+**Both left `false` fails the run.** The workflow would otherwise package charts, publish them nowhere, and still report success — a green run that shipped nothing is harder to notice than a red one, so the validation step stops it up front with a message naming both inputs. `CREATE_GITHUB_RELEASE` being `true` by default, reaching that case means it was explicitly disabled without enabling the other channel.
+
+> **And in a monorepo?** [`release-helm-local.yml`](./52-release-helm-local.md) is the counterpart for a chart living alongside application code, and exposes neither input: OCI is its only possible channel. The GitHub Releases and git tags there belong to the application, so the chart cannot claim them.
+
+### Pages branch prerequisite
+
+With `CREATE_GITHUB_RELEASE` on by default, `chart-releaser` pushes `index.yaml` to `PAGES_BRANCH` (`gh-pages` by default) and **does not create it** — `cr index --push` fails outright when it is missing ([chart-releaser-action#111](https://github.com/helm/chart-releaser-action/issues/111)). On a fresh repository, create it once:
+
+```sh
+git switch --orphan gh-pages
+git commit --allow-empty -m "chore: initialise the helm repo pages branch"
+git push -u origin gh-pages
+```
+
+Then, for `helm repo add https://<owner>.github.io/<repo>` to resolve, enable GitHub Pages on that branch under *Settings > Pages*. With no pages branch, prefer the OCI channel alone (`PUBLISH_OCI: true`, `CREATE_GITHUB_RELEASE: false`).
+
+### Private repositories: prefer the OCI channel
+
+> [!WARNING]
+> **A GitHub Pages site is public even when its repository is private.** Enabling Pages on a private charts repository therefore publishes `index.yaml` — the catalogue of your chart names, versions and descriptions — to the open internet. Restricting access to a Pages site requires **GitHub Enterprise Cloud**; Pages on a private repository already requires at least **GitHub Pro**.
+
+The `.tgz` files themselves stay private (they are Release assets and follow repo visibility), but that is also what makes the classic channel awkward here: the index is served from `<owner>.github.io` and the packages from `github.com/<owner>/<repo>/releases/download/...`, two different hosts, so credentials attached to the `helm repo add` entry do not carry through to the chart download.
+
+On a private repository, three options, best first:
+
+1. **OCI channel alone** (`PUBLISH_OCI: true`, `CREATE_GITHUB_RELEASE: false`) — the ghcr.io package follows the repository's visibility, consumers run `helm registry login ghcr.io` then `helm pull oci://ghcr.io/<owner>/<repo>/<chart> --version X`. No branch prerequisite, no plan requirement. Needs Helm 3.8+.
+2. **Classic channel with an unpublished pages branch** — `PAGES_BRANCH` is only a branch name; nothing requires enabling Pages on it. Pointing it at `PAGES_BRANCH: charts-index` and leaving *Settings > Pages* off gives the GitHub Releases, the git tags and an `index.yaml` readable only with repo access — at the cost of `helm repo add https://...`, which no longer exists.
+3. **Classic channel with Pages enabled** — only if a public catalogue is acceptable, or under GitHub Enterprise Cloud with an access-controlled site.
+
+> The two channels do not decouple any further: `chart-releaser-action` gates `cr index` on `skip_upload` alone, and that flag also suppresses `cr upload`. Creating the GitHub Releases without pushing an `index.yaml` is not expressible — hence option 2, which pushes the index to a branch nobody serves.
 
 ## Outputs
 
