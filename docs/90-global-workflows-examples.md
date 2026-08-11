@@ -199,10 +199,9 @@ jobs:
       # flow from its shape, so a stripped x.y.z would make a develop run look
       # like a release.
       APP_VERSION: ${{ needs.release.outputs.version }}
-      # 'auto': level from the appVersion delta, rc cycle vs release selected
-      # by the shape of APP_VERSION - the same value fits develop and main
-      UPGRADE_TYPE: auto
-      PRERELEASE_IDENTIFIER: rc
+      # UPGRADE_TYPE defaults to 'auto': level from the appVersion delta, rc
+      # cycle vs release selected by the shape of APP_VERSION - the same
+      # behavior on develop and main
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
 
@@ -506,10 +505,9 @@ jobs:
       # flow from its shape, so a stripped x.y.z would make a develop run look
       # like a release.
       APP_VERSION: ${{ needs.release.outputs.version }}
-      # 'auto': level from the appVersion delta, rc cycle vs release selected
-      # by the shape of APP_VERSION - the same value fits develop and main
-      UPGRADE_TYPE: auto
-      PRERELEASE_IDENTIFIER: rc
+      # UPGRADE_TYPE defaults to 'auto': level from the appVersion delta, rc
+      # cycle vs release selected by the shape of APP_VERSION - the same
+      # behavior on develop and main
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
 
@@ -559,10 +557,9 @@ jobs:
       RUN_MODE: local
       CHART_NAME: my-app
       APP_VERSION: ${{ needs.release.outputs.version }}
-      # 'auto': level from the appVersion delta, rc cycle vs release selected
-      # by the shape of APP_VERSION - the same value fits develop and main
-      UPGRADE_TYPE: auto
-      PRERELEASE_IDENTIFIER: rc
+      # UPGRADE_TYPE defaults to 'auto': level from the appVersion delta, rc
+      # cycle vs release selected by the shape of APP_VERSION - the same
+      # behavior on develop and main
 
   release-chart:
     uses: this-is-tobi/github-workflows/.github/workflows/release-helm-local.yml@v0
@@ -645,7 +642,8 @@ jobs:
       RUN_MODE: local
       CHART_NAME: my-app
       # APP_VERSION omitted: chart-only release, appVersion stays untouched.
-      # No appVersion delta means no 'auto' here - the level is explicit.
+      # No delta for the default 'auto' - it would fall back to a stable
+      # patch bump - so the level (and the rc flow on develop) is explicit.
       UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
       PRERELEASE_IDENTIFIER: rc
 
@@ -743,10 +741,9 @@ jobs:
       RUN_MODE: called
       CHART_NAME: my-app
       APP_VERSION: ${{ needs.release.outputs.version }}
-      # 'auto': level from the appVersion delta, rc cycle vs release selected
-      # by the shape of APP_VERSION - the same value fits develop and main
-      UPGRADE_TYPE: auto
-      PRERELEASE_IDENTIFIER: rc
+      # UPGRADE_TYPE defaults to 'auto': level from the appVersion delta, rc
+      # cycle vs release selected by the shape of APP_VERSION - the same
+      # behavior on develop and main
       # Open the bump PR against the branch being released
       BASE_BRANCH: ${{ github.ref_name }}
       AUTOMERGE_RELEASE: true
@@ -930,12 +927,12 @@ on:
         required: true
         type: string
       UPGRADE_TYPE:
-        description: SemVer part to increment — major, minor, patch, prerelease, or auto
+        description: SemVer part to increment — auto, major, minor, patch or prerelease
         required: false
         type: string
-        default: patch
+        default: auto
       PRERELEASE_IDENTIFIER:
-        description: Identifier used when UPGRADE_TYPE=prerelease (e.g. rc)
+        description: Prerelease identifier, used when the bump enters the prerelease flow
         required: false
         type: string
         default: rc
@@ -945,12 +942,12 @@ on:
         type: string
         default: ./charts
       AUTOMERGE_PRERELEASE:
-        description: Automatically merge the PR when UPGRADE_TYPE is 'prerelease'
+        description: Automatically merge the PR when the bump is a prerelease
         required: false
         type: boolean
         default: false
       AUTOMERGE_RELEASE:
-        description: Automatically merge the PR when UPGRADE_TYPE is not 'prerelease'
+        description: Automatically merge the PR when the bump is not a prerelease
         required: false
         type: boolean
         default: false
@@ -985,14 +982,14 @@ on:
         required: false
         type: choice
         options:
+        - auto
         - major
         - minor
         - patch
         - prerelease
-        - auto
-        default: patch
+        default: auto
       PRERELEASE_IDENTIFIER:
-        description: Identifier used when UPGRADE_TYPE=prerelease (e.g. rc)
+        description: Prerelease identifier, used when the bump enters the prerelease flow
         required: false
         type: string
         default: rc
@@ -1002,12 +999,12 @@ on:
         type: string
         default: ./charts
       AUTOMERGE_PRERELEASE:
-        description: Automatically merge the PR when UPGRADE_TYPE is 'prerelease'
+        description: Automatically merge the PR when the bump is a prerelease
         required: false
         type: boolean
         default: false
       AUTOMERGE_RELEASE:
-        description: Automatically merge the PR when UPGRADE_TYPE is not 'prerelease'
+        description: Automatically merge the PR when the bump is not a prerelease
         required: false
         type: boolean
         default: false
