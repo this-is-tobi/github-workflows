@@ -195,8 +195,13 @@ jobs:
       WORKFLOW_NAME: update-app-version.yml
       CHART_REPO: my-org/helm-charts
       CHART_NAME: my-app
-      APP_VERSION: ${{ format('{0}.{1}.{2}', needs.release.outputs.major-tag, needs.release.outputs.minor-tag, needs.release.outputs.patch-tag) }}
-      UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
+      # The FULL version output, prerelease suffix included: 'auto' reads the
+      # flow from its shape, so a stripped x.y.z would make a develop run look
+      # like a release.
+      APP_VERSION: ${{ needs.release.outputs.version }}
+      # 'auto': level from the appVersion delta, rc cycle vs release selected
+      # by the shape of APP_VERSION - the same value fits develop and main
+      UPGRADE_TYPE: auto
       PRERELEASE_IDENTIFIER: rc
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
@@ -497,8 +502,13 @@ jobs:
       WORKFLOW_NAME: update-app-version.yml
       CHART_REPO: my-org/helm-charts
       CHART_NAME: my-project
-      APP_VERSION: ${{ format('{0}.{1}.{2}', needs.release.outputs.major-tag, needs.release.outputs.minor-tag, needs.release.outputs.patch-tag) }}
-      UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
+      # The FULL version output, prerelease suffix included: 'auto' reads the
+      # flow from its shape, so a stripped x.y.z would make a develop run look
+      # like a release.
+      APP_VERSION: ${{ needs.release.outputs.version }}
+      # 'auto': level from the appVersion delta, rc cycle vs release selected
+      # by the shape of APP_VERSION - the same value fits develop and main
+      UPGRADE_TYPE: auto
       PRERELEASE_IDENTIFIER: rc
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
@@ -549,7 +559,9 @@ jobs:
       RUN_MODE: local
       CHART_NAME: my-app
       APP_VERSION: ${{ needs.release.outputs.version }}
-      UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
+      # 'auto': level from the appVersion delta, rc cycle vs release selected
+      # by the shape of APP_VERSION - the same value fits develop and main
+      UPGRADE_TYPE: auto
       PRERELEASE_IDENTIFIER: rc
 
   release-chart:
@@ -632,7 +644,8 @@ jobs:
     with:
       RUN_MODE: local
       CHART_NAME: my-app
-      # APP_VERSION omitted: chart-only release, appVersion stays untouched
+      # APP_VERSION omitted: chart-only release, appVersion stays untouched.
+      # No appVersion delta means no 'auto' here - the level is explicit.
       UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
       PRERELEASE_IDENTIFIER: rc
 
@@ -678,6 +691,8 @@ jobs:
     with:
       RUN_MODE: local
       CHART_NAME: my-app
+      # No APP_VERSION here, so no delta for 'auto': the train is driven by
+      # the identifier, the level stays explicit.
       UPGRADE_TYPE: ${{ github.ref_name == 'main' && 'patch' || 'prerelease' }}
       PRERELEASE_IDENTIFIER: ${{ github.ref_name }}
 ```
@@ -728,7 +743,9 @@ jobs:
       RUN_MODE: called
       CHART_NAME: my-app
       APP_VERSION: ${{ needs.release.outputs.version }}
-      UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
+      # 'auto': level from the appVersion delta, rc cycle vs release selected
+      # by the shape of APP_VERSION - the same value fits develop and main
+      UPGRADE_TYPE: auto
       PRERELEASE_IDENTIFIER: rc
       # Open the bump PR against the branch being released
       BASE_BRANCH: ${{ github.ref_name }}
@@ -913,7 +930,7 @@ on:
         required: true
         type: string
       UPGRADE_TYPE:
-        description: SemVer part to increment — major, minor, patch, or prerelease
+        description: SemVer part to increment — major, minor, patch, prerelease, or auto
         required: false
         type: string
         default: patch
@@ -972,6 +989,7 @@ on:
         - minor
         - patch
         - prerelease
+        - auto
         default: patch
       PRERELEASE_IDENTIFIER:
         description: Identifier used when UPGRADE_TYPE=prerelease (e.g. rc)
