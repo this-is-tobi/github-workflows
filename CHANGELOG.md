@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.26.0](https://github.com/this-is-tobi/github-workflows/compare/v0.25.0...v0.26.0) (2026-08-11)
+
+
+### Features
+
+* **release-helm:** publish through the classic channel by default ([e711215](https://github.com/this-is-tobi/github-workflows/commit/e711215b6ff23d93980dffb6f09a48e22ebccb65))
+* **sync-prerelease-branch:** own the prerelease synchronisation in a dedicated workflow ([e9d0fe3](https://github.com/this-is-tobi/github-workflows/commit/e9d0fe3cf762c708e50e373e8e0d282f4ec225e9))
+* **update-helm-chart:** add 'auto' upgrade type deriving the bump from appVersion ([ac09e0c](https://github.com/this-is-tobi/github-workflows/commit/ac09e0cd97002c5a33408dc2cce646a5c7722785))
+* **update-helm-chart:** make 'auto' the default upgrade type ([f0b7858](https://github.com/this-is-tobi/github-workflows/commit/f0b7858b205a49b06e0f1b088e68507a58f940d4))
+
+
+### Bug Fixes
+
+* **release-npm:** harden token handling and repair the yarn cache path ([cf268fc](https://github.com/this-is-tobi/github-workflows/commit/cf268fc4ed2cf4c17f5f6e8524a412ab1d9842d9))
+* **security:** route inputs through env and harden credential handling ([1afc5fd](https://github.com/this-is-tobi/github-workflows/commit/1afc5fdb2111faacff388875ace651064ce56694))
+* **sync-prerelease-branch:** make the bootstrap reachable on a shallow clone ([a2b35a9](https://github.com/this-is-tobi/github-workflows/commit/a2b35a9f5dc3f29d573c28b9c7d4af366d8061e7))
+* **update-helm-chart:** parse back any prerelease identifier the validation accepts ([95c6962](https://github.com/this-is-tobi/github-workflows/commit/95c6962a305f96525afb700fbb6a7b90cfbd7776))
+
 ## [0.25.0](https://github.com/this-is-tobi/github-workflows/compare/v0.24.0...v0.25.0) (2026-08-09)
 
 
