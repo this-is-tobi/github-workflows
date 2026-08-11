@@ -19,7 +19,7 @@ The chart version and the app version are **decoupled on purpose**: an app relea
 | CHART_NAME            | string | Name of the chart to update (in `CHART_DIR`)                                                      | Yes      | -                      |
 | CHART_DIR             | string | Directory containing the Helm charts                                                              | No       | charts                 |
 | APP_VERSION           | string | Application version to set in `Chart.yaml` (appVersion). Leave empty to keep the current appVersion (chart-only release). When set, must match `^[A-Za-z0-9][A-Za-z0-9.+_-]*$` | No       | -                      |
-| UPGRADE_TYPE          | string | Which SemVer part to increment: `major`, `minor`, `patch`, or `prerelease`                        | No       | patch                  |
+| UPGRADE_TYPE          | string | Which SemVer part to increment: `major`, `minor`, `patch`, `prerelease`, or `auto` (level derived from the appVersion delta - see [`auto` mode](#auto-mode); requires `APP_VERSION`) | No       | patch                  |
 | PRERELEASE_IDENTIFIER | string | Identifier used when `UPGRADE_TYPE=prerelease` (e.g. `rc`). Must match `^[A-Za-z0-9-]+$`          | No       | rc                     |
 | HELM_DOCS_VERSION     | string | Version of helm-docs used to regenerate the chart README. Pinned rather than tracking `:latest`   | No       | v1.14.2                |
 | AUTOMERGE_PRERELEASE  | bool   | Automatically merge the PR when `UPGRADE_TYPE` is `prerelease` (called mode)                      | No       | false                  |
@@ -165,6 +165,24 @@ jobs:
 ### Called mode – prerelease bump
 
 `UPGRADE_TYPE: prerelease` bumps the chart prerelease version (`1.2.3` → `1.2.4-rc` → `1.2.4-rc.1` → `1.2.4-rc.2`: from a stable version the patch is bumped first, then the counter increments). `APP_VERSION` is written as-is into `appVersion`; only the chart `version` field follows the prerelease bump logic.
+### `auto` mode
+
+`UPGRADE_TYPE: auto` makes the chart mirror the app's own bump instead of a level the caller hardcodes:
+
+- **The level** is derived from the appVersion delta - what `Chart.yaml` holds before the update vs `APP_VERSION` (different major → `major`, different minor → `minor`, else `patch`). Only the `X.Y.Z` base is compared.
+- **The flow** is selected by the shape of `APP_VERSION`: a prerelease (e.g. `0.3.0-rc.1`) enters or continues the chart's rc cycle, a stable version applies the standard bump (or strips the suffix when the chart is mid-cycle). One value therefore covers both branches of a two-branch pipeline - no more conditioning on `github.ref_name`.
+
+| Current chart (version / appVersion) | `APP_VERSION` | Result | Why |
+| --- | --- | --- | --- |
+| `0.2.8` / `0.2.2` | `0.2.3-rc` | `0.2.9-rc` | patch delta, cycle entry |
+| `0.2.8` / `0.2.2` | `0.3.0-rc` | `0.3.0-rc` | minor delta, the cycle opens at the right level |
+| `0.3.0-rc` / `0.3.0-rc` | `0.3.0-rc.1` | `0.3.0-rc.1` | cycle iteration |
+| `0.2.9-rc.2` / `0.2.3-rc.1` | `0.3.0-rc.1` | `0.3.0-rc.2` | mid-cycle escalation: the base rises, the counter is carried verbatim - the same rule release-please applies to the app |
+| `0.3.0-rc.2` / `0.3.0-rc.2` | `0.3.0` | `0.3.0` | promotion: the level is already in the base, the suffix is dropped |
+| `0.3.0` / `0.3.0` | `0.3.1` | `0.3.1` | direct hotfix on the release branch |
+
+`auto` requires `APP_VERSION` (a chart-only release has no delta - pick the level explicitly) and both appVersions must be semver.
+
 
 ```yaml
 jobs:
@@ -210,7 +228,10 @@ jobs:
       RUN_MODE: local
       CHART_NAME: my-service
       APP_VERSION: ${{ needs.release.outputs.version }}
-      UPGRADE_TYPE: ${{ github.ref_name == 'develop' && 'prerelease' || 'patch' }}
+      # 'auto' derives the level from the appVersion delta and selects the
+      # flow (rc cycle or release) from the shape of APP_VERSION - the same
+      # value fits develop and main.
+      UPGRADE_TYPE: auto
       PRERELEASE_IDENTIFIER: rc
 
   release-chart:
