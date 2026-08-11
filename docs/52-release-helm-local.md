@@ -88,8 +88,9 @@ jobs:
     with:
       RUN_MODE: local
       CHART_NAME: my-app
+      # UPGRADE_TYPE defaults to 'auto': the chart mirrors the app's bump,
+      # derived from the appVersion delta.
       APP_VERSION: ${{ needs.release.outputs.version }}
-      UPGRADE_TYPE: patch
 
   release-chart:
     uses: this-is-tobi/github-workflows/.github/workflows/release-helm-local.yml@v0

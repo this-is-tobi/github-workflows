@@ -19,11 +19,11 @@ The chart version and the app version are **decoupled on purpose**: an app relea
 | CHART_NAME            | string | Name of the chart to update (in `CHART_DIR`)                                                      | Yes      | -                      |
 | CHART_DIR             | string | Directory containing the Helm charts                                                              | No       | charts                 |
 | APP_VERSION           | string | Application version to set in `Chart.yaml` (appVersion). Leave empty to keep the current appVersion (chart-only release). When set, must match `^[A-Za-z0-9][A-Za-z0-9.+_-]*$` | No       | -                      |
-| UPGRADE_TYPE          | string | Which SemVer part to increment: `major`, `minor`, `patch`, `prerelease`, or `auto` (level derived from the appVersion delta - see [`auto` mode](#auto-mode); requires `APP_VERSION`) | No       | patch                  |
-| PRERELEASE_IDENTIFIER | string | Identifier used when `UPGRADE_TYPE=prerelease` (e.g. `rc`). Must match `^[A-Za-z0-9-]+$`          | No       | rc                     |
+| UPGRADE_TYPE          | string | Which SemVer part to increment: `auto` (default - level derived from the appVersion delta, see [`auto` mode](#auto-mode)), `major`, `minor`, `patch` or `prerelease` | No       | auto                   |
+| PRERELEASE_IDENTIFIER | string | Identifier used when the bump enters the prerelease flow - `UPGRADE_TYPE: prerelease`, or `auto` with a prerelease `APP_VERSION` (e.g. `rc`). Must match `^[A-Za-z0-9-]+$`          | No       | rc                     |
 | HELM_DOCS_VERSION     | string | Version of helm-docs used to regenerate the chart README. Pinned rather than tracking `:latest`   | No       | v1.14.2                |
-| AUTOMERGE_PRERELEASE  | bool   | Automatically merge the PR when `UPGRADE_TYPE` is `prerelease` (called mode)                      | No       | false                  |
-| AUTOMERGE_RELEASE     | bool   | Automatically merge the PR when `UPGRADE_TYPE` is not `prerelease` (called mode)                  | No       | false                  |
+| AUTOMERGE_PRERELEASE  | bool   | Automatically merge the PR when the bump is a prerelease (called mode)                      | No       | false                  |
+| AUTOMERGE_RELEASE     | bool   | Automatically merge the PR when the bump is not a prerelease (called mode)                  | No       | false                  |
 | AUTOMERGE_METHOD      | string | How the PR is merged when automerge is enabled: `auto` (queue until required checks pass, needs **Allow auto-merge**) or `admin` (merge now, bypassing branch protection) | No       | auto                   |
 | BASE_BRANCH           | string | Base branch to open the chart-update pull request against (called mode)                           | No       | main                   |
 | RUNS_ON               | string | Runner labels as JSON array                                                                       | No       | ["ubuntu-24.04"]       |
@@ -109,7 +109,7 @@ Add the token as a **repository secret** named `GH_PAT` in this repository:
   - `minor`: `1.2.3` → `1.3.0`
   - `patch`: `1.2.3` → `1.2.4`
   - `prerelease`: `1.2.3` → `1.2.4-rc` → `1.2.4-rc.1` → `1.2.4-rc.2` (from a stable version the patch is bumped first, then the prerelease counter increments)
-- **Automerge (called mode)**: If `AUTOMERGE_PRERELEASE: true` (when `UPGRADE_TYPE: prerelease`) or `AUTOMERGE_RELEASE: true` (otherwise), the workflow merges the PR automatically. It is gated on those inputs alone — supplying credentials never enables it by itself, and if no credential is supplied the job **fails** rather than skipping silently.
+- **Automerge (called mode)**: If `AUTOMERGE_PRERELEASE: true` (when the bump is a prerelease) or `AUTOMERGE_RELEASE: true` (otherwise), the workflow merges the PR automatically. The distinction is made on the **resolved** flow, not the `UPGRADE_TYPE` input: under `auto`, an rc bump is treated as a prerelease. It is gated on those inputs alone — supplying credentials never enables it by itself, and if no credential is supplied the job **fails** rather than skipping silently.
   - `AUTOMERGE_METHOD: auto` (default) uses `gh pr merge --auto`; the merge happens once required checks pass. Requires *Allow auto-merge* on the repository, and fails naming that setting if it is off.
   - `AUTOMERGE_METHOD: admin` uses `gh pr merge --admin` to force-merge immediately, bypassing branch protection and required checks.
   - There is **no automatic fallback** between them.
@@ -181,7 +181,12 @@ jobs:
 | `0.3.0-rc.2` / `0.3.0-rc.2` | `0.3.0` | `0.3.0` | promotion: the level is already in the base, the suffix is dropped |
 | `0.3.0` / `0.3.0` | `0.3.1` | `0.3.1` | direct hotfix on the release branch |
 
-`auto` requires `APP_VERSION` (a chart-only release has no delta - pick the level explicitly) and both appVersions must be semver.
+When there is no delta to read, `auto` falls back to a patch bump with a warning rather than failing - it is the default value, and a default cannot demand what the caller never stated:
+
+- Empty `APP_VERSION` (chart-only release): patch bump, with a warning suggesting an explicit level.
+- Non-semver current `appVersion` (e.g. `latest`, common on a chart predating the pipeline): patch bump for this run; the run writes a real version into `appVersion`, so the delta is derivable from the next run on. The flow still follows the shape of `APP_VERSION`: a prerelease never yields a stable chart version.
+
+Only an `APP_VERSION` that is supplied but not semver fails the run: that value came from the caller on this very run.
 
 
 ```yaml
@@ -227,12 +232,10 @@ jobs:
     with:
       RUN_MODE: local
       CHART_NAME: my-service
+      # UPGRADE_TYPE defaults to 'auto': the chart mirrors the app's bump,
+      # derived from the appVersion delta, and the shape of APP_VERSION
+      # selects the flow (rc cycle or release) - the same on both branches.
       APP_VERSION: ${{ needs.release.outputs.version }}
-      # 'auto' derives the level from the appVersion delta and selects the
-      # flow (rc cycle or release) from the shape of APP_VERSION - the same
-      # value fits develop and main.
-      UPGRADE_TYPE: auto
-      PRERELEASE_IDENTIFIER: rc
 
   release-chart:
     uses: this-is-tobi/github-workflows/.github/workflows/release-helm-local.yml@v0
