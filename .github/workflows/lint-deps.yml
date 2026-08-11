@@ -62,6 +62,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Detect project configuration
       id: detect
@@ -117,6 +122,18 @@ jobs:
         else
           PM=$(walk_pm)
         fi
+        # The detected value can come from the repository's own package.json,
+        # so on a pull request it is attacker-controlled - and it selects
+        # which commands the steps below run. Pinning it to an allowlist means
+        # they can only ever receive one of four literals.
+        case "$PM" in
+          npm|pnpm|yarn|bun) ;;
+          *)
+            echo "::error::Unsupported package manager '$PM'. Expected one of npm, pnpm, yarn, bun - check the 'packageManager' field in package.json, or set the PACKAGE_MANAGER input."
+            exit 1
+            ;;
+        esac
+
         echo "Package manager: $PM"
         echo "package-manager=${PM}" >> "$GITHUB_OUTPUT"
 
@@ -156,6 +173,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' }}
@@ -172,7 +194,9 @@ jobs:
     - name: Setup Corepack
       if: ${{ needs.detect-setup.outputs.package-manager == 'pnpm' || needs.detect-setup.outputs.package-manager == 'yarn' }}
       run: |
-        npm install -g corepack@latest
+        # Exact version: 'latest' would let a new upstream release change
+        # what runs here without any change on our side.
+        npm install -g corepack@0.34.0
         corepack enable
 
     - name: Install dependencies

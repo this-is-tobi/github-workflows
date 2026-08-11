@@ -81,9 +81,13 @@ jobs:
         # Capture the body via a temp file: a process substitution assignment
         # runs in a subshell, so it would never reach the parent shell here
         RESPONSE_BODY_FILE="$(mktemp)"
-        RESPONSE_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X POST "$ARGOCD_URL/api/v1/applications/$ARGOCD_APP_NAME/sync" \
+        # The Authorization header travels on stdin (-H @-) rather than in
+        # curl's argv, where the token would be world-readable in `ps` for the
+        # duration of the request.
+        RESPONSE_CODE=$(printf 'Authorization: Bearer %s\n' "$ARGOCD_TOKEN" \
+          | curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X POST "$ARGOCD_URL/api/v1/applications/$ARGOCD_APP_NAME/sync" \
           -H "Content-Type: application/json" \
-          -H "Authorization: Bearer $ARGOCD_TOKEN" \
+          -H @- \
           -d "$ARGOCD_SYNC_PAYLOAD")
 
         echo "HTTP response code: $RESPONSE_CODE"

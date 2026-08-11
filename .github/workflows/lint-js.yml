@@ -59,6 +59,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Detect project configuration
       id: detect
@@ -67,6 +72,7 @@ jobs:
         PM_INPUT: ${{ inputs.PACKAGE_MANAGER }}
         RUNTIME_INPUT: ${{ inputs.RUNTIME }}
         VERSION_INPUT: ${{ inputs.RUNTIME_VERSION }}
+        ESLINT_CONFIG_FILE: ${{ inputs.ESLINT_CONFIG_FILE }}
       run: |
         # Find the package manager by walking from the working directory up
         # to the checkout root - the same resolution npm/pnpm/yarn/bun
@@ -158,7 +164,7 @@ jobs:
 
         # Check for existing ESLint config
         HAS_CONFIG="false"
-        if [ -n "${{ inputs.ESLINT_CONFIG_FILE }}" ] && [ -f "${{ inputs.ESLINT_CONFIG_FILE }}" ]; then
+        if [ -n "$ESLINT_CONFIG_FILE" ] && [ -f "$ESLINT_CONFIG_FILE" ]; then
           HAS_CONFIG="true"
         elif [ -f "eslint.config.js" ] || [ -f "eslint.config.mjs" ] || [ -f "eslint.config.cjs" ] || [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ] || [ -f ".eslintrc.yml" ] || [ -f ".eslintrc.yaml" ]; then
           HAS_CONFIG="true"
@@ -182,6 +188,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
@@ -198,7 +209,9 @@ jobs:
     - name: Setup Corepack
       if: ${{ needs.detect-setup.outputs.package-manager == 'pnpm' || needs.detect-setup.outputs.package-manager == 'yarn' }}
       run: |
-        npm install -g corepack@latest
+        # Exact version: 'latest' would let a new upstream release change
+        # what runs here without any change on our side.
+        npm install -g corepack@0.34.0
         corepack enable
 
     - name: Install dependencies (npm)
@@ -239,6 +252,15 @@ jobs:
         PACKAGE_FILE: ${{ needs.detect-setup.outputs.package-file }}
         ESLINT_CONFIG: ${{ inputs.ESLINT_CONFIG }}
       run: |
+        # ESLINT_CONFIG is both an install target and the module specifier of
+        # the generated import below, so it is held to package-spec shape: no
+        # quotes, spaces or newlines, nothing that could close the JS string
+        # it is embedded in.
+        if [[ ! "$ESLINT_CONFIG" =~ ^[A-Za-z0-9@/._^~'<>'=-]+$ ]]; then
+          echo "::error::ESLINT_CONFIG must be an npm package spec (e.g. '@antfu/eslint-config'), got '$ESLINT_CONFIG'"
+          exit 1
+        fi
+
         # Check if ESLint is already in package.json
         echo "Checking for ESLint in package file: $PACKAGE_FILE"
         if ! grep -q '"eslint"' "$PACKAGE_FILE" 2>/dev/null; then
@@ -260,10 +282,12 @@ jobs:
           esac
         fi
 
-        # Create ESLint config if it doesn't exist
+        # Create ESLint config if it doesn't exist. The import line is
+        # printf-embedded from `env:` after the shape check above; everything
+        # else is a static heredoc, so no input becomes program text.
         echo "Creating ESLint config file: eslint.config.js"
-        cat > eslint.config.js << 'EOF'
-        import antfu from '${{ inputs.ESLINT_CONFIG }}'
+        printf "import antfu from '%s'\n" "$ESLINT_CONFIG" > eslint.config.js
+        cat >> eslint.config.js << 'EOF'
 
         export default antfu({
           vue: true,
@@ -313,6 +337,7 @@ jobs:
       env:
         ESLINT_CONFIG_FILE: ${{ inputs.ESLINT_CONFIG_FILE }}
         LINT_PATHS: ${{ inputs.LINT_PATHS }}
+        FAIL_ON_ERROR: ${{ inputs.FAIL_ON_ERROR }}
         # Read through `env:` rather than interpolated into the shell body, the
         # convention lint-deps, release-npm and test-playwright already follow.
         # The value is allowlisted in detect-setup, so this is the second of two
@@ -349,7 +374,7 @@ jobs:
 
         # Handle the exit code based on FAIL_ON_ERROR setting
         if [ $EXIT_CODE -ne 0 ]; then
-          if [ "${{ inputs.FAIL_ON_ERROR }}" = "true" ]; then
+          if [ "$FAIL_ON_ERROR" = "true" ]; then
             echo "❌ ESLint found errors and FAIL_ON_ERROR is true. Failing the workflow."
             exit $EXIT_CODE
           else

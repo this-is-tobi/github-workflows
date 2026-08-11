@@ -81,6 +81,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Detect project configuration
       id: detect
@@ -134,6 +139,20 @@ jobs:
         else
           DETECTED_PM=$(walk_pm)
         fi
+
+        # The detected value can come from the repository's own
+        # package.json, so on a pull request this value is attacker-controlled -
+        # and it is consumed downstream by shell `case` statements. Pinning it to
+        # an allowlist here means those consumers can only ever receive one of
+        # four literals, whatever they do with it.
+        case "$DETECTED_PM" in
+          npm|pnpm|yarn|bun) ;;
+          *)
+            echo "::error::Unsupported package manager '$DETECTED_PM'. Expected one of npm, pnpm, yarn, bun - check the 'packageManager' field in package.json, or set the PACKAGE_MANAGER input."
+            exit 1
+            ;;
+        esac
+
         echo "Package manager detected: $DETECTED_PM"
         echo "package-manager=${DETECTED_PM}" >> "$GITHUB_OUTPUT"
 
@@ -211,6 +230,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
@@ -227,7 +251,9 @@ jobs:
     - name: Setup Corepack
       if: ${{ needs.detect-setup.outputs.package-manager == 'pnpm' || needs.detect-setup.outputs.package-manager == 'yarn' }}
       run: |
-        npm install -g corepack@latest
+        # Exact version: 'latest' would let a new upstream release change
+        # what runs here without any change on our side.
+        npm install -g corepack@0.34.0
         corepack enable
 
     - name: Install dependencies (npm)
@@ -258,12 +284,21 @@ jobs:
 
     - name: Run tests
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        TEST_COMMAND: ${{ inputs.TEST_COMMAND }}
+        TEST_PRECOMMAND: ${{ inputs.TEST_PRECOMMAND }}
+        DETECTED_TEST_COMMAND: ${{ needs.detect-setup.outputs.test-command }}
+        PKG_MANAGER: ${{ needs.detect-setup.outputs.package-manager }}
+        COVERAGE: ${{ inputs.COVERAGE }}
+        COVERAGE_REPORTER: ${{ inputs.COVERAGE_REPORTER }}
+        TIMEOUT: ${{ inputs.TIMEOUT }}
+        FAIL_ON_ERROR: ${{ inputs.FAIL_ON_ERROR }}
       run: |
         # Determine test command
-        if [ -n "${{ inputs.TEST_COMMAND }}" ]; then
-          TEST_CMD="${{ inputs.TEST_COMMAND }}"
-        elif [ -n "${{ needs.detect-setup.outputs.test-command }}" ]; then
-          case "${{ needs.detect-setup.outputs.package-manager }}" in
+        if [ -n "$TEST_COMMAND" ]; then
+          TEST_CMD="$TEST_COMMAND"
+        elif [ -n "$DETECTED_TEST_COMMAND" ]; then
+          case "$PKG_MANAGER" in
             npm)
               TEST_CMD="npm run test"
               ;;
@@ -282,14 +317,14 @@ jobs:
           VITEST_ARGS="run --reporter=verbose"
 
           # Add coverage if requested
-          if [ "${{ inputs.COVERAGE }}" = "true" ]; then
-            VITEST_ARGS="$VITEST_ARGS --coverage --coverage.reporter=${{ inputs.COVERAGE_REPORTER }}"
+          if [ "$COVERAGE" = "true" ]; then
+            VITEST_ARGS="$VITEST_ARGS --coverage --coverage.reporter=$COVERAGE_REPORTER"
           fi
 
           # Add timeout
-          VITEST_ARGS="$VITEST_ARGS --testTimeout=${{ inputs.TIMEOUT }}"
+          VITEST_ARGS="$VITEST_ARGS --testTimeout=$TIMEOUT"
 
-          case "${{ needs.detect-setup.outputs.package-manager }}" in
+          case "$PKG_MANAGER" in
             npm)
               TEST_CMD="npx vitest $VITEST_ARGS"
               ;;
@@ -305,10 +340,12 @@ jobs:
           esac
         fi
 
-        # Run pre-command if specified
-        if [ -n "${{ inputs.TEST_PRECOMMAND }}" ]; then
-          echo "Running pre-command: ${{ inputs.TEST_PRECOMMAND }}"
-          ${{ inputs.TEST_PRECOMMAND }}
+        # Run pre-command if specified. TEST_PRECOMMAND is a shell command by
+        # contract, so it is evaluated - through `eval` from `env:` rather than
+        # interpolated into this script, keeping the program text fixed.
+        if [ -n "$TEST_PRECOMMAND" ]; then
+          echo "Running pre-command: $TEST_PRECOMMAND"
+          eval "$TEST_PRECOMMAND"
         fi
 
         # Run tests and capture exit code
@@ -318,7 +355,7 @@ jobs:
 
         # Handle the exit code based on FAIL_ON_ERROR setting
         if [ $EXIT_CODE -ne 0 ]; then
-          if [ "${{ inputs.FAIL_ON_ERROR }}" = "true" ]; then
+          if [ "$FAIL_ON_ERROR" = "true" ]; then
             echo "❌ Tests failed and FAIL_ON_ERROR is true. Failing the workflow."
             exit $EXIT_CODE
           else
