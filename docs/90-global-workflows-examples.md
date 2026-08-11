@@ -505,7 +505,8 @@ jobs:
 
   # See the note under the Simple App pipeline: only `release` commits to
   # `main` here too, since the chart lives in another repository. The in-repo
-  # chart variant below needs one more entry.
+  # chart variant below needs one more entry. A monorepo WITHOUT any chart is
+  # this same pipeline minus `bump-chart` - `needs:` stays `[release]`.
   sync-prerelease-branch:
     uses: this-is-tobi/github-workflows/.github/workflows/sync-prerelease-branch.yml@v0
     needs:
