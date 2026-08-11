@@ -18,6 +18,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Add pull request label
       uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0

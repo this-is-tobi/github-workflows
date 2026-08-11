@@ -103,6 +103,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Run pre-command
       if: ${{ inputs.PRE_COMMAND != '' }}
