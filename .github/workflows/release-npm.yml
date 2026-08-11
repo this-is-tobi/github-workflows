@@ -94,6 +94,11 @@ jobs:
     steps:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while installs
+        # and caller commands execute.
+        persist-credentials: false
 
     - name: Detect project configuration
       id: detect
@@ -149,6 +154,18 @@ jobs:
         else
           PM=$(walk_pm)
         fi
+        # The detected value can come from the repository's own package.json,
+        # so on a pull request it is attacker-controlled - and it selects
+        # which commands the steps below run. Pinning it to an allowlist means
+        # they can only ever receive one of four literals.
+        case "$PM" in
+          npm|pnpm|yarn|bun) ;;
+          *)
+            echo "::error::Unsupported package manager '$PM'. Expected one of npm, pnpm, yarn, bun - check the 'packageManager' field in package.json, or set the PACKAGE_MANAGER input."
+            exit 1
+            ;;
+        esac
+
         echo "Package manager: $PM"
         echo "package-manager=${PM}" >> "$GITHUB_OUTPUT"
 
@@ -189,7 +206,9 @@ jobs:
     - name: Setup Corepack
       if: ${{ steps.detect.outputs.package-manager == 'pnpm' || steps.detect.outputs.package-manager == 'yarn' }}
       run: |
-        npm install -g corepack@latest
+        # Exact version: 'latest' would let a new upstream release change
+        # what runs here without any change on our side.
+        npm install -g corepack@0.34.0
         corepack enable
 
     - name: Configure registry for Bun
@@ -198,9 +217,18 @@ jobs:
         REGISTRY_HOST=$(echo "$REGISTRY_URL" | sed 's|https://||g' | sed 's|http://||g' | sed 's|/$||')
         npm config set registry "$REGISTRY_URL"
         # An empty _authToken entry would shadow the OIDC flow used by the
-        # trusted-publishing step below, so it is only written when a token is set
+        # trusted-publishing step below, so it is only written when a token is
+        # set. Appended to the userconfig directly rather than through
+        # `npm config set`, whose argv - token included - is world-readable in
+        # `ps` while it runs. The cleanup step at the end of the job removes it.
+        # setup-node runs for a non-bun package manager and points npm at
+        # its own userconfig via NPM_CONFIG_USERCONFIG - write where the
+        # tools will actually read.
+        NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
         if [ -n "$NODE_AUTH_TOKEN" ]; then
-          npm config set "//${REGISTRY_HOST}/:_authToken" "${NODE_AUTH_TOKEN}"
+          touch "$NPMRC"
+          chmod 600 "$NPMRC"
+          printf '//%s/:_authToken=%s\n' "$REGISTRY_HOST" "$NODE_AUTH_TOKEN" >> "$NPMRC"
         fi
         if [ -n "$SCOPE" ]; then
           npm config set "${SCOPE}:registry" "$REGISTRY_URL"
@@ -218,7 +246,15 @@ jobs:
       run: |
         case "$PKG_MANAGER" in
           npm)  echo "CACHE_DIR=$(npm config get cache)" >> "$GITHUB_OUTPUT" ;;
-          yarn) echo "CACHE_DIR=$(yarn cache dir)" >> "$GITHUB_OUTPUT" ;;
+          yarn)
+            # `yarn cache dir` is Yarn 1 only; Berry (.yarnrc.yml) errors on
+            # it inside the $( ), which would leave CACHE_DIR empty and fail
+            # the cache step. Same Berry/classic branch as the install step.
+            if [ -f .yarnrc.yml ]; then
+              echo "CACHE_DIR=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+            else
+              echo "CACHE_DIR=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+            fi ;;
           pnpm) echo "CACHE_DIR=$(pnpm store path)" >> "$GITHUB_OUTPUT" ;;
           bun)  echo "CACHE_DIR=$(bun pm cache)" >> "$GITHUB_OUTPUT" ;;
         esac
@@ -227,7 +263,7 @@ jobs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.cache-dir.outputs.CACHE_DIR }}
-        key: ${{ steps.detect.outputs.package-manager }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml', '**/bun.lock') }}
+        key: ${{ steps.detect.outputs.package-manager }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml', '**/bun.lock', '**/bun.lockb') }}
         restore-keys: |
           ${{ steps.detect.outputs.package-manager }}-${{ runner.os }}-${{ runner.arch }}-
 
@@ -381,6 +417,14 @@ jobs:
         # Set (empty) so npm can expand the .npmrc placeholder written by
         # setup-node; the real credential comes from the OIDC exchange
         NODE_AUTH_TOKEN: ''
+
+    # The bun path above wrote the registry token into the npm userconfig,
+    # which on a self-hosted runner (supported through RUNS_ON) outlives the
+    # job. `always()` so a failed publish still clears it; setup-node's own
+    # post action cleans up the node path's .npmrc placeholder.
+    - name: Remove registry credentials
+      if: ${{ always() && steps.detect.outputs.runtime == 'bun' && env.NPM_TOKEN_PROVIDED == 'true' }}
+      run: rm -f "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
 
     - name: Fail on publish errors
       # Runs last so reports, artifacts and cleanup all happen first
