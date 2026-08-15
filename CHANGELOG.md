@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.1](https://github.com/this-is-tobi/github-workflows/compare/v0.26.0...v0.26.1) (2026-08-15)
+
+
+### Dependencies
+
+* **deps:** update github/codeql-action to v4.37.7 ([2222138](https://github.com/this-is-tobi/github-workflows/commit/22221384490db4d06343f70de5e73bccd9120c5a))
+
 ## [0.26.0](https://github.com/this-is-tobi/github-workflows/compare/v0.25.0...v0.26.0) (2026-08-11)
 
 
