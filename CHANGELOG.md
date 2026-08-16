@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.2](https://github.com/this-is-tobi/github-workflows/compare/v0.26.1...v0.26.2) (2026-08-16)
+
+
+### Dependencies
+
+* **deps:** update browser-actions/setup-chrome to v2.2.0 ([6577cbf](https://github.com/this-is-tobi/github-workflows/commit/6577cbf3714c1258755963c188ef1e24505d5d9a))
+
 ## [0.26.1](https://github.com/this-is-tobi/github-workflows/compare/v0.26.0...v0.26.1) (2026-08-15)
 
 
