@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.3](https://github.com/this-is-tobi/github-workflows/compare/v0.26.2...v0.26.3) (2026-08-21)
+
+
+### Dependencies
+
+* **deps:** update docker/setup-buildx-action to v4.3.0 ([85f6de0](https://github.com/this-is-tobi/github-workflows/commit/85f6de059171236e1b92ab13ce866d22952271d1))
+* **deps:** update github/codeql-action to v4.37.8 ([5616492](https://github.com/this-is-tobi/github-workflows/commit/5616492753a2ecce40731b7505c8975c64948ad1))
+
 ## [0.26.2](https://github.com/this-is-tobi/github-workflows/compare/v0.26.1...v0.26.2) (2026-08-16)
 
 
