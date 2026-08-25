@@ -42,6 +42,7 @@ test_pushes_to_the_current_branch() {
 # not by anything in the block above - so the invariant is asserted on the step
 # that actually carries it.
 test_the_checkout_follows_the_app_token_then_github_token() {
+  # shellcheck disable=SC2016 # the Actions marker is meant to stay literal
   local token expected='${{ steps.app-token.outputs.token || github.token }}'
 
   token=$(yq '
