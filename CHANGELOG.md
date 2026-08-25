@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.27.0](https://github.com/this-is-tobi/github-workflows/compare/v0.26.3...v0.27.0) (2026-08-25)
+
+
+### Features
+
+* **update-helm-chart:** let local mode push as the configured App ([c2cecf4](https://github.com/this-is-tobi/github-workflows/commit/c2cecf46856ac8454db896890cdb906ac0238de9))
+
+
+### Bug Fixes
+
+* **scan-gitleaks:** bound the scan to the checked-out ref ([fce4fb7](https://github.com/this-is-tobi/github-workflows/commit/fce4fb797d0a2cf9e5440982b2e7cd4c68d5904c))
+* **workflows:** point the security tab link at the ref the alerts are on ([bd00519](https://github.com/this-is-tobi/github-workflows/commit/bd005196d0627612ddb53affd750cf8e6786221c))
+
 ## [0.26.3](https://github.com/this-is-tobi/github-workflows/compare/v0.26.2...v0.26.3) (2026-08-21)
 
 
