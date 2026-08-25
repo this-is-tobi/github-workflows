@@ -55,6 +55,8 @@ The chart version and the app version are **decoupled on purpose**: an app relea
 
 > **In `local` mode** both scopes must still be granted, although that mode never uses `pull-requests: write`. A job's `permissions:` cannot depend on an input, and keeping both modes in one job is what avoids duplicating the ~130 lines of version-bump logic into a second file. The surplus is on your own repository, on top of the `contents: write` already needed to push.
 
+> **Push credential (`local` mode).** Follows the same precedence as everywhere else in this catalog: the App token when `APP_CLIENT_ID`/`APP_PRIVATE_KEY` are configured, `GITHUB_TOKEN` otherwise. This is not merely an authentication detail — `GITHUB_TOKEN` cannot trigger any workflow run, which is what stops the caller's own CD pipeline from re-entering itself, and an App token can. Supplying `APP_CLIENT_ID`/`APP_PRIVATE_KEY` to a `local`-mode call therefore **changes that behaviour**: do it only after confirming the re-entry is safe for your pipeline (e.g. the release job is idempotent on a no-change re-run), typically because you need the App identity for another reason — such as a branch ruleset requiring a pull request for every push with no exception for `GITHUB_TOKEN`, which cannot be named in a bypass list the way a GitHub App can (`actor_type: Integration`). `GH_PAT` is deliberately **not** part of this precedence, so supplying one for `called` mode leaves `local` pushes on `GITHUB_TOKEN`.
+
 ## Token setup
 
 A credential is required for **automerge**, and recommended in `called` mode so the chart update pull request actually runs its CI. Use either a **GitHub App** (preferred) or a **Personal Access Token**, stored as repository secrets in this repository.
