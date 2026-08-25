@@ -36,6 +36,7 @@ This workflow does not require any secrets.
 - A `.gitleaks.toml` configuration file and a `.gitleaksignore` file at the repository root are picked up automatically to tune rules or ignore known false positives. Prefer `.gitleaks.toml`: `.gitleaksignore` fingerprints are pinned to a commit (`<commit>:<file>:<rule>:<line>`) and go stale on every rebase, amend or squash of the branch carrying the line, whereas a `targetRules` + `paths` allowlist keeps holding.
 - When leaks are found, the report upload and PR comment always run before the workflow fails. Set `FAIL_ON_LEAKS: false` for a report-only mode that never blocks the pipeline.
 - When `GITHUB_SECURITY_TAB: true` and `FORMAT: sarif`, uploads results to the Security tab.
+- The Security tab link in the PR comment is filtered on the ref the SARIF was actually uploaded against: `pr:<number>` for a `pull_request` run, `branch:<name>` for a push, and no ref filter at all for anything else (a tag). Code scanning only indexes alerts under that ref, so a caller that scans on `push` and passes `PR_NUMBER` by hand still gets a link that resolves - a hardcoded `pr:` filter would land on an empty tab there.
 - Linux runners only (x64 and arm64 are supported).
 
 ## Examples

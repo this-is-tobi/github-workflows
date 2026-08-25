@@ -52,6 +52,7 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 - `FORMAT` controls output format: `table` (default) prints results to workflow summary, `sarif` enables GitHub Security Tab integration.
 - When `GITHUB_SECURITY_TAB: true` and `FORMAT: sarif`, uploads results to the Security tab.
 - PR comments link to either the GitHub Security Tab (when `GITHUB_SECURITY_TAB: true`) or the Workflow Summary page.
+- The Security tab link in the PR comment is filtered on the ref the SARIF was actually uploaded against: `pr:<number>` for a `pull_request` run, `branch:<name>` for a push, and no ref filter at all for anything else (a tag). Code scanning only indexes alerts under that ref, so a caller that scans on `push` and passes `PR_NUMBER` by hand still gets a link that resolves - a hardcoded `pr:` filter would land on an empty tab there.
 - Registry authentication: uses GitHub token for `ghcr.io`, otherwise uses provided credentials.
 - Skips common directories via `skip-dirs: **/node_modules` in config scan.
 - `CATEGORY` matters whenever one repository uploads more than one SARIF report: uploads sharing a category **replace one another**, so a matrix scanning several images without it leaves only whichever leg finished last visible in the Security tab.
