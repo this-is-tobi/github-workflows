@@ -1366,6 +1366,16 @@ jobs:
     permissions:
       contents: read
 
+  lint-proto:
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-proto.yml@v0
+    permissions:
+      contents: read
+    with:
+      # Only for a project publishing a schema. `buf breaking` is the gate: a
+      # renumbered field breaks every client already compiled against it, at
+      # runtime, having compiled clean on both sides
+      WORKING_DIRECTORY: proto
+
   scan-gitleaks:
     uses: this-is-tobi/github-workflows/.github/workflows/scan-gitleaks.yml@v0
     permissions:
@@ -1402,6 +1412,7 @@ jobs:
     needs:
     - lint-commits
     - lint-go
+    - lint-proto
     - test-go
     - build-go
     - scan-gitleaks

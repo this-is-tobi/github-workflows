@@ -47,6 +47,7 @@ For more details, see:
 - [Lint JavaScript, JSON, Markdown and YAML files using ESLint (`lint-js.yml`)](./.github/workflows/lint-js.yml)
 - [Lint dependency hygiene with knip and publint (`lint-deps.yml`)](./.github/workflows/lint-deps.yml)
 - [Lint a Go module with gofmt, go vet and golangci-lint (`lint-go.yml`)](./.github/workflows/lint-go.yml)
+- [Lint Protocol Buffers with buf, including breaking-change detection (`lint-proto.yml`)](./.github/workflows/lint-proto.yml)
 - [Lint YAML files using yamllint (`lint-yaml.yml`)](./.github/workflows/lint-yaml.yml)
 
 **Test**
@@ -105,6 +106,7 @@ For more details, see:
 - [Lint YAML](./docs/14-lint-yaml.md) *- YAML linting with yamllint*
 - [Lint Dependencies](./docs/15-lint-deps.md) *- Dependency policy and audit checks*
 - [Lint Go](./docs/16-lint-go.md) *- Go formatting, vet and golangci-lint*
+- [Lint Proto](./docs/17-lint-proto.md) *- Protobuf formatting, style and backward-compatibility with buf*
 - [Test Helm Charts](./docs/20-test-chart.md) *- Helm chart installation testing*
 - [Test JavaScript](./docs/21-test-vitest.md) *- JavaScript/TypeScript testing with Vitest*
 - [Test Kube Deployment](./docs/22-test-kube-deployment.md) *- Kubernetes deployment testing with Kind*

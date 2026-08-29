@@ -48,6 +48,7 @@ For more details, see:
 - [Lint dependency hygiene with knip and publint (`lint-deps.yml`)](../.github/workflows/lint-deps.yml)
 - [Lint YAML files using yamllint (`lint-yaml.yml`)](../.github/workflows/lint-yaml.yml)
 - [Lint a Go module with gofmt, go vet and golangci-lint (`lint-go.yml`)](../.github/workflows/lint-go.yml)
+- [Lint Protocol Buffers with buf, including breaking-change detection (`lint-proto.yml`)](../.github/workflows/lint-proto.yml)
 
 **Test**
 
