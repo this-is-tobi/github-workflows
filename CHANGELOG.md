@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.28.0](https://github.com/this-is-tobi/github-workflows/compare/v0.27.0...v0.28.0) (2026-08-29)
+
+
+### Features
+
+* **lint-go:** gofmt, go vet and golangci-lint over a Go module ([d5cf995](https://github.com/this-is-tobi/github-workflows/commit/d5cf995f788e84ecca26aaea19d4a146d0abf43d))
+* **lint-proto:** buf lint, format and breaking-change detection ([f0b7207](https://github.com/this-is-tobi/github-workflows/commit/f0b7207d11c7c17bf019e7774e196b83fa00bc84))
+* **release-go:** build and publish a Go project with GoReleaser ([37e0ba5](https://github.com/this-is-tobi/github-workflows/commit/37e0ba59abff9eaf7297f6b46b7a3ea8b921a39e))
+* **test-go:** test a Go module across operating systems and build tags ([2b9593a](https://github.com/this-is-tobi/github-workflows/commit/2b9593a102a995fe721e1e74e9a0a3de56407e05))
+
+
+### Code Refactoring
+
+* **go:** split building from releasing, and let the release authenticate ([2bc6416](https://github.com/this-is-tobi/github-workflows/commit/2bc641617b4e33363c87cbf2168b838545acd889))
+
+
+### Dependencies
+
+* **deps:** update github/codeql-action to v4.37.9 ([72b826b](https://github.com/this-is-tobi/github-workflows/commit/72b826b54b92fd523e79e4233159c741db7ac65e))
+
 ## [0.27.0](https://github.com/this-is-tobi/github-workflows/compare/v0.26.3...v0.27.0) (2026-08-25)
 
 
