@@ -1,0 +1,339 @@
+name: Test Go
+
+on:
+  workflow_call:
+    inputs:
+      GO_VERSION:
+        description: Go version to use. Empty reads the version from go.mod, which is the one the module already declares
+        type: string
+        required: false
+        default: ""
+      WORKING_DIRECTORY:
+        description: Working directory for the module under test
+        type: string
+        required: false
+        default: "."
+      PACKAGES:
+        description: Package pattern to test
+        type: string
+        required: false
+        default: "./..."
+      BUILD_TAGS:
+        description: >-
+          Build tag sets to test, as a JSON array. Each element is one pass, and
+          an empty string means no tags: '["", "ai"]' runs the suite twice, once
+          untagged and once with -tags ai. A build tag produces a second binary,
+          and a change that compiles under one and not the other is exactly what
+          a tagged tree makes easy to miss
+        type: string
+        required: false
+        default: '[""]'
+      RUNNERS:
+        description: >-
+          Runner labels to test across, as a JSON array of JSON arrays (e.g.
+          '[["ubuntu-24.04"], ["macos-15"]]'). Empty uses RUNS_ON alone. A suite
+          that reads the machine it runs on passes on the machine it was written
+          on; a second operating system is what notices
+        type: string
+        required: false
+        default: ""
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        type: string
+        required: false
+        default: '["ubuntu-24.04"]'
+      RACE:
+        description: Whether to run with the race detector
+        type: boolean
+        required: false
+        default: true
+      SHUFFLE:
+        description: Whether to randomise test order, so nothing passes by depending on what ran before it
+        type: boolean
+        required: false
+        default: true
+      COUNT:
+        description: Value for -count. "1" disables the test result cache, so a green run means the tests actually ran
+        type: string
+        required: false
+        default: "1"
+      TIMEOUT:
+        description: Value for -timeout
+        type: string
+        required: false
+        default: "10m"
+      TEST_COMMAND:
+        description: Custom test command, replacing the assembled `go test` invocation entirely (e.g. "make hard")
+        type: string
+        required: false
+        default: ""
+      TEST_PRECOMMAND:
+        description: Command to run before the tests (e.g. a code generation step)
+        type: string
+        required: false
+        default: ""
+      COVERAGE:
+        description: Whether to collect coverage
+        type: boolean
+        required: false
+        default: false
+      COVERAGE_PACKAGES:
+        description: >-
+          Value for -coverpkg. Worth setting to ./... where most of a module is
+          exercised from other packages' tests, which otherwise reads as
+          untested when it is not
+        type: string
+        required: false
+        default: ""
+      COVERAGE_ARTIFACT_NAME:
+        description: Artifact name for the coverage profile
+        type: string
+        required: false
+        default: go-tests-coverage
+      COVERAGE_ARTIFACT_PATH:
+        description: Path of the coverage profile to upload
+        type: string
+        required: false
+        default: ./coverage.out
+      CACHE:
+        description: Whether to cache the module and build caches
+        type: boolean
+        required: false
+        default: true
+      FAIL_ON_ERROR:
+        description: Whether to fail the workflow on test failures
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  detect-setup:
+    name: Detect project setup
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+    outputs:
+      has-module: ${{ steps.detect.outputs.has-module }}
+      has-tests: ${{ steps.detect.outputs.has-tests }}
+      runners: ${{ steps.detect.outputs.runners }}
+      tags: ${{ steps.detect.outputs.tags }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while the
+        # caller's own commands execute.
+        persist-credentials: false
+
+    - name: Detect module and resolve the matrix
+      id: detect
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        RUNNERS_INPUT: ${{ inputs.RUNNERS }}
+        RUNS_ON_INPUT: ${{ inputs.RUNS_ON }}
+        BUILD_TAGS_INPUT: ${{ inputs.BUILD_TAGS }}
+      run: |
+        set -uo pipefail
+
+        # A module is the precondition for everything below. Reported rather
+        # than assumed: a caller who pointed WORKING_DIRECTORY at the wrong
+        # place otherwise gets a green run that tested nothing.
+        HAS_MODULE="false"
+        if [ -f go.mod ]; then
+          HAS_MODULE="true"
+        fi
+        echo "Go module found: $HAS_MODULE"
+        echo "has-module=${HAS_MODULE}" >> "$GITHUB_OUTPUT"
+
+        # `go test ./...` over a module with no _test.go files exits 0 and
+        # tests nothing, which is indistinguishable from a passing suite.
+        HAS_TESTS="false"
+        if find . -name '*_test.go' -not -path './vendor/*' | head -1 | grep -q .; then
+          HAS_TESTS="true"
+        fi
+        echo "Test files found: $HAS_TESTS"
+        echo "has-tests=${HAS_TESTS}" >> "$GITHUB_OUTPUT"
+
+        # The runner matrix. RUNNERS keeps its own meaning - a list of runner
+        # label-sets - and when it is empty the single RUNS_ON label-set is
+        # wrapped into a one-element matrix, so both paths run through the
+        # same job rather than through two that drift.
+        if [ -n "$RUNNERS_INPUT" ]; then
+          RUNNERS_JSON="$RUNNERS_INPUT"
+        else
+          RUNNERS_JSON=$(printf '%s' "$RUNS_ON_INPUT" | jq -c '[.]')
+        fi
+        if ! printf '%s' "$RUNNERS_JSON" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+          echo "::error::RUNNERS must be a non-empty JSON array of runner label arrays, e.g. '[[\"ubuntu-24.04\"],[\"macos-15\"]]'"
+          exit 1
+        fi
+        echo "Runner matrix: $RUNNERS_JSON"
+        echo "runners=${RUNNERS_JSON}" >> "$GITHUB_OUTPUT"
+
+        # The build-tag matrix. Validated here so the test job can only ever
+        # receive a list of strings: the value reaches a `go test -tags`
+        # argument, and a caller passing an object or a nested array would
+        # otherwise produce an unreadable failure inside the matrix expansion.
+        if ! printf '%s' "$BUILD_TAGS_INPUT" | jq -e 'type == "array" and length > 0 and all(type == "string")' >/dev/null 2>&1; then
+          echo "::error::BUILD_TAGS must be a non-empty JSON array of strings, e.g. '[\"\"]' or '[\"\", \"ai\"]'"
+          exit 1
+        fi
+        echo "Build tag sets: $BUILD_TAGS_INPUT"
+        echo "tags=${BUILD_TAGS_INPUT}" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Test${{ matrix.tags != '' && format(' (-tags {0})', matrix.tags) || '' }}
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-module == 'true' && needs.detect-setup.outputs.has-tests == 'true' }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      # One operating system failing is a result about that operating system,
+      # and cancelling the others throws away the comparison that makes it
+      # readable.
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(needs.detect-setup.outputs.runners) }}
+        tags: ${{ fromJSON(needs.detect-setup.outputs.tags) }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Setup Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        # go-version-file wins when no explicit version is asked for: the
+        # module already declares the version it is meant to build with, and a
+        # default pinned here would silently disagree with it.
+        go-version: ${{ inputs.GO_VERSION }}
+        go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
+        cache: ${{ inputs.CACHE }}
+        cache-dependency-path: ${{ format('{0}/go.sum', inputs.WORKING_DIRECTORY) }}
+
+    - name: Run tests
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        PACKAGES: ${{ inputs.PACKAGES }}
+        BUILD_TAGS: ${{ matrix.tags }}
+        RACE: ${{ inputs.RACE }}
+        SHUFFLE: ${{ inputs.SHUFFLE }}
+        COUNT: ${{ inputs.COUNT }}
+        TIMEOUT: ${{ inputs.TIMEOUT }}
+        TEST_COMMAND: ${{ inputs.TEST_COMMAND }}
+        TEST_PRECOMMAND: ${{ inputs.TEST_PRECOMMAND }}
+        COVERAGE: ${{ inputs.COVERAGE }}
+        COVERAGE_PACKAGES: ${{ inputs.COVERAGE_PACKAGES }}
+        COVERAGE_ARTIFACT_PATH: ${{ inputs.COVERAGE_ARTIFACT_PATH }}
+        FAIL_ON_ERROR: ${{ inputs.FAIL_ON_ERROR }}
+      run: |
+        set -uo pipefail
+
+        # TEST_PRECOMMAND and TEST_COMMAND are shell commands by contract, so
+        # they are evaluated - through `eval` from `env:` rather than
+        # interpolated into this script, which keeps the program text fixed
+        # whatever a caller passes.
+        #
+        # In this shell rather than a subshell, so a pre-command can export a
+        # variable or change directory for the tests that follow, which is most
+        # of why it exists. The cost is that a pre-command calling `exit`
+        # directly ends the step there, with its own status and without the
+        # message below - failing correctly, just more quietly. Pinned in
+        # ci/tests/test-go-command.test.sh rather than left to be discovered.
+        if [ -n "$TEST_PRECOMMAND" ]; then
+          echo "Running pre-command: $TEST_PRECOMMAND"
+          if ! eval "$TEST_PRECOMMAND"; then
+            echo "::error::Pre-command failed: $TEST_PRECOMMAND"
+            exit 1
+          fi
+        fi
+
+        EXIT_CODE=0
+        if [ -n "$TEST_COMMAND" ]; then
+          echo "Running test command: $TEST_COMMAND"
+          eval "$TEST_COMMAND" || EXIT_CODE=$?
+        else
+          ARGS=(test)
+
+          [ -n "$COUNT" ] && ARGS+=("-count=$COUNT")
+          [ "$RACE" = "true" ] && ARGS+=(-race)
+          [ "$SHUFFLE" = "true" ] && ARGS+=(-shuffle=on)
+          [ -n "$TIMEOUT" ] && ARGS+=("-timeout=$TIMEOUT")
+          [ -n "$BUILD_TAGS" ] && ARGS+=(-tags "$BUILD_TAGS")
+
+          if [ "$COVERAGE" = "true" ]; then
+            [ -n "$COVERAGE_PACKAGES" ] && ARGS+=("-coverpkg=$COVERAGE_PACKAGES")
+            ARGS+=("-coverprofile=$COVERAGE_ARTIFACT_PATH")
+          fi
+
+          # Unquoted on purpose: PACKAGES is a pattern list ("./... ./tools/...")
+          # and quoting it would hand `go test` a single package named after the
+          # whole string.
+          # shellcheck disable=SC2086
+          echo "Running: go ${ARGS[*]} $PACKAGES"
+          # shellcheck disable=SC2086
+          go "${ARGS[@]}" $PACKAGES || EXIT_CODE=$?
+        fi
+
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          if [ "$FAIL_ON_ERROR" = "true" ]; then
+            echo "❌ Tests failed and FAIL_ON_ERROR is true. Failing the workflow."
+            exit "$EXIT_CODE"
+          fi
+          echo "⚠️ Tests failed but FAIL_ON_ERROR is false. Workflow will continue."
+        else
+          echo "✅ All tests passed successfully."
+        fi
+
+    - name: Report coverage
+      if: ${{ inputs.COVERAGE == true }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        COVERAGE_ARTIFACT_PATH: ${{ inputs.COVERAGE_ARTIFACT_PATH }}
+      run: |
+        set -uo pipefail
+        if [ ! -f "$COVERAGE_ARTIFACT_PATH" ]; then
+          echo "::warning::No coverage profile at $COVERAGE_ARTIFACT_PATH"
+          exit 0
+        fi
+        go tool cover -func="$COVERAGE_ARTIFACT_PATH" | tail -1
+
+    # Uploaded once rather than per matrix entry: the profiles are the same
+    # measurement taken on different machines, and identical artifact names
+    # across a matrix collide.
+    - name: Upload coverage profile
+      if: ${{ inputs.COVERAGE == true && strategy.job-index == 0 }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.COVERAGE_ARTIFACT_NAME }}
+        path: ${{ format('{0}/{1}', inputs.WORKING_DIRECTORY, inputs.COVERAGE_ARTIFACT_PATH) }}
+
+  no-module:
+    name: No Go module found
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-module == 'false' }}
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions: {}
+    steps:
+    - name: Skip tests
+      env:
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        echo "ℹ️ No go.mod found in '$WORKING_DIRECTORY'."
+        echo "Set the WORKING_DIRECTORY input to the directory holding the module."
+
+  no-tests:
+    name: No tests found
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-module == 'true' && needs.detect-setup.outputs.has-tests == 'false' }}
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions: {}
+    steps:
+    - name: Skip tests
+      run: |
+        echo "ℹ️ No *_test.go files found in the module."
+        echo "'go test ./...' would exit 0 here without testing anything, which is"
+        echo "why this is reported rather than run."

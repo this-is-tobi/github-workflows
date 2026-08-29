@@ -55,6 +55,7 @@ For more details, see:
 - [Test Kubernetes deployments in an ephemeral Kind cluster (`test-kube-deployment.yml`)](./.github/workflows/test-kube-deployment.yml)
 - [Run end-to-end Playwright tests across a browser matrix (`test-playwright.yml`)](./.github/workflows/test-playwright.yml)
 - [Run a command inside a built Docker image (`test-docker.yml`)](./.github/workflows/test-docker.yml)
+- [Test a Go module across operating systems and build tags (`test-go.yml`)](./.github/workflows/test-go.yml)
 
 **Build**
 
@@ -105,6 +106,7 @@ For more details, see:
 - [Test Kube Deployment](./docs/22-test-kube-deployment.md) *- Kubernetes deployment testing with Kind*
 - [Test Playwright](./docs/23-test-playwright.md) *- End-to-end Playwright testing across browsers*
 - [Test Docker](./docs/24-test-docker.md) *- Run a command inside a Docker image (registry or tarball)*
+- [Test Go](./docs/25-test-go.md) *- Go module testing with race, shuffle and a build-tag matrix*
 - [Build Docker](./docs/30-build-docker.md) *- Docker image building and registry pushing*
 - [Attest Docker](./docs/31-attest-docker.md) *- SLSA provenance and SBOM attestations for Docker images*
 - [Scan SonarQube](./docs/40-scan-sonarqube.md) *- Code quality analysis with SonarQube*
