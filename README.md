@@ -78,6 +78,7 @@ For more details, see:
 - [Bump a Helm chart hosted in this repository (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
 - [Trigger a Helm chart bump in a separate repository (`dispatch-helm-chart.yml`)](./.github/workflows/dispatch-helm-chart.yml)
 - [Publish packages to any NPM-compatible registry (`release-npm.yml`)](./.github/workflows/release-npm.yml)
+- [Build and publish a Go project with GoReleaser (`release-go.yml`)](./.github/workflows/release-go.yml)
 
 **Deploy**
 
@@ -122,6 +123,7 @@ For more details, see:
 - [Dispatch Helm Chart](./docs/54-dispatch-helm-chart.md) *- Trigger a chart bump in a separate chart repository*
 - [Sync Prerelease Branch](./docs/57-sync-prerelease-branch.md) *- Re-synchronise the prerelease branch after a release (place the job last)*
 - [Release NPM](./docs/55-release-npm.md) *- NPM package publishing with multi-runtime and multi-registry support*
+- [Release Go](./docs/58-release-go.md) *- Go release and snapshot builds with GoReleaser*
 - [ArgoCD Preview](./docs/60-argocd-preview.md) *- Preview environment deployment with ArgoCD*
 - [Preview Comment](./docs/61-preview-comment.md) *- Post or update PR comments with preview environment URLs*
 - [Clean Cache](./docs/70-clean-cache.md) *- GitHub Actions cache cleanup*
