@@ -10,6 +10,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 GUARDED_JOBS=(
   "build-docker.yml:build:Validate credentials"
   "release-app.yml:release:Validate inputs"
+  "release-go.yml:release:Validate inputs"
   "release-helm.yml:release:Validate inputs"
   "scan-trivy.yml:images-scan:Validate credentials"
   "scan-trivy.yml:config-scan:Validate credentials"

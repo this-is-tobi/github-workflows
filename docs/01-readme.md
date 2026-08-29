@@ -47,6 +47,7 @@ For more details, see:
 - [Lint JavaScript, JSON, Markdown and YAML files using ESLint (`lint-js.yml`)](../.github/workflows/lint-js.yml)
 - [Lint dependency hygiene with knip and publint (`lint-deps.yml`)](../.github/workflows/lint-deps.yml)
 - [Lint YAML files using yamllint (`lint-yaml.yml`)](../.github/workflows/lint-yaml.yml)
+- [Lint a Go module with gofmt, go vet and golangci-lint (`lint-go.yml`)](../.github/workflows/lint-go.yml)
 
 **Test**
 
@@ -55,10 +56,12 @@ For more details, see:
 - [Test Kubernetes deployments in an ephemeral Kind cluster (`test-kube-deployment.yml`)](../.github/workflows/test-kube-deployment.yml)
 - [Run end-to-end Playwright tests across a browser matrix (`test-playwright.yml`)](../.github/workflows/test-playwright.yml)
 - [Run a command inside a built Docker image (`test-docker.yml`)](../.github/workflows/test-docker.yml)
+- [Test a Go module across operating systems and build tags (`test-go.yml`)](../.github/workflows/test-go.yml)
 
 **Build**
 
 - [Build docker images and optionally push it to a registry (`build-docker.yml`)](../.github/workflows/build-docker.yml)
+- [Compile a Go project across its release matrix with GoReleaser (`build-go.yml`)](../.github/workflows/build-go.yml)
 - [Generate and attach security attestations to a Docker image (`attest-docker.yml`)](../.github/workflows/attest-docker.yml)
 - [Sign and attest published Helm charts (`attest-helm.yml`)](../.github/workflows/attest-helm.yml)
 
@@ -76,6 +79,7 @@ For more details, see:
 - [Bump a Helm chart hosted in this repository (`update-helm-chart.yml`)](../.github/workflows/update-helm-chart.yml)
 - [Trigger a Helm chart bump in a separate repository (`dispatch-helm-chart.yml`)](../.github/workflows/dispatch-helm-chart.yml)
 - [Publish packages to any NPM-compatible registry (`release-npm.yml`)](../.github/workflows/release-npm.yml)
+- [Publish a Go project with GoReleaser (`release-go.yml`)](../.github/workflows/release-go.yml)
 
 **Deploy**
 
