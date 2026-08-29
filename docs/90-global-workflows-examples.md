@@ -1311,3 +1311,162 @@ jobs:
 > `build-cli` is a `needs:` of `release`, not the other way round: `RELEASE_ARTIFACT_NAMES` resolves artifacts from the **current run**, so the bundle has to exist before release-app looks for it. It runs on every push, including those that produce no release — the cost of one bundle step, in exchange for not splitting the release across two runs.
 >
 > **On a repository with [immutable releases](./50-release-app.md#immutable-releases) enabled**, attaching assets requires the draft flow: add `PUBLISH_DRAFT_RELEASE: true` here, plus `"draft": true` and `"force-tag-creation": true` in `release-please-config.json`. Without it the asset upload is rejected, because the release is already published by the time it runs.
+
+## Go CLI / Module
+
+A Go project distributing binaries rather than images or charts. release-please owns the version and the changelog exactly as it does for a JS package; [GoReleaser](https://goreleaser.com) owns the cross-compilation matrix and attaches the archives to the release release-please created. Nothing about the release side is Go-specific, which is the point — the Go workflows cover the three things Go actually needs (formatting and vet, a test matrix, cross-compilation) and reuse the rest.
+
+### CI Pipeline
+
+Commit messages, formatting, tests and the cross-compile check run in parallel on every pull request. The build job is the one worth explaining: cross-compilation failures are host-independent and invisible from a laptop, so a build constraint that resolves on darwin and not on windows compiles clean for everybody who never builds for windows.
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - synchronize
+    - ready_for_review
+    branches:
+    - "**"
+  workflow_dispatch:
+
+jobs:
+  lint-commits:
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
+    permissions:
+      contents: read
+      pull-requests: read
+
+  lint-go:
+    uses: this-is-tobi/github-workflows/.github/workflows/lint-go.yml@v0
+    permissions:
+      contents: read
+    with:
+      # One vet pass per tag set: a change that compiles untagged and not under
+      # `ai` is exactly what a tagged tree makes easy to miss
+      BUILD_TAGS: '["", "ai"]'
+
+  test-go:
+    uses: this-is-tobi/github-workflows/.github/workflows/test-go.yml@v0
+    permissions:
+      contents: read
+    with:
+      # A suite that reads the machine it runs on passes on the machine it was
+      # written on; a second operating system is what notices
+      RUNNERS: '[["ubuntu-24.04"], ["macos-15"]]'
+      BUILD_TAGS: '["", "ai"]'
+      COVERAGE: true
+
+  build-go:
+    uses: this-is-tobi/github-workflows/.github/workflows/build-go.yml@v0
+    permissions:
+      contents: read
+
+  scan-gitleaks:
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-gitleaks.yml@v0
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    with:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
+  scan-sonarqube:
+    uses: this-is-tobi/github-workflows/.github/workflows/scan-sonarqube.yml@v0
+    needs:
+    - test-go
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    with:
+      SONAR_URL: https://sonarqube.example.com
+      SOURCES_PATH: .
+      COVERAGE_IMPORT: true
+      # test-go uploads `coverage.out` under this name; scan-sonarqube unpacks
+      # it into ./coverage, so that is where Sonar is pointed
+      COVERAGE_ARTIFACT_NAME: go-tests-coverage
+      SONAR_EXTRA_ARGS: -Dsonar.go.coverage.reportPaths=./coverage/coverage.out
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+
+  all-jobs-passed:
+    name: Check jobs status
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    needs:
+    - lint-commits
+    - lint-go
+    - test-go
+    - build-go
+    - scan-gitleaks
+    - scan-sonarqube
+    steps:
+    - name: Check status of all required jobs
+      run: |-
+        NEEDS_CONTEXT='${{ toJson(needs) }}'
+        JOB_IDS=$(echo "$NEEDS_CONTEXT" | jq -r 'keys[]')
+        for JOB_ID in $JOB_IDS; do
+          RESULT=$(echo "$NEEDS_CONTEXT" | jq -r ".[\"$JOB_ID\"].result")
+          echo "$JOB_ID job result: $RESULT"
+          if [[ $RESULT != "success" && $RESULT != "skipped" ]]; then
+            echo "***"
+            echo "Error: The $JOB_ID job did not pass."
+            exit 1
+          fi
+        done
+        echo "All jobs passed or were skipped."
+```
+
+> `build-go` runs `goreleaser build --snapshot` and needs only `contents: read`. That separation is deliberate: a single Go workflow with a "don't publish" switch would declare `contents: write` for every caller, and this one is started by a pull request. Use `PACKAGE: true` to also exercise the archiving and checksumming a plain compile never reaches.
+
+### CD Pipeline
+
+Triggered on push to `main`. release-please opens and merges the release pull request, tags it and writes the GitHub Release; GoReleaser then builds the matrix and attaches the archives to that release.
+
+```yaml
+name: CD
+
+on:
+  push:
+    branches:
+    - main
+  workflow_dispatch:
+
+jobs:
+  release:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    with:
+      RELEASE_BRANCH: main
+      AUTOMERGE_RELEASE: true
+    secrets:
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+
+  binaries:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-go.yml@v0
+    if: ${{ needs.release.outputs.release-created == 'true' }}
+    needs:
+    - release
+    permissions:
+      contents: write
+      packages: write
+    secrets:
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+```
+
+> **Two things must not both create the release.** release-please does, so `.goreleaser.yaml` must leave it alone: [`release.mode`](https://goreleaser.com/customization/release/) defaults to `keep-existing`, which is correct here, and `release.draft: true` is worth dropping — the release is already published by the time GoReleaser sees it. See [Composing with `release-app`](./58-release-go.md#composing-with-release-app).
+>
+> **`binaries` is chained with `needs:`, not with `on: release: published`.** Both work, but the trigger only fires if release-please itself ran under App or PAT credentials, since [`GITHUB_TOKEN` cannot trigger workflows](./05-authentication.md#why-the-app-mode-exists). The `needs:` form does not care, and `release-go`'s own tag fetch is what picks up the tag release-please created moments earlier in the same run.
+>
+> **What not to reach for** is the [CLI-as-a-release-asset pattern](#cd-pipeline--cli-distributed-as-a-release-asset) above, feeding `build-go` into `RELEASE_ARTIFACT_NAMES`. It is the right shape for a bundled JS CLI and the wrong one here: `--snapshot` stamps a derived version and ignores `GORELEASER_CURRENT_TAG`, so the assets would be published as `myapp_0.0.1-next_linux_amd64.tar.gz`.
