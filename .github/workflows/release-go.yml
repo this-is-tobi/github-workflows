@@ -28,34 +28,28 @@ on:
         type: string
         required: false
         default: "goreleaser"
-      SNAPSHOT:
-        description: >-
-          Build without publishing anything. The way to run this on a pull
-          request: it proves the whole release matrix compiles at the moment a
-          change lands rather than at the moment somebody tags
-        type: boolean
-        required: false
-        default: false
       ARGS:
         description: Extra arguments appended to the GoReleaser invocation
         type: string
         required: false
         default: ""
       REGISTRY:
-        description: Container registry to log into before releasing, for a configuration that also publishes images. Empty skips the login
-        type: string
-        required: false
-        default: ""
-      REGISTRY_USERNAME:
-        description: Username for the container registry
+        description: >-
+          Container registry to log into before releasing, for a configuration
+          that also publishes images. Empty skips the login
         type: string
         required: false
         default: ""
       ARTIFACT_NAME:
-        description: Artifact name for the built distribution. Empty uploads nothing
+        description: Artifact name for the released distribution. Empty uploads nothing
         type: string
         required: false
         default: ""
+      ARTIFACT_RETENTION_DAYS:
+        description: How long to keep the uploaded artifact
+        type: number
+        required: false
+        default: 7
       FETCH_DEPTH:
         description: >-
           Checkout depth. GoReleaser reads tags to work out the version and the
@@ -70,11 +64,35 @@ on:
         required: false
         default: '["ubuntu-24.04"]'
     secrets:
+      APP_CLIENT_ID:
+        description: >-
+          GitHub App Client ID (e.g. Iv23li..., NOT the numeric App ID). Supply
+          with APP_PRIVATE_KEY to have GoReleaser authenticate as a GitHub App.
+          Unlike GITHUB_TOKEN, the release it creates can then fire `release:`
+          triggers - which is what a downstream attestation, image build or
+          announcement job waits on.
+          See docs/05-authentication.md.
+        required: false
+      APP_PRIVATE_KEY:
+        description: GitHub App private key (PEM). Required alongside APP_CLIENT_ID.
+        required: false
+      GH_PAT:
+        description: >-
+          Personal access token, used for the same purpose as the App
+          credentials above and resolved after them. Like an App token it can
+          trigger workflows, so the same caveat applies.
+        required: false
       GORELEASER_KEY:
         description: License key for goreleaser-pro. Not needed for the open-source distribution
         required: false
+      REGISTRY_USERNAME:
+        description: >-
+          Username for the registry named by REGISTRY. Required when REGISTRY is
+          set and is not ghcr.io; for ghcr.io the workflow authenticates with
+          the built-in GITHUB_TOKEN instead
+        required: false
       REGISTRY_PASSWORD:
-        description: Password or token for the container registry named by REGISTRY
+        description: Password or token for the registry named by REGISTRY. Required alongside REGISTRY_USERNAME.
         required: false
       EXTRA_ENV:
         description: >-
@@ -85,24 +103,75 @@ on:
 
 jobs:
   release:
-    name: ${{ inputs.SNAPSHOT && 'Build snapshot' || 'Release' }}
+    name: Release
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
     permissions:
-      # Creating the release and uploading its assets. A snapshot needs none of
-      # this, and the caller is free to grant only contents: read for one.
+      # Creating the release and uploading its assets.
       contents: write
+      # For a configuration that also publishes images to ghcr.io. `permissions:`
+      # takes no expressions, so this is granted even with REGISTRY empty, where
+      # nothing uses it - the same unavoidable shape release-helm.yml carries for
+      # PUBLISH_OCI. A caller that publishes no images may grant `packages: none`
+      # to take it back; the intersection is what the job actually gets.
+      packages: write
+    env:
+      # `secrets` is not available in a step-level `if`, but it is here.
+      HAS_APP_AUTH: ${{ secrets.APP_CLIENT_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
+      # Exactly one of the two set: a typo or a half-finished setup. Never a
+      # valid configuration, and silently falling back would downgrade auth.
+      HAS_PARTIAL_APP_AUTH: ${{ (secrets.APP_CLIENT_ID != '') != (secrets.APP_PRIVATE_KEY != '') }}
+      HAS_REGISTRY_AUTH: ${{ secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != '' }}
     steps:
+    - name: Validate inputs
+      env:
+        REGISTRY: ${{ inputs.REGISTRY }}
+      run: |
+        set -euo pipefail
+
+        if [ "$HAS_PARTIAL_APP_AUTH" = "true" ]; then
+          echo "::error::APP_CLIENT_ID and APP_PRIVATE_KEY must be supplied together, but only one was. Continuing would silently fall back to GH_PAT or GITHUB_TOKEN instead of authenticating as the App."
+          exit 1
+        fi
+
+        # Only ghcr.io can fall back to the built-in GITHUB_TOKEN. Any other
+        # registry needs explicit credentials; without them the login step would
+        # pipe an empty password into `docker login` and fail with an opaque
+        # authentication error partway through, instead of naming the cause
+        # before anything is built.
+        if [ -n "$REGISTRY" ] && [ "$REGISTRY" != "ghcr.io" ] && [ "$HAS_REGISTRY_AUTH" != "true" ]; then
+          echo "::error::REGISTRY_USERNAME and REGISTRY_PASSWORD are required when REGISTRY ('$REGISTRY') is set and is not ghcr.io."
+          exit 1
+        fi
+
+    # Minted so that the release GoReleaser creates can fire `release:` triggers.
+    # A release created with GITHUB_TOKEN cannot, which is silent: the release
+    # appears, and the attestation or image build waiting on it never starts.
+    # Scoped to this repository only: passing `owner:` without `repositories:`
+    # would widen the token to every repo in the installation.
+    - name: Generate GitHub App token
+      id: app-token
+      if: ${{ env.HAS_APP_AUTH == 'true' }}
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        client-id: ${{ secrets.APP_CLIENT_ID }}
+        private-key: ${{ secrets.APP_PRIVATE_KEY }}
+        permission-contents: write
+
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         fetch-depth: ${{ inputs.FETCH_DEPTH }}
-        # Credentials stay: GoReleaser runs `git` against this checkout, and
-        # unlike the lint and test workflows here it may legitimately need to
-        # reach the remote.
+        # Deliberately the job's own GITHUB_TOKEN and not the App token above:
+        # the tag fetch below needs a credential in a private repository, and
+        # GITHUB_TOKEN cannot trigger workflows, so nothing `git` does here can
+        # re-enter the caller's pipeline. The elevated credential is handed only
+        # to the step that creates the release.
         persist-credentials: true
 
-    # A tag is what the version is derived from, and a checkout that fetched
-    # depth 0 still does not necessarily have the tags in a fork or a re-run.
+    # GoReleaser's own documented Actions setup pairs fetch-depth 0 with this:
+    # checkout writes the triggering tag as a lightweight local tag, so an
+    # annotated tag's own message and date - which the changelog and the release
+    # notes read - are not what is in the working copy until it is re-fetched.
     - name: Fetch tags
       if: ${{ inputs.FETCH_DEPTH == 0 }}
       run: git fetch --force --tags
@@ -120,8 +189,11 @@ jobs:
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
         registry: ${{ inputs.REGISTRY }}
-        username: ${{ inputs.REGISTRY_USERNAME }}
-        password: ${{ secrets.REGISTRY_PASSWORD }}
+        # ghcr.io accepts the job's own token, so a caller pushing there supplies
+        # nothing. Any other registry reached this step only by passing the
+        # validation above, which means both secrets are set.
+        username: ${{ secrets.REGISTRY_USERNAME || github.actor }}
+        password: ${{ secrets.REGISTRY_PASSWORD || github.token }}
 
     # Before anything is built or published. A configuration that is invalid in
     # a way GoReleaser only notices at the publish step leaves a half-finished
@@ -156,18 +228,37 @@ jobs:
           # Blank lines and comments are ignorable; anything else that is not
           # KEY=VALUE is a mistake worth naming, because a silently dropped
           # entry surfaces as an authentication failure halfway through a
-          # release.
+          # release. A multi-line value - a PEM key pasted whole - fails here
+          # rather than being truncated to its first line.
           case "$LINE" in
             ""|"#"*) continue ;;
           esac
           if ! printf '%s' "$LINE" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*='; then
-            echo "::error::EXTRA_ENV lines must be KEY=VALUE; found one that is not"
+            echo "::error::EXTRA_ENV lines must be KEY=VALUE; found one that is not. A value spanning several lines - a PEM private key, for instance - cannot be carried this way."
             exit 1
           fi
+
           # The name is safe to echo, having just been matched against the
-          # pattern above. The value is not, and is never printed.
-          printf '%s\n' "$LINE" >> "$GITHUB_ENV"
+          # pattern above.
+          NAME=$(printf '%s' "$LINE" | cut -d= -f1)
+
+          # This step exists to carry a tap token or a signing key to
+          # GoReleaser. These names do something else: they change how every
+          # later step in the job runs, or they are the job's own plumbing.
+          # GITHUB_TOKEN is refused rather than honoured because the release
+          # step sets it at step level, which wins - so an entry here would be
+          # accepted, ignored, and blamed for nothing.
+          case "$NAME" in
+            PATH|NODE_OPTIONS|LD_PRELOAD|LD_LIBRARY_PATH|DYLD_*|GITHUB_*|ACTIONS_*|RUNNER_*)
+              echo "::error::EXTRA_ENV must not set $NAME: it changes how the rest of the job runs rather than passing a value to GoReleaser."
+              exit 1
+              ;;
+          esac
+
+          # Masked before it is written, so there is no window in which a later
+          # failure could echo an unregistered value.
           echo "::add-mask::$(printf '%s' "$LINE" | cut -d= -f2-)"
+          printf '%s\n' "$LINE" >> "$GITHUB_ENV"
           COUNT=$((COUNT + 1))
         done <<EOF
         $EXTRA_ENV
@@ -183,11 +274,13 @@ jobs:
         workdir: ${{ inputs.WORKING_DIRECTORY }}
         args: >-
           release --clean
-          ${{ inputs.SNAPSHOT && '--snapshot' || '' }}
           ${{ inputs.CONFIG != '' && format('--config {0}', inputs.CONFIG) || '' }}
           ${{ inputs.ARGS }}
       env:
-        GITHUB_TOKEN: ${{ github.token }}
+        # App token, then GH_PAT, then GITHUB_TOKEN. The first two can trigger
+        # workflows, so the release they create fires `release:`; under
+        # GITHUB_TOKEN it never does.
+        GITHUB_TOKEN: ${{ steps.app-token.outputs.token || secrets.GH_PAT || github.token }}
         GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
     - name: Upload the distribution
@@ -196,3 +289,4 @@ jobs:
       with:
         name: ${{ inputs.ARTIFACT_NAME }}
         path: ${{ format('{0}/dist', inputs.WORKING_DIRECTORY) }}
+        retention-days: ${{ inputs.ARTIFACT_RETENTION_DAYS }}

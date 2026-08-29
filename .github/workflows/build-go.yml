@@ -1,0 +1,206 @@
+name: Build Go
+
+on:
+  workflow_call:
+    inputs:
+      GO_VERSION:
+        description: Go version to use. Empty reads the version from go.mod, which is the one the module already declares
+        type: string
+        required: false
+        default: ""
+      WORKING_DIRECTORY:
+        description: Working directory holding the module and its GoReleaser configuration
+        type: string
+        required: false
+        default: "."
+      CONFIG:
+        description: Path to the GoReleaser configuration. Empty lets GoReleaser find its own
+        type: string
+        required: false
+        default: ""
+      GORELEASER_VERSION:
+        description: GoReleaser version to install
+        type: string
+        required: false
+        default: "~> v2"
+      DISTRIBUTION:
+        description: GoReleaser distribution to run (goreleaser, goreleaser-pro)
+        type: string
+        required: false
+        default: "goreleaser"
+      PACKAGE:
+        description: >-
+          Whether to produce the full distribution - archives, checksums, SBOMs
+          - instead of bare executables. Off answers "does every target still
+          compile"; on answers "does the whole packaging pipeline still run",
+          which is the half a compile check cannot reach. Nothing is published
+          either way, and the version stamped on the archives is a snapshot
+          one, so these are artifacts to inspect rather than to hand out
+        type: boolean
+        required: false
+        default: false
+      SINGLE_TARGET:
+        description: >-
+          Whether to build only for the runner's own platform instead of the
+          whole matrix. Faster, and correspondingly worse at catching the
+          failure this workflow exists to catch. Not available with PACKAGE,
+          which has no such flag
+        type: boolean
+        required: false
+        default: false
+      IDS:
+        description: >-
+          Build ids to build, comma-separated. Empty builds every id in the
+          configuration. Not available with PACKAGE, which has no such flag
+        type: string
+        required: false
+        default: ""
+      ARGS:
+        description: Extra arguments appended to the GoReleaser invocation
+        type: string
+        required: false
+        default: ""
+      ARTIFACT_NAME:
+        description: Artifact name for the built distribution. Empty uploads nothing
+        type: string
+        required: false
+        default: ""
+      ARTIFACT_RETENTION_DAYS:
+        description: How long to keep the uploaded artifact
+        type: number
+        required: false
+        default: 7
+      CACHE:
+        description: Whether to cache the module and build caches
+        type: boolean
+        required: false
+        default: true
+      FETCH_DEPTH:
+        description: >-
+          Checkout depth. Shallow by default, unlike release-go.yml: nothing
+          built here is published, so the tag history a changelog would need is
+          history this would only pay for
+        type: number
+        required: false
+        default: 1
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        type: string
+        required: false
+        default: '["ubuntu-24.04"]'
+    secrets:
+      GORELEASER_KEY:
+        description: License key for goreleaser-pro. Not needed for the open-source distribution
+        required: false
+
+jobs:
+  build:
+    name: Build binaries
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    # Read-only, and that is the whole reason this is a separate workflow from
+    # release-go.yml. Everything here runs under --snapshot, which publishes
+    # nothing - so a caller running it on a pull request never hands a
+    # release-capable token to a job a pull request starts.
+    permissions:
+      contents: read
+    steps:
+    - name: Validate inputs
+      env:
+        PACKAGE: ${{ inputs.PACKAGE }}
+        SINGLE_TARGET: ${{ inputs.SINGLE_TARGET }}
+        IDS: ${{ inputs.IDS }}
+      run: |
+        set -euo pipefail
+
+        # `--single-target` and `--id` belong to `goreleaser build`, and the
+        # PACKAGE path runs `goreleaser release --snapshot` instead, which has
+        # neither. Accepting them there would narrow nothing and say so
+        # nowhere: the caller would read a green run as having built one target
+        # while the whole matrix was built, or as having built one id while
+        # every id was.
+        if [ "$PACKAGE" = "true" ]; then
+          if [ "$SINGLE_TARGET" = "true" ]; then
+            echo "::error::SINGLE_TARGET is not available with PACKAGE. The full distribution is produced by 'goreleaser release --snapshot', which builds every target; drop one of the two."
+            exit 1
+          fi
+          if [ -n "$IDS" ]; then
+            echo "::error::IDS is not available with PACKAGE. The full distribution is produced by 'goreleaser release --snapshot', which builds every id; drop one of the two."
+            exit 1
+          fi
+        fi
+
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: ${{ inputs.FETCH_DEPTH }}
+        # Nothing here reaches the remote: GoReleaser reads the working tree and
+        # the local object database, and writes only to dist/.
+        persist-credentials: false
+
+    - name: Setup Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: ${{ inputs.GO_VERSION }}
+        go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
+        cache: ${{ inputs.CACHE }}
+        cache-dependency-path: ${{ format('{0}/go.sum', inputs.WORKING_DIRECTORY) }}
+
+    # Before the build rather than after it. A configuration error that only
+    # surfaces at release time is one this workflow could have caught on the
+    # pull request that introduced it, which is the reason to run it here where
+    # nothing is at stake.
+    - name: Check the GoReleaser configuration
+      uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+      with:
+        distribution: ${{ inputs.DISTRIBUTION }}
+        version: ${{ inputs.GORELEASER_VERSION }}
+        workdir: ${{ inputs.WORKING_DIRECTORY }}
+        args: check ${{ inputs.CONFIG != '' && format('--config {0}', inputs.CONFIG) || '' }}
+      env:
+        GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+    # `goreleaser build` is GoReleaser's own word for this: "analogous to the
+    # go build command, in the sense it only builds binaries". No archives, no
+    # checksums, no release - and no GITHUB_TOKEN, which is why neither this
+    # step nor the one below takes one.
+    - name: Build the binaries
+      if: ${{ !inputs.PACKAGE }}
+      uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+      with:
+        distribution: ${{ inputs.DISTRIBUTION }}
+        version: ${{ inputs.GORELEASER_VERSION }}
+        workdir: ${{ inputs.WORKING_DIRECTORY }}
+        args: >-
+          build --snapshot --clean
+          ${{ inputs.SINGLE_TARGET && '--single-target' || '' }}
+          ${{ inputs.IDS != '' && format('--id {0}', inputs.IDS) || '' }}
+          ${{ inputs.CONFIG != '' && format('--config {0}', inputs.CONFIG) || '' }}
+          ${{ inputs.ARGS }}
+      env:
+        GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+    # `release --snapshot` runs the whole pipeline and publishes none of it,
+    # which is the only way to get the archives and the checksum file. The
+    # version it stamps is derived rather than tagged, so these artifacts are
+    # for a caller to attach to a release, not to hand out on their own.
+    - name: Build the full distribution
+      if: ${{ inputs.PACKAGE }}
+      uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+      with:
+        distribution: ${{ inputs.DISTRIBUTION }}
+        version: ${{ inputs.GORELEASER_VERSION }}
+        workdir: ${{ inputs.WORKING_DIRECTORY }}
+        args: >-
+          release --snapshot --clean
+          ${{ inputs.CONFIG != '' && format('--config {0}', inputs.CONFIG) || '' }}
+          ${{ inputs.ARGS }}
+      env:
+        GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+    - name: Upload the distribution
+      if: ${{ inputs.ARTIFACT_NAME != '' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.ARTIFACT_NAME }}
+        path: ${{ format('{0}/dist', inputs.WORKING_DIRECTORY) }}
+        retention-days: ${{ inputs.ARTIFACT_RETENTION_DAYS }}

@@ -13,6 +13,7 @@ Start at the top and stop at the first row that matches.
 | need automerge                                                                          | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
 | need to dispatch a workflow in **another** repository (`dispatch-helm-chart`)           | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
 | need chart releases to fire `release:` triggers (`release-helm`)                        | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
+| need a Go release to fire `release:` triggers (`release-go`)                            | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
 | hit GitHub API rate limits during Trivy scans                                           | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
 | hit GitHub API rate limits **inside a Docker build**                                    | **GitHub App** (or `GH_PAT`)   | the two above, **plus** [`BUILD_SECRET_GITHUB_TOKEN`](#what-build-docker-actually-injects) |
 | already have `GH_PAT` working and don't want to change                                  | **`GH_PAT`** — still supported | `GH_PAT`                           |
@@ -588,6 +589,7 @@ Keeping `GITHUB_TOKEN` on `actions/checkout` bounds **`git` pushes only**. Anyth
 | `git push` of the prerelease branch            | Checkout's token     | No                          |
 | `git push` of the `local`-mode chart bump      | Checkout's token     | No                          |
 | release-please's `vX.Y.Z` tag and Release      | App token / `GH_PAT` | **Yes**                     |
+| GoReleaser's Release and its assets            | App token / `GH_PAT` | **Yes**                     |
 | The release pull request                       | App token / `GH_PAT` | **Yes** — this is the point |
 | The chart update pull request                  | App token / `GH_PAT` | **Yes** — this is the point |
 | The push of the chart update *branch* itself   | App token / `GH_PAT` | **Yes**                     |

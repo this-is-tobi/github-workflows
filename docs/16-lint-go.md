@@ -1,11 +1,8 @@
 # `lint-go.yml`
 
-Formatting, `go vet` and optionally golangci-lint over a Go module. Detects the
-module first and reports rather than passes when there is not one.
+Formatting, `go vet` and optionally golangci-lint over a Go module. Detects the module first and reports rather than passes when there is not one.
 
-`go vet` runs once per build tag set, because a build tag produces a second
-binary and code that only compiles under one of them is otherwise only vetted
-under one.
+`go vet` runs once per build tag set, because a build tag produces a second binary and code that only compiles under one of them is otherwise only vetted under one.
 
 ## Inputs
 
@@ -33,24 +30,11 @@ under one.
 
 ## Notes
 
-- **`gofmt -l` exits 0 whether or not it found anything**, naming the files it
-  would rewrite on stdout. The emptiness of that output is the result, so this
-  workflow tests the output rather than the status — a step that forwarded
-  gofmt's exit code would pass unconditionally and look exactly like a clean
-  tree.
-- **golangci-lint is opt-in by configuration.** Empty `GOLANGCI_LINT` runs it
-  when a `.golangci.yml`, `.yaml`, `.toml` or `.json` is present: enabling it by
-  default would hold every caller to a linter they never chose, and defaulting
-  it off would ignore a configuration file somebody wrote on purpose. An
-  explicit `"true"` or `"false"` wins over the file in both directions.
-- **The vet passes share one job** rather than a matrix. Vet is seconds, and a
-  matrix would pay for a checkout and a toolchain per pass to parallelise
-  something shorter than its own setup. A finding in any pass fails the step;
-  a later clean pass cannot clear an earlier one.
+- **`gofmt -l` exits 0 whether or not it found anything**, naming the files it would rewrite on stdout. The emptiness of that output is the result, so this workflow tests the output rather than the status — a step that forwarded gofmt's exit code would pass unconditionally and look exactly like a clean tree.
+- **golangci-lint is opt-in by configuration.** Empty `GOLANGCI_LINT` runs it when a `.golangci.yml`, `.yaml`, `.toml` or `.json` is present: enabling it by default would hold every caller to a linter they never chose, and defaulting it off would ignore a configuration file somebody wrote on purpose. An explicit `"true"` or `"false"` wins over the file in both directions.
+- **The vet passes share one job** rather than a matrix. Vet is seconds, and a matrix would pay for a checkout and a toolchain per pass to parallelise something shorter than its own setup. A finding in any pass fails the step; a later clean pass cannot clear an earlier one.
 - **The Go version comes from `go.mod`** unless `GO_VERSION` says otherwise.
-- **The golangci-lint action's own cache is disabled**, because `setup-go` has
-  already restored one and the two disagree about what is current often enough
-  to be worth having only one.
+- **The golangci-lint action's own cache is disabled**, because `setup-go` has already restored one and the two disagree about what is current often enough to be worth having only one.
 
 ## Usage
 
@@ -66,8 +50,7 @@ jobs:
 
 ### Narrowing the formatting check
 
-Worth doing where a repository holds other modules that are formatted on their
-own — plugins, examples, generated trees.
+Worth doing where a repository holds other modules that are formatted on their own — plugins, examples, generated trees.
 
 ```yaml
 jobs:
@@ -93,8 +76,7 @@ jobs:
 
 ### With golangci-lint
 
-Nothing needs saying when a `.golangci.yml` is committed — it is picked up. Pass
-the input to run it without one, or to keep it off in a repository that has one.
+Nothing needs saying when a `.golangci.yml` is committed — it is picked up. Pass the input to run it without one, or to keep it off in a repository that has one.
 
 ```yaml
 jobs:
