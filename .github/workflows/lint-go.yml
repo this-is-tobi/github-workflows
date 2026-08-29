@@ -1,0 +1,255 @@
+name: Lint Go
+
+on:
+  workflow_call:
+    inputs:
+      GO_VERSION:
+        description: Go version to use. Empty reads the version from go.mod, which is the one the module already declares
+        type: string
+        required: false
+        default: ""
+      WORKING_DIRECTORY:
+        description: Working directory for the module to lint
+        type: string
+        required: false
+        default: "."
+      PACKAGES:
+        description: Package pattern to vet
+        type: string
+        required: false
+        default: "./..."
+      BUILD_TAGS:
+        description: >-
+          Build tag sets to vet, as a JSON array. Each element is one pass, and
+          an empty string means no tags. A build tag produces a second binary,
+          and code that only compiles under one of them is only vetted under one
+        type: string
+        required: false
+        default: '[""]'
+      FORMAT:
+        description: Whether to check formatting with gofmt
+        type: boolean
+        required: false
+        default: true
+      FORMAT_PATHS:
+        description: >-
+          Paths to check formatting in, space separated. Worth narrowing where a
+          repository holds other modules that are formatted on their own
+        type: string
+        required: false
+        default: "."
+      VET:
+        description: Whether to run go vet
+        type: boolean
+        required: false
+        default: true
+      GOLANGCI_LINT:
+        description: >-
+          Whether to run golangci-lint ("true", "false", or empty to run it when
+          a .golangci configuration file is present)
+        type: string
+        required: false
+        default: ""
+      GOLANGCI_LINT_VERSION:
+        description: golangci-lint version to install
+        type: string
+        required: false
+        default: "v2.6.2"
+      GOLANGCI_LINT_ARGS:
+        description: Extra arguments for golangci-lint run
+        type: string
+        required: false
+        default: ""
+      CACHE:
+        description: Whether to cache the module and build caches
+        type: boolean
+        required: false
+        default: true
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        type: string
+        required: false
+        default: '["ubuntu-24.04"]'
+      FAIL_ON_ERROR:
+        description: Whether to fail the workflow on lint findings
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  detect-setup:
+    name: Detect project setup
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+    outputs:
+      has-module: ${{ steps.detect.outputs.has-module }}
+      golangci: ${{ steps.detect.outputs.golangci }}
+      tags: ${{ steps.detect.outputs.tags }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while the
+        # caller's own commands execute.
+        persist-credentials: false
+
+    - name: Detect module and linter configuration
+      id: detect
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        GOLANGCI_INPUT: ${{ inputs.GOLANGCI_LINT }}
+        BUILD_TAGS_INPUT: ${{ inputs.BUILD_TAGS }}
+      run: |
+        set -uo pipefail
+
+        HAS_MODULE="false"
+        if [ -f go.mod ]; then
+          HAS_MODULE="true"
+        fi
+        echo "Go module found: $HAS_MODULE"
+        echo "has-module=${HAS_MODULE}" >> "$GITHUB_OUTPUT"
+
+        # An explicit answer wins; an empty one means "run it if this repository
+        # is configured for it". Enabling it by default would hold every caller
+        # to a linter they never chose, and defaulting it off would ignore a
+        # configuration file somebody wrote on purpose.
+        case "$GOLANGCI_INPUT" in
+          true|false)
+            GOLANGCI="$GOLANGCI_INPUT"
+            ;;
+          "")
+            GOLANGCI="false"
+            for f in .golangci.yml .golangci.yaml .golangci.toml .golangci.json; do
+              if [ -f "$f" ]; then
+                GOLANGCI="true"
+                echo "Found $f"
+                break
+              fi
+            done
+            ;;
+          *)
+            echo "::error::GOLANGCI_LINT must be \"true\", \"false\" or empty (auto-detect), got '$GOLANGCI_INPUT'"
+            exit 1
+            ;;
+        esac
+        echo "golangci-lint: $GOLANGCI"
+        echo "golangci=${GOLANGCI}" >> "$GITHUB_OUTPUT"
+
+        # Validated here so the vet job can only ever receive a list of strings:
+        # the value reaches a `go vet -tags` argument.
+        if ! printf '%s' "$BUILD_TAGS_INPUT" | jq -e 'type == "array" and length > 0 and all(type == "string")' >/dev/null 2>&1; then
+          echo "::error::BUILD_TAGS must be a non-empty JSON array of strings, e.g. '[\"\"]' or '[\"\", \"ai\"]'"
+          exit 1
+        fi
+        echo "Build tag sets: $BUILD_TAGS_INPUT"
+        echo "tags=${BUILD_TAGS_INPUT}" >> "$GITHUB_OUTPUT"
+
+  lint:
+    name: Lint
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-module == 'true' }}
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Setup Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: ${{ inputs.GO_VERSION }}
+        go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
+        cache: ${{ inputs.CACHE }}
+        cache-dependency-path: ${{ format('{0}/go.sum', inputs.WORKING_DIRECTORY) }}
+
+    - name: Check formatting
+      if: ${{ inputs.FORMAT == true }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        FORMAT_PATHS: ${{ inputs.FORMAT_PATHS }}
+        FAIL_ON_ERROR: ${{ inputs.FAIL_ON_ERROR }}
+      run: |
+        set -uo pipefail
+
+        # gofmt -l names the files it would change and exits 0 either way, so
+        # the emptiness of its output is the result. Piping it anywhere that
+        # discards that would make this step pass unconditionally.
+        # shellcheck disable=SC2086
+        UNFORMATTED=$(gofmt -l $FORMAT_PATHS)
+
+        if [ -z "$UNFORMATTED" ]; then
+          echo "✅ All files are formatted."
+          exit 0
+        fi
+
+        echo "::error::gofmt needed:"
+        echo "$UNFORMATTED"
+        if [ "$FAIL_ON_ERROR" = "true" ]; then
+          exit 1
+        fi
+        echo "⚠️ FAIL_ON_ERROR is false. Workflow will continue."
+
+    - name: Run go vet
+      if: ${{ inputs.VET == true }}
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        PACKAGES: ${{ inputs.PACKAGES }}
+        BUILD_TAGS_JSON: ${{ needs.detect-setup.outputs.tags }}
+        FAIL_ON_ERROR: ${{ inputs.FAIL_ON_ERROR }}
+      run: |
+        set -uo pipefail
+
+        EXIT_CODE=0
+
+        # One pass per tag set, in this one step rather than a matrix: vet is
+        # seconds, and a matrix would pay for a checkout and a toolchain per
+        # pass to parallelise something shorter than the setup.
+        while IFS= read -r TAGS; do
+          ARGS=(vet)
+          [ -n "$TAGS" ] && ARGS+=(-tags "$TAGS")
+          # shellcheck disable=SC2086
+          echo "Running: go ${ARGS[*]} $PACKAGES"
+          # shellcheck disable=SC2086
+          go "${ARGS[@]}" $PACKAGES || EXIT_CODE=$?
+        done < <(printf '%s' "$BUILD_TAGS_JSON" | jq -r '.[]')
+
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          if [ "$FAIL_ON_ERROR" = "true" ]; then
+            echo "❌ go vet reported findings and FAIL_ON_ERROR is true."
+            exit "$EXIT_CODE"
+          fi
+          echo "⚠️ go vet reported findings but FAIL_ON_ERROR is false. Workflow will continue."
+        else
+          echo "✅ go vet is clean."
+        fi
+
+    - name: Run golangci-lint
+      if: ${{ needs.detect-setup.outputs.golangci == 'true' }}
+      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      with:
+        version: ${{ inputs.GOLANGCI_LINT_VERSION }}
+        working-directory: ${{ inputs.WORKING_DIRECTORY }}
+        args: ${{ inputs.GOLANGCI_LINT_ARGS }}
+        # The action's own cache duplicates the one setup-go already restored
+        # above, and the two disagree about what is current often enough to be
+        # worth having only one.
+        skip-cache: true
+
+  no-module:
+    name: No Go module found
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-module == 'false' }}
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions: {}
+    steps:
+    - name: Skip lint
+      env:
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        echo "ℹ️ No go.mod found in '$WORKING_DIRECTORY'."
+        echo "Set the WORKING_DIRECTORY input to the directory holding the module."
