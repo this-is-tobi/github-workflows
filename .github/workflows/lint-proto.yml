@@ -1,0 +1,287 @@
+name: Lint Proto
+
+on:
+  workflow_call:
+    inputs:
+      WORKING_DIRECTORY:
+        description: >-
+          Directory holding the buf configuration. Passed to buf as its input
+          rather than entered with `cd`, so the repository root stays the
+          working directory and `.git` keeps its ordinary path
+        type: string
+        required: false
+        default: "."
+      BUF_VERSION:
+        description: buf version to install. Empty uses the action's own default
+        type: string
+        required: false
+        default: ""
+      FORMAT:
+        description: Whether to check formatting with buf format
+        type: boolean
+        required: false
+        default: true
+      LINT:
+        description: Whether to run buf lint
+        type: boolean
+        required: false
+        default: true
+      BREAKING:
+        description: >-
+          Whether to run buf breaking. This is the gate a published schema
+          exists for: a plugin or client compiled against the current contract
+          keeps working only if nothing here renumbers or removes a field
+        type: boolean
+        required: false
+        default: true
+      BREAKING_AGAINST:
+        description: >-
+          buf input to compare against, verbatim (e.g.
+          '.git#branch=origin/main,subdir=proto'). Empty derives it from the
+          pull request's base branch, which is what it should almost always be
+        type: string
+        required: false
+        default: ""
+      BREAKING_BRANCH:
+        description: >-
+          Branch to compare against when BREAKING_AGAINST is empty. Empty uses
+          the pull request's base branch, falling back to the repository default
+        type: string
+        required: false
+        default: ""
+      PATHS:
+        description: Limit every check to these paths, space separated. Empty checks everything buf knows about
+        type: string
+        required: false
+        default: ""
+      FETCH_DEPTH:
+        description: >-
+          Checkout depth. The breaking check reads the base branch out of the
+          local clone, so the default of 0 fetches the whole history; a shallow
+          clone has nothing to compare against
+        type: number
+        required: false
+        default: 0
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        type: string
+        required: false
+        default: '["ubuntu-24.04"]'
+      FAIL_ON_ERROR:
+        description: Whether to fail the workflow on lint findings
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  detect-setup:
+    name: Detect project setup
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+    outputs:
+      has-config: ${{ steps.detect.outputs.has-config }}
+      breaking-against: ${{ steps.detect.outputs.breaking-against }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: ${{ inputs.FETCH_DEPTH }}
+        # No step after checkout runs git against the remote, so the job's
+        # token has no reason to stay readable in .git/config while the
+        # caller's own commands execute.
+        persist-credentials: false
+
+    - name: Detect buf configuration and resolve the comparison target
+      id: detect
+      env:
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+        BREAKING: ${{ inputs.BREAKING }}
+        BREAKING_AGAINST: ${{ inputs.BREAKING_AGAINST }}
+        BREAKING_BRANCH: ${{ inputs.BREAKING_BRANCH }}
+        BASE_REF: ${{ github.base_ref }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        CURRENT_REF: ${{ github.ref_name }}
+      run: |
+        set -uo pipefail
+
+        HAS_CONFIG="false"
+        for f in buf.yaml buf.yml buf.work.yaml buf.work.yml; do
+          if [ -f "$WORKING_DIRECTORY/$f" ]; then
+            HAS_CONFIG="true"
+            echo "Found $WORKING_DIRECTORY/$f"
+            break
+          fi
+        done
+        echo "buf configuration found: $HAS_CONFIG"
+        echo "has-config=${HAS_CONFIG}" >> "$GITHUB_OUTPUT"
+
+        if [ "$HAS_CONFIG" != "true" ] || [ "$BREAKING" != "true" ]; then
+          echo "breaking-against=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # An explicit target wins and is passed through untouched: a caller
+        # comparing against a registry module or a tag has a shape this cannot
+        # derive.
+        if [ -n "$BREAKING_AGAINST" ]; then
+          echo "Comparing against the supplied target: $BREAKING_AGAINST"
+          echo "breaking-against=${BREAKING_AGAINST}" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        BASE="${BREAKING_BRANCH:-${BASE_REF:-$DEFAULT_BRANCH}}"
+        if [ -z "$BASE" ]; then
+          echo "::error::Cannot work out what to compare against: BREAKING_BRANCH is empty, this is not a pull request, and the repository default branch is unknown. Set BREAKING_BRANCH or BREAKING_AGAINST."
+          exit 1
+        fi
+
+        # `origin/` is not decoration. A checkout leaves the base branch as a
+        # remote-tracking ref only - there is no local branch of that name - and
+        # buf's `branch=main` form clones the local repository looking for one,
+        # failing with `exit status 128` and naming nothing. `branch=origin/main`
+        # resolves. Verified against buf 1.47.
+        TARGET=".git#branch=origin/${BASE}"
+        if [ "$WORKING_DIRECTORY" != "." ]; then
+          TARGET="${TARGET},subdir=${WORKING_DIRECTORY}"
+        fi
+
+        if ! git rev-parse --verify --quiet "origin/${BASE}" >/dev/null; then
+          echo "::error::No origin/${BASE} in this clone, so there is nothing to compare against. Check FETCH_DEPTH is 0 (it is by default) and that '${BASE}' is the right branch."
+          exit 1
+        fi
+
+        # Comparing a branch with itself always passes, so the gate would be
+        # green without having compared anything. Said out loud rather than
+        # left to look like a result.
+        if [ "$CURRENT_REF" = "$BASE" ]; then
+          echo "::warning::This run is on '${BASE}', the branch it would compare against, so the breaking check has nothing to detect. It is meant to run on pull requests into ${BASE}."
+        fi
+
+        echo "Comparing against: $TARGET"
+        echo "breaking-against=${TARGET}" >> "$GITHUB_OUTPUT"
+
+  lint:
+    name: Lint
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-config == 'true' }}
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: ${{ inputs.FETCH_DEPTH }}
+        persist-credentials: false
+
+    # setup_only, so each check below is a step somebody can read and gate
+    # rather than a flag on one opaque action. The action is used for the
+    # install because it is the maintained one - buf-setup-action has not been
+    # released since January 2025.
+    - name: Setup buf
+      uses: bufbuild/buf-action@8c6a16e16f12ba20b6470afa9c2ba9b5ba8c97c3 # v1.5.0
+      with:
+        setup_only: true
+        version: ${{ inputs.BUF_VERSION }}
+
+    - name: Check formatting
+      if: ${{ inputs.FORMAT == true }}
+      env:
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+        PATHS: ${{ inputs.PATHS }}
+        FAIL_ON_ERROR: ${{ inputs.FAIL_ON_ERROR }}
+      run: |
+        set -uo pipefail
+
+        ARGS=(format --diff --exit-code "$WORKING_DIRECTORY")
+        for p in $PATHS; do
+          ARGS+=(--path "$p")
+        done
+
+        # --exit-code is what makes this a check rather than a report: without
+        # it `buf format --diff` prints the diff and exits 0, so the step would
+        # pass while showing the work it wanted done.
+        if buf "${ARGS[@]}"; then
+          echo "✅ All proto files are formatted."
+          exit 0
+        fi
+
+        echo "::error::buf format needed. Run 'buf format -w $WORKING_DIRECTORY'."
+        if [ "$FAIL_ON_ERROR" = "true" ]; then
+          exit 1
+        fi
+        echo "⚠️ FAIL_ON_ERROR is false. Workflow will continue."
+
+    - name: Run buf lint
+      if: ${{ inputs.LINT == true }}
+      env:
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+        PATHS: ${{ inputs.PATHS }}
+        FAIL_ON_ERROR: ${{ inputs.FAIL_ON_ERROR }}
+      run: |
+        set -uo pipefail
+
+        ARGS=(lint "$WORKING_DIRECTORY")
+        for p in $PATHS; do
+          ARGS+=(--path "$p")
+        done
+
+        if buf "${ARGS[@]}"; then
+          echo "✅ buf lint is clean."
+          exit 0
+        fi
+
+        echo "::error::buf lint reported findings."
+        if [ "$FAIL_ON_ERROR" = "true" ]; then
+          exit 1
+        fi
+        echo "⚠️ FAIL_ON_ERROR is false. Workflow will continue."
+
+    - name: Run buf breaking
+      if: ${{ inputs.BREAKING == true }}
+      env:
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+        AGAINST: ${{ needs.detect-setup.outputs.breaking-against }}
+        PATHS: ${{ inputs.PATHS }}
+        FAIL_ON_ERROR: ${{ inputs.FAIL_ON_ERROR }}
+      run: |
+        set -uo pipefail
+
+        # Empty here would mean the previous job resolved no target while
+        # BREAKING was on. Running buf without --against compares nothing and
+        # exits 0, which is the shape this gate exists to not have.
+        if [ -z "$AGAINST" ]; then
+          echo "::error::BREAKING is enabled but no comparison target was resolved. Without one buf has nothing to compare against and would report success."
+          exit 1
+        fi
+
+        ARGS=(breaking "$WORKING_DIRECTORY" --against "$AGAINST")
+        for p in $PATHS; do
+          ARGS+=(--path "$p")
+        done
+
+        if buf "${ARGS[@]}"; then
+          echo "✅ No breaking changes against $AGAINST."
+          exit 0
+        fi
+
+        echo "::error::buf breaking reported incompatible changes against $AGAINST."
+        if [ "$FAIL_ON_ERROR" = "true" ]; then
+          exit 1
+        fi
+        echo "⚠️ FAIL_ON_ERROR is false. Workflow will continue."
+
+  no-config:
+    name: No buf configuration found
+    needs: detect-setup
+    if: ${{ needs.detect-setup.outputs.has-config == 'false' }}
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions: {}
+    steps:
+    - name: Skip lint
+      env:
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+      run: |
+        echo "ℹ️ No buf.yaml found in '$WORKING_DIRECTORY'."
+        echo "Set the WORKING_DIRECTORY input to the directory holding the buf configuration."
