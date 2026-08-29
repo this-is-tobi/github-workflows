@@ -1,0 +1,198 @@
+name: Release Go
+
+on:
+  workflow_call:
+    inputs:
+      GO_VERSION:
+        description: Go version to use. Empty reads the version from go.mod, which is the one the module already declares
+        type: string
+        required: false
+        default: ""
+      WORKING_DIRECTORY:
+        description: Working directory holding the module and its GoReleaser configuration
+        type: string
+        required: false
+        default: "."
+      CONFIG:
+        description: Path to the GoReleaser configuration. Empty lets GoReleaser find its own
+        type: string
+        required: false
+        default: ""
+      GORELEASER_VERSION:
+        description: GoReleaser version to install
+        type: string
+        required: false
+        default: "~> v2"
+      DISTRIBUTION:
+        description: GoReleaser distribution to run (goreleaser, goreleaser-pro)
+        type: string
+        required: false
+        default: "goreleaser"
+      SNAPSHOT:
+        description: >-
+          Build without publishing anything. The way to run this on a pull
+          request: it proves the whole release matrix compiles at the moment a
+          change lands rather than at the moment somebody tags
+        type: boolean
+        required: false
+        default: false
+      ARGS:
+        description: Extra arguments appended to the GoReleaser invocation
+        type: string
+        required: false
+        default: ""
+      REGISTRY:
+        description: Container registry to log into before releasing, for a configuration that also publishes images. Empty skips the login
+        type: string
+        required: false
+        default: ""
+      REGISTRY_USERNAME:
+        description: Username for the container registry
+        type: string
+        required: false
+        default: ""
+      ARTIFACT_NAME:
+        description: Artifact name for the built distribution. Empty uploads nothing
+        type: string
+        required: false
+        default: ""
+      FETCH_DEPTH:
+        description: >-
+          Checkout depth. GoReleaser reads tags to work out the version and the
+          changelog, so the default of 0 fetches the whole history; a shallow
+          clone produces a release that believes it is the first one
+        type: number
+        required: false
+        default: 0
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        type: string
+        required: false
+        default: '["ubuntu-24.04"]'
+    secrets:
+      GORELEASER_KEY:
+        description: License key for goreleaser-pro. Not needed for the open-source distribution
+        required: false
+      REGISTRY_PASSWORD:
+        description: Password or token for the container registry named by REGISTRY
+        required: false
+      EXTRA_ENV:
+        description: >-
+          Additional environment for GoReleaser, as KEY=VALUE lines - a
+          Homebrew tap token, a signing key. Passed as a secret because that is
+          what it usually holds
+        required: false
+
+jobs:
+  release:
+    name: ${{ inputs.SNAPSHOT && 'Build snapshot' || 'Release' }}
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      # Creating the release and uploading its assets. A snapshot needs none of
+      # this, and the caller is free to grant only contents: read for one.
+      contents: write
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: ${{ inputs.FETCH_DEPTH }}
+        # Credentials stay: GoReleaser runs `git` against this checkout, and
+        # unlike the lint and test workflows here it may legitimately need to
+        # reach the remote.
+        persist-credentials: true
+
+    # A tag is what the version is derived from, and a checkout that fetched
+    # depth 0 still does not necessarily have the tags in a fork or a re-run.
+    - name: Fetch tags
+      if: ${{ inputs.FETCH_DEPTH == 0 }}
+      run: git fetch --force --tags
+
+    - name: Setup Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: ${{ inputs.GO_VERSION }}
+        go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
+        cache: true
+        cache-dependency-path: ${{ format('{0}/go.sum', inputs.WORKING_DIRECTORY) }}
+
+    - name: Log into the container registry
+      if: ${{ inputs.REGISTRY != '' }}
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      with:
+        registry: ${{ inputs.REGISTRY }}
+        username: ${{ inputs.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+
+    # Before anything is built or published. A configuration that is invalid in
+    # a way GoReleaser only notices at the publish step leaves a half-finished
+    # release behind, which is the one outcome a release workflow must not have.
+    - name: Check the GoReleaser configuration
+      uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+      with:
+        distribution: ${{ inputs.DISTRIBUTION }}
+        version: ${{ inputs.GORELEASER_VERSION }}
+        workdir: ${{ inputs.WORKING_DIRECTORY }}
+        args: check ${{ inputs.CONFIG != '' && format('--config {0}', inputs.CONFIG) || '' }}
+      env:
+        GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+    - name: Assemble the GoReleaser environment
+      id: env
+      env:
+        EXTRA_ENV: ${{ secrets.EXTRA_ENV }}
+      run: |
+        set -uo pipefail
+
+        # Written to the job environment rather than interpolated into a
+        # command line: these are secrets, and an argv is visible to every
+        # other process on the runner.
+        if [ -z "$EXTRA_ENV" ]; then
+          echo "No extra environment supplied."
+          exit 0
+        fi
+
+        COUNT=0
+        while IFS= read -r LINE; do
+          # Blank lines and comments are ignorable; anything else that is not
+          # KEY=VALUE is a mistake worth naming, because a silently dropped
+          # entry surfaces as an authentication failure halfway through a
+          # release.
+          case "$LINE" in
+            ""|"#"*) continue ;;
+          esac
+          if ! printf '%s' "$LINE" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*='; then
+            echo "::error::EXTRA_ENV lines must be KEY=VALUE; found one that is not"
+            exit 1
+          fi
+          # The name is safe to echo, having just been matched against the
+          # pattern above. The value is not, and is never printed.
+          printf '%s\n' "$LINE" >> "$GITHUB_ENV"
+          echo "::add-mask::$(printf '%s' "$LINE" | cut -d= -f2-)"
+          COUNT=$((COUNT + 1))
+        done <<EOF
+        $EXTRA_ENV
+        EOF
+
+        echo "Loaded $COUNT extra environment entries."
+
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+      with:
+        distribution: ${{ inputs.DISTRIBUTION }}
+        version: ${{ inputs.GORELEASER_VERSION }}
+        workdir: ${{ inputs.WORKING_DIRECTORY }}
+        args: >-
+          release --clean
+          ${{ inputs.SNAPSHOT && '--snapshot' || '' }}
+          ${{ inputs.CONFIG != '' && format('--config {0}', inputs.CONFIG) || '' }}
+          ${{ inputs.ARGS }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+    - name: Upload the distribution
+      if: ${{ inputs.ARTIFACT_NAME != '' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.ARTIFACT_NAME }}
+        path: ${{ format('{0}/dist', inputs.WORKING_DIRECTORY) }}
