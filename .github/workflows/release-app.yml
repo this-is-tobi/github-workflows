@@ -138,6 +138,13 @@ on:
       patch-tag:
         description: Patch version tag
         value: ${{ jobs.release.outputs.patch-tag }}
+      tag-name:
+        description: >-
+          The full tag release-please created (e.g. 'v1.2.3'), for a downstream
+          job that needs to name it explicitly rather than reconstruct it -
+          attest-go.yml's TAG input, or 'gh release download'/'gh release
+          upload' against the same release.
+        value: ${{ jobs.release.outputs.tag-name }}
 
 jobs:
   release:
@@ -153,6 +160,7 @@ jobs:
       major-tag: ${{ steps.release.outputs.major }}
       minor-tag: ${{ steps.release.outputs.minor }}
       patch-tag: ${{ steps.release.outputs.patch }}
+      tag-name: ${{ steps.release.outputs.tag_name }}
     env:
       # `secrets` is not available in a step-level `if`, but it is here - so the
       # presence check is hoisted to the job and the step tests `env`.
