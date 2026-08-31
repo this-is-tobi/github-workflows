@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# scan-gitleaks.yml / scan-trivy.yml - 'Build the report link'
+# scan-gitleaks.yml / scan-trivy.yml / scan-govulncheck.yml - 'Build the report link'
 #
-# Both scan workflows point their pull request comment at the same place, so the
-# block is extracted from each and every case runs against both. A fix landing
-# in one and not the other is the failure mode this guards.
+# All three scan workflows point their pull request comment at the same place,
+# so the block is extracted from each and every case runs against all of them.
+# A fix landing in one and not the others is the failure mode this guards.
 
 # shellcheck source=ci/tests/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 GITLEAKS_BLOCK=$(extract_run scan-gitleaks.yml scan-notif 'Build the report link')
 TRIVY_BLOCK=$(extract_run scan-trivy.yml scan-notif 'Build the report link')
+GOVULNCHECK_BLOCK=$(extract_run scan-govulncheck.yml scan-notif 'Build the report link')
 
 link_env() {
   export GITHUB_SECURITY_TAB="true"
@@ -23,7 +24,7 @@ link_env() {
 assert_link() {
   local expected="$1" block
 
-  for block in "$GITLEAKS_BLOCK" "$TRIVY_BLOCK"; do
+  for block in "$GITLEAKS_BLOCK" "$TRIVY_BLOCK" "$GOVULNCHECK_BLOCK"; do
     : >"$GITHUB_OUTPUT"
     run_block "$block"
     assert_status 0

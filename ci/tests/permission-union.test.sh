@@ -23,6 +23,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # Format: <workflow>:<scope> => reason
 declare -A ACCEPTED_EXCESS=(
   ["scan-gitleaks.yml:pull-requests"]="scan-notif posts the leak summary on the pull request; a caller that passes no PR_NUMBER still grants it. Splitting the notifier out would separate a scan from the report it exists to produce."
+  ["scan-govulncheck.yml:pull-requests"]="scan-notif posts the vulnerability summary on the pull request; a caller that passes no PR_NUMBER still grants it. Splitting the notifier out would separate a scan from the report it exists to produce."
   ["scan-trivy.yml:packages"]="images-scan pulls the image to scan; a config-only caller still grants it. Read-only, and the two scans share the SARIF upload plumbing."
   ["scan-trivy.yml:contents"]="both scans read the checked-out tree; only a caller that selects neither scan - a no-op call - grants this unused."
   ["scan-trivy.yml:security-events"]="both scans upload SARIF; only a caller that selects neither scan - a no-op call - grants this unused."
