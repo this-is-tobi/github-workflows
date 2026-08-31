@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.30.0](https://github.com/this-is-tobi/github-workflows/compare/v0.29.0...v0.30.0) (2026-08-31)
+
+
+### Features
+
+* **attest-go:** add SLSA provenance, SBOM and cosign signing for Go releases ([008bb25](https://github.com/this-is-tobi/github-workflows/commit/008bb25db5301a694a049cb6e17c80e118c0ddb1))
+* **release-app:** expose the created release's tag as an output ([75d1746](https://github.com/this-is-tobi/github-workflows/commit/75d1746094fed3834e5908932cedad1aa20f0474))
+* **release-npm:** add SLSA provenance signing support ([f74dbef](https://github.com/this-is-tobi/github-workflows/commit/f74dbef9e96cf54c90d70fa3dec89117669ae7f7))
+
 ## [0.29.0](https://github.com/this-is-tobi/github-workflows/compare/v0.28.0...v0.29.0) (2026-08-31)
 
 
