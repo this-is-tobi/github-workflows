@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.29.0](https://github.com/this-is-tobi/github-workflows/compare/v0.28.0...v0.29.0) (2026-08-31)
+
+
+### Features
+
+* **scan-govulncheck:** scan a Go module for known vulnerabilities ([3d8cf2d](https://github.com/this-is-tobi/github-workflows/commit/3d8cf2dcdbd533f6420a6a26f45510c245bead57))
+
 ## [0.28.0](https://github.com/this-is-tobi/github-workflows/compare/v0.27.0...v0.28.0) (2026-08-29)
 
 
