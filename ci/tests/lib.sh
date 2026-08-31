@@ -201,6 +201,35 @@ case "$args" in
     ;;
   "pr merge"*|"workflow "*)
     ;;
+  # attest-go.yml's asset download/upload. STUB_GH_RELEASE_DOWNLOAD_FAIL
+  # simulates gh's own real behavior for a missing release or a pattern
+  # matching nothing (nonzero exit, nothing written).
+  # STUB_GH_RELEASE_DOWNLOAD_EMPTY simulates the narrower case a workflow
+  # cannot assume away: gh exits 0 but the requested file still is not there.
+  "release download"*)
+    if [ -n "${STUB_GH_RELEASE_DOWNLOAD_FAIL:-}" ]; then
+      printf 'stub gh: release not found\n' >&2
+      exit 1
+    fi
+    if [ "${STUB_GH_RELEASE_DOWNLOAD_EMPTY:-false}" = "true" ]; then
+      exit 0
+    fi
+    # Parsed from $args (captured at the top, untouched) rather than from the
+    # positional parameters: the --jq extraction above has already shifted
+    # those away by the time a case arm runs.
+    dir="."
+    pattern=""
+    if [[ "$args" =~ --dir[[:space:]]+([^[:space:]]+) ]]; then
+      dir="${BASH_REMATCH[1]}"
+    fi
+    if [[ "$args" =~ --pattern[[:space:]]+([^[:space:]]+) ]]; then
+      pattern="${BASH_REMATCH[1]}"
+    fi
+    mkdir -p "$dir"
+    printf 'stub checksum content\n' >"$dir/$pattern"
+    ;;
+  "release upload"*)
+    ;;
   *)
     printf 'stub gh: unhandled invocation: %s\n' "$args" >&2
     exit 127

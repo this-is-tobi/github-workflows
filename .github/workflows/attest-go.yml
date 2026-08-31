@@ -1,0 +1,266 @@
+name: Attest Go release
+
+# Generate and attach security attestations (SLSA provenance and/or SBOM)
+# and/or a cosign keyless signature to an already-published Go release.
+# Designed to run after release-go.yml, once release-go.yml's GoReleaser step
+# has published the GitHub Release.
+#
+# Reads the release back through the GitHub API rather than reusing
+# release-go.yml's local `dist/` - the same reason attest-docker.yml takes a
+# DIGEST instead of a locally-built image: an attestation is only honest about
+# what it names, and what a downstream user actually downloads is the
+# published release asset, not a same-run copy of it. `gh release download`
+# also means this workflow needs no coordination with release-go.yml beyond a
+# `needs:` ordering and the tag - no ARTIFACT_NAME to keep in sync on both
+# sides.
+#
+# Every capability below is anchored to GoReleaser's own checksums file
+# (CHECKSUMS_FILE) rather than to the individual archives, packages and
+# manifests it covers:
+#   - actions/attest and actions/attest-build-provenance both accept a
+#     `subject-checksums` file directly - documented upstream with GoReleaser
+#     by name - so the attestation lists every real asset as a subject
+#     without this workflow re-deriving digests or guessing which files a
+#     release contains.
+#   - SIGN signs that one file with cosign. GoReleaser's own checksum step
+#     already gives every other asset a verifiable link to it
+#     (`sha256sum -c checksums.txt`); signing it once is what the release
+#     footer's existing verification instructions extend into "and this
+#     file's signer is provably CI."
+#
+# SBOM deliberately does NOT scan the published binaries or archives the way
+# attest-docker.yml's Trivy step scans a built image. Two reasons, not one:
+#   1. It cannot, correctly. syft's directory cataloger does not unpack
+#      archives it merely finds on a walk (confirmed empirically: a directory
+#      holding only a `.tar.gz` catalogs zero packages, the same scan against
+#      the unpacked binary catalogs the real count) - "scan the downloaded
+#      release assets" would need per-format extraction (tar, zip, ar+tar for
+#      .deb, cpio for .rpm) with real per-format failure modes, for a result
+#      no more accurate than the option below.
+#   2. It does not need to. A statically linked (CGO_ENABLED=0) Go binary's
+#      dependency set is fully and exactly determined by go.sum - unlike an
+#      OS package layered into a container image, there is no way for
+#      something to be in the binary that go.sum does not name. Scanning the
+#      module source is therefore not an approximation of scanning the
+#      binary; for this artifact class the two agree by construction, and the
+#      source is what syft's own go-module-file cataloger is built to read.
+#
+# That size difference is also why SBOM attestation uses actions/attest
+# directly (its `sbom-path` input) rather than cosign: actions/attest refuses
+# a predicate over 16 MiB, which is exactly why attest-docker.yml cannot use
+# it for an image SBOM ("the transitive module graph of a few dozen
+# statically linked Go... binaries runs to thousands of packages" - see
+# docs/31-attest-docker.md). One Go module's own dependency graph is that
+# same graph, once, not duplicated per platform archive - realistically well
+# under the cap. This is a permanent choice for this workflow, not a
+# size-conditional fallback: it buys a single, consistent verification story
+# (`gh attestation verify`, same as PROVENANCE, visible in the Attestations
+# tab) instead of cosign's separate command and invisibility there. A module
+# graph large enough to exceed 16 MiB is a real limit worth knowing about
+# (see docs/33-attest-go.md), not one this workflow works around.
+#
+# Split from release-go.yml for the same reason attest-docker.yml is split
+# from build-docker.yml: PROVENANCE and SBOM both need `id-token: write` and
+# `attestations: write`, and GitHub validates a reusable workflow's entire
+# declared job graph against what the caller grants - folding this in would
+# force those on every release-go.yml caller, including ones that never
+# attest anything.
+
+on:
+  workflow_call:
+    inputs:
+      TAG:
+        description: >-
+          Release tag to attest (e.g. the 'tag-name' output of
+          release-app.yml, or github.ref_name on a tag-push trigger).
+        required: true
+        type: string
+      WORKING_DIRECTORY:
+        description: >-
+          Directory holding the Go module (go.mod/go.sum) to catalog for
+          SBOM. Only used when SBOM is true
+        required: false
+        type: string
+        default: "."
+      CHECKSUMS_FILE:
+        description: >-
+          Name of the checksum file release-go.yml's GoReleaser configuration
+          produced (its 'checksum' block's name_template), as a release asset
+        required: false
+        type: string
+        default: checksums.txt
+      PROVENANCE:
+        description: >-
+          Generate GitHub's standard SLSA build provenance attestation,
+          covering every asset listed in CHECKSUMS_FILE (records the calling
+          workflow, repository and commit).
+        required: false
+        default: false
+        type: boolean
+      SBOM:
+        description: >-
+          Generate an SBOM (Software Bill of Materials) from the Go module at
+          WORKING_DIRECTORY and attest it, bound to CHECKSUMS_FILE. Also
+          uploaded to the release as a plain file for direct inspection.
+        required: false
+        default: false
+        type: boolean
+      SIGN:
+        description: Sign CHECKSUMS_FILE with cosign keyless signing
+        required: false
+        default: false
+        type: boolean
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+
+jobs:
+  attest:
+    name: Attest release
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      # gh release download (read) and gh release upload (write, the SBOM
+      # file and the cosign signature bundle - the only way either survives
+      # past this job).
+      contents: write
+      # OIDC for cosign and for actions/attest*.
+      id-token: write
+      attestations: write
+    steps:
+    - name: Validate inputs
+      env:
+        TAG: ${{ inputs.TAG }}
+        PROVENANCE: ${{ inputs.PROVENANCE }}
+        SBOM: ${{ inputs.SBOM }}
+        SIGN: ${{ inputs.SIGN }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "$TAG" ]; then
+          echo "::error::TAG must name the release to attest - e.g. the 'tag-name' output of release-app.yml, or github.ref_name on a tag-push trigger."
+          exit 1
+        fi
+
+        # Would otherwise download the checksums file and do nothing with it -
+        # green, and indistinguishable from a run that attested everything.
+        if [ "$PROVENANCE" != "true" ] && [ "$SBOM" != "true" ] && [ "$SIGN" != "true" ]; then
+          echo "::error::Nothing to attest: PROVENANCE, SBOM and SIGN are all false. Enable PROVENANCE for a SLSA build provenance attestation, SBOM for a dependency inventory, SIGN for a cosign keyless signature over the checksums file, or any combination."
+          exit 1
+        fi
+
+    # Only for SBOM, and deliberately before the checksums file is
+    # downloaded below: actions/checkout's default clean step removes
+    # untracked files from the workspace, which would delete an
+    # already-downloaded release-assets/ if this ran after it.
+    - name: Checks-out repository
+      if: ${{ inputs.SBOM }}
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ inputs.TAG }}
+        persist-credentials: false
+
+    # Every capability reads this file (as the subject list, or as the blob to
+    # sign), so its absence is diagnosed once, here, with one clear message -
+    # rather than as three different opaque failures depending on which
+    # capability happened to be enabled.
+    #
+    # GH_REPO is set explicitly, unlike gh calls elsewhere in this
+    # repository: those always run after a checkout, so gh's own repo
+    # auto-detection (reading the git remote) already knows where it is; a
+    # SIGN/PROVENANCE-only run here never checks anything out at all.
+    - name: Download the checksums file
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        TAG: ${{ inputs.TAG }}
+        CHECKSUMS_FILE: ${{ inputs.CHECKSUMS_FILE }}
+      run: |
+        set -euo pipefail
+
+        mkdir -p release-assets
+        gh release download "$TAG" --pattern "$CHECKSUMS_FILE" --dir release-assets --clobber
+
+        if [ ! -f "release-assets/$CHECKSUMS_FILE" ]; then
+          echo "::error::'$CHECKSUMS_FILE' is not an asset of release '$TAG'. Confirm CHECKSUMS_FILE names the file GoReleaser's 'checksum' block produced (default 'checksums.txt')."
+          exit 1
+        fi
+
+    - name: Install Cosign
+      if: ${{ inputs.SIGN }}
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+    - name: Sign the checksums file
+      if: ${{ inputs.SIGN }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        TAG: ${{ inputs.TAG }}
+        CHECKSUMS_FILE: ${{ inputs.CHECKSUMS_FILE }}
+      run: |
+        set -euo pipefail
+
+        cosign sign-blob --yes --bundle "$CHECKSUMS_FILE.cosign.bundle" "release-assets/$CHECKSUMS_FILE"
+        gh release upload "$TAG" "$CHECKSUMS_FILE.cosign.bundle" --clobber
+
+    # dir-mode, reading go.mod/go.sum directly - see the file header for why
+    # this is scanned instead of the published binaries. Scans WORKING_DIRECTORY
+    # as-is: a repository with more than one Go module under it (a monorepo, a
+    # plugin architecture with independently-built modules) gets an inventory
+    # of everything syft's catalogers find there, not only the module this
+    # release's binaries were built from. Narrow WORKING_DIRECTORY, or accept
+    # the wider inventory - see docs/33-attest-go.md.
+    - name: Generate SBOM
+      if: ${{ inputs.SBOM }}
+      uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      with:
+        path: ${{ inputs.WORKING_DIRECTORY }}
+        format: spdx-json
+        output-file: sbom.spdx.json
+        # Both default true and neither wanted: this is attested and uploaded
+        # explicitly below instead, the same "generate, then this workflow
+        # decides how it is attested" shape attest-docker.yml uses for Trivy's
+        # output.
+        upload-artifact: false
+        upload-release-assets: false
+
+    # actions/attest directly, not attest-build-provenance: 'sbom-path' wraps
+    # a predicate this workflow already has rather than generating one, which
+    # is all attest-build-provenance's SLSA-specific logic would add. See the
+    # file header for why this can use actions/attest at all, unlike
+    # attest-docker.yml's image SBOM.
+    - name: Attest SBOM
+      if: ${{ inputs.SBOM }}
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+      with:
+        subject-checksums: release-assets/${{ inputs.CHECKSUMS_FILE }}
+        sbom-path: sbom.spdx.json
+
+    # The attestation is the durable, verifiable record; the plain file
+    # alongside it is for someone who wants to read it without extracting it
+    # from the attestation bundle first.
+    - name: Upload the SBOM as a release asset
+      if: ${{ inputs.SBOM }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        TAG: ${{ inputs.TAG }}
+      run: |
+        set -euo pipefail
+
+        gh release upload "$TAG" sbom.spdx.json --clobber
+
+    # Deliberately not gated on the SBOM/SIGN steps succeeding. Provenance is
+    # the attestation that establishes where and from what the release was
+    # built, so a problem generating or attaching an SBOM, or signing the
+    # checksums file, must never be the reason a release ships without it.
+    - name: Attest build provenance
+      if: ${{ !cancelled() && inputs.PROVENANCE }}
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      with:
+        subject-checksums: release-assets/${{ inputs.CHECKSUMS_FILE }}
+        # No create-storage-record here, unlike attest-docker.yml/attest-helm.yml:
+        # the input's own description ties it to push-to-registry, which has
+        # no meaning for a file subject - there is no registry for it to
+        # duplicate a record from or into.
