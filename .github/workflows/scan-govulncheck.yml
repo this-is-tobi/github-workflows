@@ -1,0 +1,265 @@
+name: Govulncheck scan
+
+on:
+  workflow_call:
+    inputs:
+      GO_VERSION:
+        description: Go version to use. Empty reads the version from go.mod, which is the one the module already declares
+        type: string
+        required: false
+        default: ""
+      WORKING_DIRECTORY:
+        description: Working directory holding the module to scan
+        type: string
+        required: false
+        default: "."
+      PACKAGES:
+        description: Package pattern to scan
+        type: string
+        required: false
+        default: "./..."
+      GOVULNCHECK_VERSION:
+        description: >-
+          govulncheck version to install. Exact, not a range: this is
+          third-party code executed in the job, and 'latest' would let a new
+          upstream release change what runs here without any change on our
+          side
+        type: string
+        required: false
+        # renovate: datasource=go depName=golang.org/x/vuln/cmd/govulncheck
+        default: v1.7.0
+      FORMAT:
+        description: Format of the report (text, json, sarif)
+        required: false
+        type: string
+        default: text
+      FAIL_ON_VULNS:
+        description: Whether to fail the workflow when a known vulnerability is found
+        required: false
+        type: boolean
+        default: true
+      PR_NUMBER:
+        description: Number of the pull request to post the scan summary comment on
+        required: false
+        type: string
+      GITHUB_SECURITY_TAB:
+        description: Whether to link to GitHub Security Tab in the PR comment
+        required: false
+        default: false
+        type: boolean
+      CATEGORY:
+        description: >-
+          Code scanning category for the SARIF upload. Set a distinct value
+          per module when several callers scan different modules of the same
+          repository (e.g. one leg per plugin) - uploads sharing a category
+          replace one another, leaving only whichever finished last
+        required: false
+        type: string
+      CACHE:
+        description: Whether to cache the module and build caches
+        type: boolean
+        required: false
+        default: true
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+
+jobs:
+  vuln-scan:
+    name: Scan for known vulnerabilities
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+      security-events: write
+    outputs:
+      vulns: ${{ steps.scan.outputs.vulns }}
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Setup Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: ${{ inputs.GO_VERSION }}
+        go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
+        cache: ${{ inputs.CACHE }}
+        cache-dependency-path: ${{ format('{0}/go.sum', inputs.WORKING_DIRECTORY) }}
+
+    # govulncheck reports only vulnerabilities in code actually reachable from
+    # the scanned packages - not merely present in go.sum - which is what
+    # keeps a false positive here rare enough that FAIL_ON_VULNS defaults on.
+    - name: Run govulncheck
+      id: scan
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
+      env:
+        GOVULNCHECK_VERSION: ${{ inputs.GOVULNCHECK_VERSION }}
+        PACKAGES: ${{ inputs.PACKAGES }}
+        FORMAT: ${{ inputs.FORMAT }}
+      # Exit code 3 means vulnerabilities were found, anything else above 0 is
+      # a scan error (a bad pattern, a network failure reaching the database).
+      # Findings are reported but only fail the workflow in the last step, so
+      # the report upload and the PR comment always run first.
+      run: |
+        set -uo pipefail
+
+        EXIT_CODE=0
+        # shellcheck disable=SC2086
+        go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" \
+          -format "${FORMAT}" \
+          $PACKAGES > "govulncheck-results.${FORMAT}" || EXIT_CODE=$?
+
+        if [ "${EXIT_CODE}" -eq 0 ]; then
+          echo "vulns=false" >> "$GITHUB_OUTPUT"
+          echo ":white_check_mark: govulncheck found no known vulnerabilities reachable from the scanned packages." >> "$GITHUB_STEP_SUMMARY"
+        elif [ "${EXIT_CODE}" -eq 3 ]; then
+          echo "vulns=true" >> "$GITHUB_OUTPUT"
+          echo ":rotating_light: govulncheck found a known vulnerability reachable from the scanned packages, see the scan report for details." >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo ":warning: The govulncheck scan did not complete successfully (exit code ${EXIT_CODE})." >> "$GITHUB_STEP_SUMMARY"
+          cat "govulncheck-results.${FORMAT}" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          exit "${EXIT_CODE}"
+        fi
+
+    # Only for text: json and sarif are meant for tooling, not for a person
+    # reading the run, and sarif's own findings already surface through the
+    # Security tab once uploaded below.
+    - name: Print govulncheck results
+      id: report-text
+      if: ${{ !cancelled() && inputs.FORMAT == 'text' && steps.scan.outputs.vulns == 'true' }}
+      run: |
+        # GITHUB_STEP_SUMMARY is capped at 1 MiB and a write over the cap is
+        # dropped whole, not trimmed - budget leaves room for the fences.
+        BUDGET=900000
+        REPORT_FILE="govulncheck-results.text"
+        {
+          echo ""
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+        if [ "$(wc -c < "$REPORT_FILE")" -gt "$BUDGET" ]; then
+          head -c "$BUDGET" "$REPORT_FILE" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ''
+            echo '```'
+            echo '> [!NOTE]'
+            echo '> Truncated to fit the 1 MiB step summary limit - the complete'
+            echo '> report is attached to this run as an artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "truncated=true" >> "$GITHUB_OUTPUT"
+        else
+          cat "$REPORT_FILE" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Upload the complete govulncheck report
+      if: ${{ !cancelled() && steps.report-text.outputs.truncated == 'true' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: govulncheck-report${{ inputs.CATEGORY != '' && format('-{0}', inputs.CATEGORY) || '' }}
+        path: govulncheck-results.text
+        retention-days: 7
+      continue-on-error: true
+
+    - name: Upload govulncheck scan results to GitHub Security tab
+      id: upload
+      uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+      if: ${{ !cancelled() && inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' }}
+      with:
+        sarif_file: govulncheck-results.sarif
+        category: ${{ inputs.CATEGORY }}
+      continue-on-error: true
+
+    - name: Warn about error
+      if: ${{ steps.upload.outcome == 'failure' }}
+      run: |
+        echo ":warning: The govulncheck scan report was not successfully uploaded to the Github Security Panel." >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Fail on detected vulnerabilities
+      if: ${{ inputs.FAIL_ON_VULNS && steps.scan.outputs.vulns == 'true' }}
+      run: |
+        echo "::error::govulncheck found a known vulnerability reachable from the scanned packages."
+        exit 1
+
+  scan-notif:
+    name: Notify users
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      pull-requests: write
+    # The vulns output is only set when the scan completed (with or without
+    # findings) - skip the comment when the scan itself errored
+    if: ${{ always() && inputs.PR_NUMBER != '' && needs.vuln-scan.outputs.vulns != '' }}
+    needs:
+    - vuln-scan
+    steps:
+    - name: Build the report link
+      id: report
+      env:
+        GITHUB_SECURITY_TAB: ${{ inputs.GITHUB_SECURITY_TAB }}
+        FORMAT: ${{ inputs.FORMAT }}
+        REPOSITORY: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+        REF: ${{ github.ref }}
+      # Code scanning only finds the alerts under the ref the SARIF was uploaded
+      # against, and that ref is `github.ref` - the same one for every job of
+      # this run. A pull request lands under `refs/pull/<N>/merge`, which the
+      # search matches as `pr:<N>`; anything pushed lands under
+      # `refs/heads/<branch>`, which it matches as `branch:<name>`. Deriving the
+      # filter from the ref instead of always assuming a pull request is what
+      # keeps the link honest for a caller that scans on `push` and passes
+      # PR_NUMBER by hand - there the alerts are on a branch and `pr:<N>` finds
+      # nothing.
+      run: |
+        if [ "${GITHUB_SECURITY_TAB}" != "true" ] || [ "${FORMAT}" != "sarif" ]; then
+          echo "link=[the GitHub Workflow Summary](https://github.com/${REPOSITORY}/actions/runs/${RUN_ID})" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # Percent-encode everything outside the unreserved set: a branch name may
+        # hold `#`, `&` or `+`, each of which would otherwise cut the query short
+        # or decode back to a different name. Iterating under LC_ALL=C walks
+        # bytes, so a non-ASCII name encodes to the UTF-8 sequence the search
+        # expects rather than to a codepoint it cannot read.
+        urlencode() {
+          local LC_ALL=C string="$1" index char encoded=""
+          for (( index = 0; index < ${#string}; index++ )); do
+            char="${string:index:1}"
+            case "${char}" in
+              [a-zA-Z0-9.~_-]) encoded+="${char}" ;;
+              *) printf -v char '%%%02X' "'${char}"; encoded+="${char}" ;;
+            esac
+          done
+          printf '%s' "${encoded}"
+        }
+
+        case "${REF}" in
+          refs/pull/*/merge | refs/pull/*/head)
+            PR_REF="${REF#refs/pull/}"
+            FILTER="+pr%3A$(urlencode "${PR_REF%%/*}")"
+            ;;
+          refs/heads/*)
+            FILTER="+branch%3A$(urlencode "${REF#refs/heads/}")"
+            ;;
+          # A tag, or a ref shape that is none of the above: no ref filter beats
+          # a wrong one, since the tab then lists every open alert rather than
+          # none of them.
+          *)
+            FILTER=""
+            ;;
+        esac
+
+        echo "link=[the GitHub Security Tab](https://github.com/${REPOSITORY}/security/code-scanning?query=is%3Aopen${FILTER})" >> "$GITHUB_OUTPUT"
+
+    - name: Comment PR
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+      with:
+        message: |
+          🤖 Hey !
+
+          ${{ needs.vuln-scan.outputs.vulns == 'true' && '🚨 govulncheck found a known vulnerability reachable from the scanned packages.' || '✅ govulncheck found no known vulnerabilities.' }} The scan report for the current pull request is available in ${{ steps.report.outputs.link }}.
+        header: govulncheck-scan
+        # Not `number`: that one is only a fallback the event payload overrides,
+        # and the caller naming a pull request has to be what decides.
+        number_force: ${{ inputs.PR_NUMBER }}

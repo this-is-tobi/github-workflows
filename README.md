@@ -71,6 +71,7 @@ For more details, see:
 - [Run SonarQube analysis and quality gate check (`scan-sonarqube.yml`)](./.github/workflows/scan-sonarqube.yml)
 - [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](./.github/workflows/scan-trivy.yml)
 - [Scan git history for leaked secrets using gitleaks (`scan-gitleaks.yml`)](./.github/workflows/scan-gitleaks.yml)
+- [Scan a Go module for known vulnerabilities using govulncheck (`scan-govulncheck.yml`)](./.github/workflows/scan-govulncheck.yml)
 
 **Release**
 
@@ -119,6 +120,7 @@ For more details, see:
 - [Scan SonarQube](./docs/40-scan-sonarqube.md) *- Code quality analysis with SonarQube*
 - [Scan Trivy](./docs/41-scan-trivy.md) *- Vulnerability scanning for images and configs*
 - [Scan Gitleaks](./docs/42-scan-gitleaks.md) *- Secret scanning across the whole git history*
+- [Scan Govulncheck](./docs/43-scan-govulncheck.md) *- Known-vulnerability scanning for Go modules*
 - [Release App](./docs/50-release-app.md) *- Application releases using release-please*
 - [Release Helm](./docs/51-release-helm.md) *- Helm chart releases with chart-releaser*
 - [Release Helm (local)](./docs/52-release-helm-local.md) *- Monorepo Helm chart releases without chart-releaser*
