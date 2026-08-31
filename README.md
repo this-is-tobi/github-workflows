@@ -65,6 +65,7 @@ For more details, see:
 - [Compile a Go project across its release matrix with GoReleaser (`build-go.yml`)](./.github/workflows/build-go.yml)
 - [Generate and attach security attestations to a Docker image (`attest-docker.yml`)](./.github/workflows/attest-docker.yml)
 - [Sign and attest published Helm charts (`attest-helm.yml`)](./.github/workflows/attest-helm.yml)
+- [Generate and attach security attestations to a Go release (`attest-go.yml`)](./.github/workflows/attest-go.yml)
 
 **Scan**
 
@@ -117,6 +118,7 @@ For more details, see:
 - [Build Docker](./docs/30-build-docker.md) *- Docker image building and registry pushing*
 - [Attest Docker](./docs/31-attest-docker.md) *- SLSA provenance and SBOM attestations for Docker images*
 - [Build Go](./docs/32-build-go.md) *- Go cross-compilation and packaging with GoReleaser, publishing nothing*
+- [Attest Go](./docs/33-attest-go.md) *- SLSA provenance, SBOM and cosign signing for a published Go release*
 - [Scan SonarQube](./docs/40-scan-sonarqube.md) *- Code quality analysis with SonarQube*
 - [Scan Trivy](./docs/41-scan-trivy.md) *- Vulnerability scanning for images and configs*
 - [Scan Gitleaks](./docs/42-scan-gitleaks.md) *- Secret scanning across the whole git history*

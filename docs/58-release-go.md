@@ -102,6 +102,28 @@ jobs:
 
 What **not** to reach for here is `build-go.yml` with `PACKAGE: true` feeding `RELEASE_ARTIFACT_NAMES`. It looks like the same shape as the [CLI-as-a-release-asset pattern](./90-global-workflows-examples.md), and it produces archives named for a snapshot version — `myapp_0.0.1-next_linux_amd64.tar.gz` — because `--snapshot` ignores the tag it would need. Those belong on a pull request, not on a release.
 
+## Attesting what was released
+
+This workflow has no built-in attestation path — it never declares a nested call requesting `id-token`/`attestations`, so a caller that only wants binaries published never needs to grant them. SLSA provenance, an SBOM and cosign signing are entirely [`attest-go.yml`](./33-attest-go.md)'s responsibility, composed as a second job that reads the release this workflow just published back through the GitHub API rather than through any output of this one:
+
+```yaml
+attest:
+  uses: this-is-tobi/github-workflows/.github/workflows/attest-go.yml@v0
+  needs:
+  - release
+  - binaries
+  permissions:
+    contents: write
+    id-token: write
+    attestations: write
+  with:
+    TAG: ${{ needs.release.outputs.tag-name }}
+    PROVENANCE: true
+    SBOM: true
+```
+
+See [`attest-go.yml`](./33-attest-go.md) for the full input list and how `TAG` is supplied on a plain tag-push trigger instead.
+
 ## Notes
 
 - **The configuration is checked before anything is built.** A configuration invalid in a way GoReleaser only notices at the publish step leaves a half-finished release behind, which is the one outcome a release workflow must not have.

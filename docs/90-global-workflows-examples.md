@@ -1474,6 +1474,20 @@ jobs:
     secrets:
       APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+
+  attest:
+    uses: this-is-tobi/github-workflows/.github/workflows/attest-go.yml@v0
+    needs:
+    - release
+    - binaries
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      TAG: ${{ needs.release.outputs.tag-name }}
+      PROVENANCE: true
+      SBOM: true
 ```
 
 > **Two things must not both create the release.** release-please does, so `.goreleaser.yaml` must leave it alone: [`release.mode`](https://goreleaser.com/customization/release/) defaults to `keep-existing`, which is correct here, and `release.draft: true` is worth dropping — the release is already published by the time GoReleaser sees it. See [Composing with `release-app`](./58-release-go.md#composing-with-release-app).
@@ -1481,3 +1495,5 @@ jobs:
 > **`binaries` is chained with `needs:`, not with `on: release: published`.** Both work, but the trigger only fires if release-please itself ran under App or PAT credentials, since [`GITHUB_TOKEN` cannot trigger workflows](./05-authentication.md#why-the-app-mode-exists). The `needs:` form does not care, and `release-go`'s own tag fetch is what picks up the tag release-please created moments earlier in the same run.
 >
 > **What not to reach for** is the [CLI-as-a-release-asset pattern](#cd-pipeline--cli-distributed-as-a-release-asset) above, feeding `build-go` into `RELEASE_ARTIFACT_NAMES`. It is the right shape for a bundled JS CLI and the wrong one here: `--snapshot` stamps a derived version and ignores `GORELEASER_CURRENT_TAG`, so the assets would be published as `myapp_0.0.1-next_linux_amd64.tar.gz`.
+>
+> **`attest` needs both `release` and `binaries`.** It reads `tag-name` from the first and waits on the second to know the archives it is about to attest actually exist yet — `release-go.yml` exposes no output of its own to chain from. See [`release-go.yml` → Attesting what was released](./58-release-go.md#attesting-what-was-released).
