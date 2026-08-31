@@ -48,6 +48,7 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 | major-tag       | Major version tag (e.g., `1`)             |
 | minor-tag       | Minor version tag (e.g., `2`)             |
 | patch-tag       | Patch version tag (e.g., `3`)             |
+| tag-name        | The full tag that was created (e.g., `v1.2.3`) - for a downstream job that needs to name the release explicitly rather than reconstruct the tag prefix, such as [`attest-go.yml`](./33-attest-go.md)'s `TAG` input |
 
 ## Permissions
 
