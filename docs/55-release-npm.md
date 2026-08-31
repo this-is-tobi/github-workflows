@@ -19,6 +19,7 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 | PUBLISH_COMMAND   | string  | Custom publish command (overrides auto-detected publish). Runs in `WORKING_DIRECTORY`         | No       | -                            |
 | TAG               | string  | NPM dist-tag for the published version (e.g. `latest`, `beta`, `next`)                        | No       | `latest`                     |
 | ACCESS            | string  | Package access level (`public` or `restricted`)                                               | No       | `public`                     |
+| PROVENANCE        | boolean | Generate a signed SLSA provenance attestation for the published package. Requires `ACCESS: public` — see [Provenance](#provenance) below | No       | false                        |
 | DRY_RUN           | boolean | Perform a dry-run publish (validate without uploading)                                        | No       | false                        |
 | FAIL_ON_ERROR     | boolean | Whether to fail the workflow on publish errors                                                | No       | true                         |
 | RUNS_ON           | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)      | No       | `["ubuntu-24.04"]`           |
@@ -34,13 +35,13 @@ Supports Node.js and Bun runtimes, all major package managers (npm, yarn, pnpm, 
 | Scope    | Access | Description                                                 |
 | -------- | ------ | ----------------------------------------------------------- |
 | contents | read   | Check out the repository                                    |
-| id-token | write  | Mint the OIDC token used for trusted publishing (npm, pnpm) |
+| id-token | write  | Mint the OIDC token used for trusted publishing (npm, pnpm) and for signing provenance attestations (npm, yarn, pnpm) |
 
 ## Notes
 
 - Authentication uses the `NODE_AUTH_TOKEN` environment variable, set from `NPM_TOKEN`, which is the standard mechanism understood by npm, yarn, pnpm and bun.
 - For the **Node.js** runtime, `actions/setup-node` creates the `.npmrc` auth entry automatically based on `REGISTRY_URL` and `SCOPE`.
-- For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries. Bun is set up whenever `PACKAGE_MANAGER: bun` is used, even with `RUNTIME: node`. Bun has no OIDC/trusted-publishing support ([oven-sh/bun#24855](https://github.com/oven-sh/bun/issues/24855)), so when `NPM_TOKEN` is omitted the publish step transparently falls back to the npm CLI, which handles the OIDC exchange — install and build still run with bun.
+- For the **Bun** runtime, the registry URL and auth token are written to the user-level `.npmrc` manually, since `actions/setup-node` is not invoked — this covers both the default registry and scoped registries. Bun is set up whenever `PACKAGE_MANAGER: bun` is used, even with `RUNTIME: node`. Bun has no OIDC/trusted-publishing support ([oven-sh/bun#22423](https://github.com/oven-sh/bun/issues/22423)), so when `NPM_TOKEN` is omitted the publish step transparently falls back to the npm CLI, which handles the OIDC exchange — install and build still run with bun.
 - **Auto-detection** (à la [`@antfu/ni`](https://github.com/antfu-collective/ni)): when `PACKAGE_MANAGER`/`RUNTIME` are empty, the workflow walks upward from `WORKING_DIRECTORY` to the checkout root, checking at each level for the corepack `packageManager` field in `package.json` first, then lock files (`bun.lockb`/`bun.lock` → bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `package-lock.json` → npm), falling back to npm if nothing is found up to the root. This means a job scoped to a monorepo package (`WORKING_DIRECTORY: packages/my-lib`) still detects the package manager from the workspace root's lock file. The runtime resolves to Bun when the detected package manager is bun, else Node.js. Set the inputs explicitly to override. The detected package manager also selects the matching publish step.
 - **pnpm/yarn** are set up automatically via Corepack when the detected package manager is `pnpm` or `yarn`; no manual install is needed, and the version pinned in `package.json`'s `packageManager` field (if any) is used. Yarn Berry (`.yarnrc.yml`) installs with `--immutable`, classic with `--frozen-lockfile`.
 - The `yarn` publish step uses `yarn npm publish` (Yarn Berry / v2+).
@@ -60,9 +61,27 @@ npm and pnpm support [trusted publishing](https://docs.npmjs.com/trusted-publish
 2. Grant `id-token: write` on the calling job (in your `cd.yml`) — this workflow already requests it internally, but both are required since permissions must be explicit at every level of a reusable-workflow call chain.
 3. Omit the `NPM_TOKEN` secret, or keep passing it as a fallback — npm's CLI (≥ 11.5.1, bundled with Node.js 24+) tries OIDC first and only falls back to a static token if OIDC isn't available.
 4. pnpm's OIDC support is newer and has had regressions in some releases (see [pnpm#11513](https://github.com/pnpm/pnpm/issues/11513)) — pin a known-good `packageManager` version and verify a real publish before relying on it exclusively.
-5. bun has no OIDC support ([oven-sh/bun#24855](https://github.com/oven-sh/bun/issues/24855)): with `PACKAGE_MANAGER: bun` and no `NPM_TOKEN`, this workflow publishes through the npm CLI instead of `bun publish` — no caller change needed beyond dropping the secret.
+5. bun has no OIDC support ([oven-sh/bun#22423](https://github.com/oven-sh/bun/issues/22423)): with `PACKAGE_MANAGER: bun` and no `NPM_TOKEN`, this workflow publishes through the npm CLI instead of `bun publish` — no caller change needed beyond dropping the secret.
 
 If you switch an existing package from a token-based setup to trusted publishing, remember to update the trusted publisher's registered workflow path whenever you change which file is the actual entry point (e.g. after moving CI/CD to reusable workflows).
+
+### Provenance
+
+`PROVENANCE: true` requests a signed [SLSA provenance attestation](https://docs.npmjs.com/generating-provenance-statements/) for the published package — a verifiable, publicly-viewable record of which workflow, repository and commit produced it. Support and the exact mechanism differ per package manager, all riding on the same `id-token: write` OIDC token this job already requests:
+
+| Package manager | Mechanism                                                          | Notes                                                                                                             |
+| ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| npm               | `--provenance` (native since npm 9.5.0; this workflow's bundled Node.js 24 is well past that) | Automatic under trusted publishing even without the flag — passing it explicitly is harmless either way and is what this workflow does |
+| yarn              | `--provenance` on `yarn npm publish` (Yarn Berry / v2+; needs ≥ 4.9.0) | Not available on Yarn Classic (v1) — this workflow's yarn publish step already targets Berry only, see the note above |
+| pnpm              | `--provenance` on `pnpm publish`                                    | Newer than npm's, and pnpm's own OIDC machinery has had real regressions before (see point 4 above) — verify a real publish rather than assuming parity with npm |
+| bun               | Not supported by `bun publish` itself ([oven-sh/bun#22423](https://github.com/oven-sh/bun/issues/22423)) | With no `NPM_TOKEN`, this workflow already routes bun projects through the npm CLI instead (point 5 above), which does support it — `PROVENANCE: true` with `PACKAGE_MANAGER: bun` and an `NPM_TOKEN` supplied fails validation up front rather than silently publishing without it |
+
+Two requirements apply regardless of package manager, both enforced by the registry rather than by any of these clients:
+
+- **`ACCESS` must be `public`.** A provenance attestation is public, verifiable-by-anyone metadata; the registry refuses to attach one to a restricted package ("Can't generate provenance for new or private package, you must set access to public"). This workflow validates the combination up front and fails naming the input to change, rather than letting the publish step fail with the registry's own less specific error.
+- **`package.json`'s `repository` field must match** (case-sensitively) the repository this workflow is publishing from. This is the package's own responsibility, not something this workflow can validate on a caller's behalf.
+
+`PROVENANCE` only applies to the auto-detected publish steps — like `TAG`, `ACCESS` and `DRY_RUN`, it has no effect when `PUBLISH_COMMAND` overrides them.
 
 ## Examples
 
@@ -96,6 +115,22 @@ jobs:
       id-token: write
     with:
       WORKING_DIRECTORY: .
+```
+
+### Provenance
+
+Combines with trusted publishing naturally (both ride on the same OIDC token), but also works with a static `NPM_TOKEN` — see [Provenance](#provenance) above for what differs per package manager.
+
+```yaml
+jobs:
+  release-npm:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-npm.yml@v0
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      WORKING_DIRECTORY: .
+      PROVENANCE: true
 ```
 
 ### Monorepo: build shared deps then publish
