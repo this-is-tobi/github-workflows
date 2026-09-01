@@ -148,8 +148,31 @@ jobs:
 
         # `go test ./...` over a module with no _test.go files exits 0 and
         # tests nothing, which is indistinguishable from a passing suite.
+        #
+        # **No pipeline here, and that is the whole point.** This was
+        #
+        #   find . -name '*_test.go' -not -path './vendor/*' | head -1 | grep -q .
+        #
+        # which silently reported "no tests" for large modules and skipped
+        # their entire suite. `head -1` closes the pipe after the first match;
+        # a `find` still walking the tree then dies of SIGPIPE with status 141,
+        # and `set -o pipefail` above makes that the status of the whole
+        # pipeline even though `head` and `grep` both succeeded. The `if` reads
+        # false and the tests never run.
+        #
+        # The failure is size-dependent, which is what made it survive: a small
+        # module's `find` finishes before `head` exits and detection works, so
+        # every small caller looked fine while a repository with hundreds of
+        # test files had its suite skipped on every run - the better tested the
+        # module, the more reliably its tests were dropped. It is also silent
+        # by construction, because "no tests found" is a legitimate outcome
+        # this workflow reports as a success.
+        #
+        # `-print -quit` makes find stop itself at the first match, so nothing
+        # is left writing into a closed pipe and there is no pipeline for
+        # pipefail to judge. Supported by GNU and BSD find alike.
         HAS_TESTS="false"
-        if find . -name '*_test.go' -not -path './vendor/*' | head -1 | grep -q .; then
+        if [ -n "$(find . -name '*_test.go' -not -path './vendor/*' -print -quit)" ]; then
           HAS_TESTS="true"
         fi
         echo "Test files found: $HAS_TESTS"
