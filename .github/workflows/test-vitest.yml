@@ -210,9 +210,25 @@ jobs:
           } >> "$GITHUB_OUTPUT"
         fi
 
-        # Check for test files
+        # Check for test files.
+        #
+        # No pipeline, for the reason spelled out at length in test-go.yml's
+        # own detection: `... | head -1 | grep -q .` reports no tests for any
+        # tree large enough that find is still walking it when head closes the
+        # pipe, because find then dies of SIGPIPE and pipefail promotes that to
+        # the pipeline's status. The whole suite is skipped, and skipping is a
+        # reported success rather than a failure, so nothing says so.
+        #
+        # A JS project is squarely in the size range where that bites: this
+        # walks node_modules unless something stops it, and -quit stops it at
+        # the first match rather than after the whole tree.
+        #
+        # The parentheses are load-bearing. `-o` binds looser than the implicit
+        # -a, so without them `-print -quit` would attach to the last -name
+        # alone and the other five patterns would print nothing.
         HAS_TESTS="false"
-        if find . -name "*.test.js" -o -name "*.test.ts" -o -name "*.test.mjs" -o -name "*.spec.js" -o -name "*.spec.ts" -o -name "*.spec.mjs" | head -1 | grep -q .; then
+        if [ -n "$(find . \( -name '*.test.js' -o -name '*.test.ts' -o -name '*.test.mjs' \
+          -o -name '*.spec.js' -o -name '*.spec.ts' -o -name '*.spec.mjs' \) -print -quit)" ]; then
           HAS_TESTS="true"
         elif [ -d "test" ] || [ -d "tests" ] || [ -d "__tests__" ]; then
           HAS_TESTS="true"
