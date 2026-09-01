@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.30.1](https://github.com/this-is-tobi/github-workflows/compare/v0.30.0...v0.30.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **lint-commits:** generate the commitlint config as CommonJS ([14dd8b8](https://github.com/this-is-tobi/github-workflows/commit/14dd8b8474b573290c7d9f8a6525aea44ce27cb3))
+
+
+### Dependencies
+
+* **deps:** update docker/setup-qemu-action to v4.3.0 ([4ab677b](https://github.com/this-is-tobi/github-workflows/commit/4ab677b8f0c93e0af5254825d9215c6e06cea7a4))
+
 ## [0.30.0](https://github.com/this-is-tobi/github-workflows/compare/v0.29.0...v0.30.0) (2026-08-31)
 
 
