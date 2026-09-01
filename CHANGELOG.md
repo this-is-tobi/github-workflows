@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.2](https://github.com/this-is-tobi/github-workflows/compare/v0.30.1...v0.30.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **test-go,test-vitest:** detect test files without a pipeline ([e0472dd](https://github.com/this-is-tobi/github-workflows/commit/e0472ddcd42880270782f60c2ec4b23bdb24cf8b))
+
 ## [0.30.1](https://github.com/this-is-tobi/github-workflows/compare/v0.30.0...v0.30.1) (2026-09-01)
 
 
