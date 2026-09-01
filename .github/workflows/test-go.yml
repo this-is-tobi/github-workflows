@@ -324,6 +324,39 @@ jobs:
         fi
         go tool cover -func="$COVERAGE_ARTIFACT_PATH" | tail -1
 
+    # **The two inputs cannot simply be joined, and the defaults alone prove
+    # it.** upload-artifact globs its path, and @actions/glob refuses a `.`
+    # segment anywhere but the first:
+    #
+    #   assert(literalSegments.every((x, i) => (x !== '.' || i === 0) && x !== '..'))
+    #
+    # WORKING_DIRECTORY defaults to "." and COVERAGE_ARTIFACT_PATH to
+    # "./coverage.out", so `format('{0}/{1}', …)` produced "././coverage.out" —
+    # two `.` segments, the second at index 1 — and the upload failed with
+    # "Relative pathing '.' and '..' is not allowed". That is every caller
+    # running COVERAGE against a root module, which is the common case.
+    #
+    # Normalised here rather than by narrowing the default, because "./x.out"
+    # is the natural way to write a relative path and the default itself models
+    # it — a caller passing their own would hit exactly the same wall, with
+    # nothing in the message pointing at the leading "./" as the cause.
+    - name: Resolve the coverage profile path
+      if: ${{ inputs.COVERAGE == true && strategy.job-index == 0 }}
+      id: coverage-profile
+      env:
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+        COVERAGE_ARTIFACT_PATH: ${{ inputs.COVERAGE_ARTIFACT_PATH }}
+      run: |
+        set -euo pipefail
+
+        # The sed loop (:a … ta) rather than a single s///g pass: consecutive
+        # "/./" segments overlap on the shared slash, so one pass leaves every
+        # other one behind.
+        PROFILE=$(printf '%s/%s' "${WORKING_DIRECTORY%/}" "$COVERAGE_ARTIFACT_PATH" \
+          | sed -e ':a' -e 's#/\./#/#g;ta' -e 's#^\./##')
+        echo "Coverage profile: $PROFILE"
+        echo "path=${PROFILE}" >> "$GITHUB_OUTPUT"
+
     # Uploaded once rather than per matrix entry: the profiles are the same
     # measurement taken on different machines, and identical artifact names
     # across a matrix collide.
@@ -332,7 +365,7 @@ jobs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ${{ inputs.COVERAGE_ARTIFACT_NAME }}
-        path: ${{ format('{0}/{1}', inputs.WORKING_DIRECTORY, inputs.COVERAGE_ARTIFACT_PATH) }}
+        path: ${{ steps.coverage-profile.outputs.path }}
 
   no-module:
     name: No Go module found
