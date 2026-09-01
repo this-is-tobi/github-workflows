@@ -69,6 +69,24 @@ jobs:
     # the 'Lint commits' step below), so no workflow input ever becomes part
     # of the JavaScript. Interpolating them here would let a crafted
     # ALLOWED_TYPES escape both the heredoc and the string literal.
+    #
+    # CommonJS, not ESM, and deliberately so. `bun install` writes a
+    # package.json with no "type" field, which makes a .js file CommonJS by
+    # default - so an `export default` here forced Node to reparse the file as
+    # an ES module and print a MODULE_TYPELESS_PACKAGE_JSON warning. The lint
+    # step runs commitlint once per commit, so that warning is emitted once per
+    # commit too, and the noise grows with the size of the pull request until
+    # the one line saying which commit actually failed is the hard part to find.
+    #
+    # Of the three ways to silence it, this is the only one that changes
+    # nothing else. Renaming to .mjs works, but commitlint searches
+    # `commitlint.config.js` *before* `commitlint.config.mjs`, so a caller with
+    # its own checked-in .js would silently start winning and its ALLOWED_TYPES
+    # /REQUIRE_SCOPE/MAX_SUBJECT_LENGTH inputs would stop having any effect,
+    # with nothing in the log saying so. Adding "type": "module" means editing
+    # a package.json bun generates for us. `module.exports` keeps the filename,
+    # keeps the precedence, and keeps `extends` resolving - commitlint imports
+    # config-conventional itself, so this file never requires it.
     - name: Create commitlint config
       if: ${{ inputs.CONFIG_FILE == '' }}
       run: |
@@ -78,7 +96,7 @@ jobs:
         const requireScope = process.env.COMMITLINT_REQUIRE_SCOPE === 'true';
         const headerMaxLength = Number(process.env.COMMITLINT_MAX_SUBJECT_LENGTH ?? 100);
 
-        export default {
+        module.exports = {
           extends: ['@commitlint/config-conventional'],
           rules: {
             'type-enum': [2, 'always', allowedTypes],
