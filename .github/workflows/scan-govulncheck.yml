@@ -89,6 +89,26 @@ jobs:
         cache: ${{ inputs.CACHE }}
         cache-dependency-path: ${{ format('{0}/go.sum', inputs.WORKING_DIRECTORY) }}
 
+    # Installed and then run, rather than launched through `go run`, and the
+    # difference is the whole findings path. `go run` collapses every non-zero
+    # exit status of the program it runs into 1 of its own, and govulncheck's
+    # exit code 3 is the only thing separating "scanned fine, found something"
+    # from "the scan broke". Through `go run` every finding therefore arrived
+    # here as exit 1 and took the scan-error branch below: `vulns` was never
+    # set, so the findings never reached the step summary, the SARIF upload
+    # and the PR comment were skipped, FAIL_ON_VULNS: false failed the job
+    # anyway, and the summary said the scan had not completed - about a scan
+    # that had completed and found two advisories. Running the built binary
+    # makes the exit codes the tool's own again.
+    #
+    # `pkg@version` install mode ignores whatever module the checkout holds,
+    # so this pins exactly the third-party code the input names whatever the
+    # scanned repository requires, which is the point of pinning it.
+    - name: Install govulncheck
+      env:
+        GOVULNCHECK_VERSION: ${{ inputs.GOVULNCHECK_VERSION }}
+      run: go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
+
     # govulncheck reports only vulnerabilities in code actually reachable from
     # the scanned packages - not merely present in go.sum - which is what
     # keeps a false positive here rare enough that FAIL_ON_VULNS defaults on.
@@ -96,7 +116,6 @@ jobs:
       id: scan
       working-directory: ${{ inputs.WORKING_DIRECTORY }}
       env:
-        GOVULNCHECK_VERSION: ${{ inputs.GOVULNCHECK_VERSION }}
         PACKAGES: ${{ inputs.PACKAGES }}
         FORMAT: ${{ inputs.FORMAT }}
       # Exit code 3 means vulnerabilities were found, anything else above 0 is
@@ -107,8 +126,11 @@ jobs:
         set -uo pipefail
 
         EXIT_CODE=0
+        # Addressed through GOPATH rather than trusting the bare name to be on
+        # PATH: which of setup-go's directories lands there has changed across
+        # its majors, and a not-found here would read as a scan error.
         # shellcheck disable=SC2086
-        go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" \
+        "$(go env GOPATH)/bin/govulncheck" \
           -format "${FORMAT}" \
           $PACKAGES > "govulncheck-results.${FORMAT}" || EXIT_CODE=$?
 
@@ -188,9 +210,14 @@ jobs:
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
     permissions:
       pull-requests: write
-    # The vulns output is only set when the scan completed (with or without
-    # findings) - skip the comment when the scan itself errored
-    if: ${{ always() && inputs.PR_NUMBER != '' && needs.vuln-scan.outputs.vulns != '' }}
+    # Comments whatever happened, including when the scan produced no verdict
+    # at all. Requiring a verdict here is what made this job silent in exactly
+    # the case worth hearing about: a scan that errors, or one whose findings
+    # never became an output, left the pull request with no comment - and,
+    # where several callers share this workflow, left an older comment from
+    # another module's clean scan standing as if it were this one's answer.
+    # Saying "the scan did not complete" is the honest third state.
+    if: ${{ always() && inputs.PR_NUMBER != '' }}
     needs:
     - vuln-scan
     steps:
@@ -258,8 +285,17 @@ jobs:
         message: |
           🤖 Hey !
 
-          ${{ needs.vuln-scan.outputs.vulns == 'true' && '🚨 govulncheck found a known vulnerability reachable from the scanned packages.' || '✅ govulncheck found no known vulnerabilities.' }} The scan report for the current pull request is available in ${{ steps.report.outputs.link }}.
-        header: govulncheck-scan
+          ${{ needs.vuln-scan.outputs.vulns == 'true' && '🚨 govulncheck found a known vulnerability reachable from the scanned packages.' || needs.vuln-scan.outputs.vulns == 'false' && '✅ govulncheck found no known vulnerabilities.' || '⚠️ The govulncheck scan did not complete, so nothing here was checked.' }} Scanned `${{ inputs.PACKAGES }}` in `${{ inputs.WORKING_DIRECTORY }}`. The scan report for the current pull request is available in ${{ steps.report.outputs.link }}.
+        # One sticky comment per scanned module, not one per workflow. Several
+        # callers of this workflow on the same pull request - one leg per Go
+        # module is the ordinary shape - all wrote to a single header and
+        # overwrote each other, so the comment a reviewer saw was whichever leg
+        # finished last: a repository whose main module had two advisories
+        # carried a green "no known vulnerabilities" from a plugin's clean
+        # scan. CATEGORY is what a caller already sets to keep those legs
+        # apart in the Security tab; the working directory covers a caller
+        # that scans several modules without setting it.
+        header: govulncheck-scan${{ inputs.CATEGORY != '' && format('-{0}', inputs.CATEGORY) || (inputs.WORKING_DIRECTORY != '.' && format('-{0}', inputs.WORKING_DIRECTORY) || '') }}
         # Not `number`: that one is only a fallback the event payload overrides,
         # and the caller naming a pull request has to be what decides.
         number_force: ${{ inputs.PR_NUMBER }}
