@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.30.4](https://github.com/this-is-tobi/github-workflows/compare/v0.30.3...v0.30.4) (2026-09-02)
+
+
+### Bug Fixes
+
+* **scan-govulncheck:** report findings again - go run masked the tool's exit code ([f1db6af](https://github.com/this-is-tobi/github-workflows/commit/f1db6afc96ee9f7a1c55e27ab528e47ab0823342))
+
+
+### Dependencies
+
+* **deps:** update helm/kind-action to v1.15.0 ([3bd2f2c](https://github.com/this-is-tobi/github-workflows/commit/3bd2f2c21805b43b817c69df6bbf8365851f24f6))
+
 ## [0.30.3](https://github.com/this-is-tobi/github-workflows/compare/v0.30.2...v0.30.3) (2026-09-01)
 
 
