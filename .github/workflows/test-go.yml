@@ -106,6 +106,27 @@ on:
         required: false
         default: true
 
+# **Every `run:` below is a bash script, and on a Windows runner nothing would
+# have said so.** GitHub picks the shell from the runner when a step does not
+# name one — bash on Linux and macOS, PowerShell on Windows — so the moment
+# RUNNERS named windows-latest, the test step was handed to pwsh, which stopped
+# at the first `if [ -n "$TEST_PRECOMMAND" ]` with "Missing '(' after 'if'".
+# The suite never ran; the job failed in 37 seconds having tested nothing.
+#
+# That is this workflow's own RUNNERS input pointed at the case it exists for —
+# "a suite that reads the machine it runs on passes on the machine it was
+# written on" — so it could not be left to each caller to discover.
+#
+# At file level rather than on the one step, because the reason is a fact about
+# every script in this file and not about that step: detect-setup and the two
+# skip jobs are bash too, and they run on RUNS_ON, which a caller may equally
+# point somewhere else. Existing callers are unaffected — `shell: bash` differs
+# from the Linux default only by adding `-o pipefail`, which every script here
+# already sets for itself.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   detect-setup:
     name: Detect project setup
