@@ -49,6 +49,24 @@ Create releases using [`release-please`](https://github.com/googleapis/release-p
 | minor-tag       | Minor version tag (e.g., `2`)             |
 | patch-tag       | Patch version tag (e.g., `3`)             |
 | tag-name        | The full tag that was created (e.g., `v1.2.3`) - for a downstream job that needs to name the release explicitly rather than reconstruct the tag prefix, such as [`attest-go.yml`](./33-attest-go.md)'s `TAG` input |
+| releases-created | Whether any release was created - set in manifest (monorepo) mode too, where `release-created` above stays unset for a repository without a root package |
+| paths-released  | JSON array of the package paths that had a release created (`[]` when nothing was released) - feed it to a matrix with `fromJSON` |
+| release-outputs | Every release-please output as one JSON object, for the per-path values (`<path>--tag_name`, `<path>--version`, ...): `fromJSON(needs.release.outputs.release-outputs)[format('{0}--tag_name', matrix.path)]` |
+
+**Monorepo callers.** With a manifest config holding one package per directory and no root package, the six single-package outputs are unset - release-please names every output after the path it belongs to. Use `releases-created` as the gate, `paths-released` as the matrix, and `release-outputs` for each leg's tag and version:
+
+```yaml
+  binaries:
+    needs: [release]
+    if: ${{ needs.release.outputs.releases-created == 'true' }}
+    strategy:
+      matrix:
+        path: ${{ fromJSON(needs.release.outputs.paths-released) }}
+    steps:
+    - env:
+        TAG: ${{ fromJSON(needs.release.outputs.release-outputs)[format('{0}--tag_name', matrix.path)] }}
+      run: gh release upload "$TAG" dist/*
+```
 
 ## Permissions
 
