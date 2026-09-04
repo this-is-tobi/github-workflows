@@ -145,6 +145,28 @@ on:
           attest-go.yml's TAG input, or 'gh release download'/'gh release
           upload' against the same release.
         value: ${{ jobs.release.outputs.tag-name }}
+      releases-created:
+        description: >-
+          Whether any release was created in this run. 'release-created' above
+          is a root-component output and stays unset for a repository with no
+          root package (manifest mode, one package per directory); this one is
+          set in every mode.
+        value: ${{ jobs.release.outputs.releases-created }}
+      paths-released:
+        description: >-
+          JSON array of the package paths that had a release created ('[]'
+          when nothing was released). A monorepo caller feeds it to a job
+          matrix with fromJSON to run one leg per released package.
+        value: ${{ jobs.release.outputs.paths-released }}
+      release-outputs:
+        description: >-
+          Every output of the release-please step as one JSON object, so a
+          monorepo caller can read the per-path values release-please names
+          after the path ('<path>--tag_name', '<path>--version', ...) - values
+          this workflow cannot declare one by one because it does not know
+          the paths. Read one with
+          fromJSON(needs.<job>.outputs.release-outputs)[format('{0}--tag_name', matrix.path)].
+        value: ${{ jobs.release.outputs.release-outputs }}
 
 # Every `run:` below is bash. Without this GitHub reads the shell off the runner
 # — PowerShell on Windows — so a caller pointing RUNS_ON at one gets a parse
@@ -169,6 +191,17 @@ jobs:
       minor-tag: ${{ steps.release.outputs.minor }}
       patch-tag: ${{ steps.release.outputs.patch }}
       tag-name: ${{ steps.release.outputs.tag_name }}
+      # The three below are what manifest (monorepo) mode sets. The six above
+      # are root-component outputs, unset when a repository has no root
+      # package — a caller releasing `pg/` and `kube/` reads nothing from
+      # them and everything from these.
+      releases-created: ${{ steps.release.outputs.releases_created }}
+      paths-released: ${{ steps.release.outputs.paths_released }}
+      # Every output of the step as one JSON object. A reusable workflow cannot
+      # enumerate `<path>--tag_name` for paths it does not know, so it hands
+      # the whole map over and the caller indexes it with the path it does
+      # know: fromJSON(...)[format('{0}--tag_name', matrix.plugin)].
+      release-outputs: ${{ toJSON(steps.release.outputs) }}
     env:
       # `secrets` is not available in a step-level `if`, but it is here - so the
       # presence check is hoisted to the job and the step tests `env`.
