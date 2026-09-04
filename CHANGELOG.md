@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.5](https://github.com/this-is-tobi/github-workflows/compare/v0.30.4...v0.30.5) (2026-09-04)
+
+
+### Bug Fixes
+
+* **workflows:** a run: step is bash, and only the runner was saying so ([921db91](https://github.com/this-is-tobi/github-workflows/commit/921db91077e6f8127ddb0ac2c0abc00c2b486eb1))
+
 ## [0.30.4](https://github.com/this-is-tobi/github-workflows/compare/v0.30.3...v0.30.4) (2026-09-02)
 
 
