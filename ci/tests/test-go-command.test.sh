@@ -162,4 +162,9 @@ test_a_passing_precommand_runs_before_the_tests() {
   assert_called_before "go|generate ./..." "go|test"
 }
 
+# The shell this step is written in is asserted in shell-declared.test.sh, over
+# every workflow rather than this one: the tests here run the step's body under
+# bash directly, so the harness cannot see the shell GitHub would have picked
+# and all of them stay green while a Windows caller gets a parse error.
+
 run_tests
