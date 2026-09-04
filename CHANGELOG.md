@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.0](https://github.com/this-is-tobi/github-workflows/compare/v0.30.5...v0.31.0) (2026-09-04)
+
+
+### Features
+
+* **workflows:** release-app exposes release-please's monorepo outputs ([bb35c0b](https://github.com/this-is-tobi/github-workflows/commit/bb35c0b18cf611957d24ddbdead76e118f7a56de))
+
 ## [0.30.5](https://github.com/this-is-tobi/github-workflows/compare/v0.30.4...v0.30.5) (2026-09-04)
 
 
