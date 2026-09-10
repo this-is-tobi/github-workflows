@@ -16,10 +16,10 @@
     },
     {
       "customType": "regex",
-      "description": "Bump non-Go tool versions pinned as workflow input defaults, marked with a 'renovate:' comment on the line above. Split from the Go case above because the two disagree on the 'v' prefix: these defaults are written bare (e.g. a download URL built from the version has none), while their upstream release tags carry one - a single shared extractVersionTemplate stripping it for both classes is what silently dropped the 'v' from a Go module version too.",
+      "description": "Bump non-Go tool versions pinned as workflow input defaults, marked with a 'renovate:' comment on the line above. Split from the Go case above because the two disagree on the 'v' prefix: these defaults are written bare (e.g. a download URL built from the version has none), while their upstream release tags carry one - a single shared extractVersionTemplate stripping it for both classes is what silently dropped the 'v' from a Go module version too. The datasource group excludes exactly 'go' (leaving 'golang-version' and friends matchable) without a lookahead: Renovate compiles matchStrings with RE2, which rejects lookahead/lookbehind outright, so the exclusion is spelled out as alternation on the first couple of characters instead.",
       "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
       "matchStrings": [
-        "# renovate: datasource=(?!go(?=\\s))(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s+default: (?<currentValue>[^\\s]+)"
+        "# renovate: datasource=(?<datasource>[a-fh-z-][a-z-]*|g(?:[a-np-z-][a-z-]*|o[a-z-]+)?) depName=(?<depName>[^\\s]+)\\s+default: (?<currentValue>[^\\s]+)"
       ],
       "extractVersionTemplate": "^v?(?<version>.*)$"
     }
