@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.2](https://github.com/this-is-tobi/github-workflows/compare/v0.31.1...v0.31.2) (2026-09-10)
+
+
+### Bug Fixes
+
+* **scan-govulncheck:** restore the v prefix go install needs ([b693a6b](https://github.com/this-is-tobi/github-workflows/commit/b693a6b8ec23fe09ccc96fb5e2a4899a6b14331f))
+
 ## [0.31.1](https://github.com/this-is-tobi/github-workflows/compare/v0.31.0...v0.31.1) (2026-09-10)
 
 
