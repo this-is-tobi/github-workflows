@@ -27,7 +27,7 @@ on:
         type: string
         required: false
         # renovate: datasource=go depName=golang.org/x/vuln/cmd/govulncheck
-        default: 1.8.0
+        default: v1.8.0
       FORMAT:
         description: Format of the report (text, json, sarif)
         required: false

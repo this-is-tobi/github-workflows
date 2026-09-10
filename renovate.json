@@ -7,10 +7,19 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Bump tool versions pinned as workflow input defaults, marked with a 'renovate:' comment on the line above.",
+      "description": "Bump Go module tool versions pinned as workflow input defaults, marked with a 'renovate:' comment on the line above. Go module versions are always v-prefixed, in the datasource's own tags and in this file's defaults alike, so the matched value is reused as-is - nothing to add or strip.",
       "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s+default: (?<currentValue>[^\\s]+)"
+        "# renovate: datasource=go depName=(?<depName>[^\\s]+)\\s+default: (?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Bump non-Go tool versions pinned as workflow input defaults, marked with a 'renovate:' comment on the line above. Split from the Go case above because the two disagree on the 'v' prefix: these defaults are written bare (e.g. a download URL built from the version has none), while their upstream release tags carry one - a single shared extractVersionTemplate stripping it for both classes is what silently dropped the 'v' from a Go module version too.",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?!go(?=\\s))(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s+default: (?<currentValue>[^\\s]+)"
       ],
       "extractVersionTemplate": "^v?(?<version>.*)$"
     }
