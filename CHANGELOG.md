@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.1](https://github.com/this-is-tobi/github-workflows/compare/v0.31.0...v0.31.1) (2026-09-10)
+
+
+### Dependencies
+
+* **deps:** update github/codeql-action to v4.38.0 ([4519f70](https://github.com/this-is-tobi/github-workflows/commit/4519f704d952ca5cbfd92a834d3e41031f17ba8b))
+* **deps:** update golang.org/x/vuln/cmd/govulncheck to v1.8.0 ([d01f9e6](https://github.com/this-is-tobi/github-workflows/commit/d01f9e627ac55f62ba0d82f4541d3a97b437e1e5))
+
 ## [0.31.0](https://github.com/this-is-tobi/github-workflows/compare/v0.30.5...v0.31.0) (2026-09-04)
 
 
