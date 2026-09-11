@@ -1,6 +1,6 @@
 # `attest-helm.yml`
 
-Attestations for Helm charts published to an OCI registry: cosign keyless signatures and SLSA build provenance. Takes the `published-charts` output of [`release-helm.yml`](./51-release-helm.md) and attests each chart by digest.
+Attestations for Helm charts published to an OCI registry: cosign keyless signatures and SLSA build provenance. Takes the `published-charts` output of [`release-helm.yml`](./51-release-helm.md) or [`release-helm-local.yml`](./52-release-helm-local.md) — the two emit the same shape — and attests each chart by digest.
 
 The capability inputs mirror [`attest-docker.yml`](./31-attest-docker.md), so an image and a chart are attested the same way — both flows are keyless, driven by the job's GitHub OIDC token, with no key at rest.
 
@@ -16,7 +16,7 @@ This is the same reasoning that separates [`attest-docker.yml`](./31-attest-dock
 
 | Input      | Type    | Description                                                                                                                                                | Required | Default          |
 | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ---------------- |
-| CHARTS     | string  | JSON array of charts to attest, as produced by the `published-charts` output of `release-helm.yml`: `{name, version, repository, digest}` per entry. An empty array is a no-op | Yes      | -                |
+| CHARTS     | string  | JSON array of charts to attest, as produced by the `published-charts` output of `release-helm.yml` or `release-helm-local.yml`: `{name, version, repository, digest}` per entry. An empty array is a no-op | Yes      | -                |
 | SIGN       | boolean | Sign the chart digest with cosign keyless signing                                                                                                          | No       | false            |
 | PROVENANCE | boolean | Generate GitHub's standard SLSA build provenance attestation for the chart (records the calling workflow, repository and commit)                            | No       | false            |
 | RUNS_ON    | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                                                    | No       | ["ubuntu-24.04"] |
