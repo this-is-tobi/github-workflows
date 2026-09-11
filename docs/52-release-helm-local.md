@@ -40,6 +40,16 @@ The same reasoning splits [`dispatch-helm-chart.yml`](./54-dispatch-helm-chart.m
 
 No GitHub App/PAT credentials — this workflow never creates a git tag, release or commit, so there's nothing that needs a credential beyond registry login.
 
+## Outputs
+
+| Output           | Description                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| published-charts | JSON array of the charts pushed to the OCI registry — `{name, version, repository, digest}` per entry. Never empty |
+
+Identical in shape to the [output of the same name on `release-helm.yml`](./51-release-helm.md#outputs), so [`attest-helm.yml`](./56-attest-helm.md) consumes either without caring which one published — a monorepo chart is no less entitled to a signature and a provenance statement than one from a dedicated chart repository. `repository` and `digest` are kept apart so they can be fed straight through, as cosign's subject and as the `subject-name`/`subject-digest` pair `actions/attest-build-provenance` expects. The name and version are read back from `helm push`'s own output rather than parsed out of the package file name, which cannot be split reliably: a prerelease version contains dashes of its own (`my-chart-1.2.3-rc.1.tgz`).
+
+Unlike `release-helm.yml`, this output is never an empty array — there is no input that turns publishing off, and a run that found no chart to package fails rather than succeeding with nothing to show. A downstream `attest-helm.yml` therefore needs no guard against attesting nothing.
+
 ## Permissions
 
 | Scope    | Access | Description       |
@@ -104,6 +114,21 @@ jobs:
       CHART_NAME: my-app
       # Package exactly the bump commit pushed by update-helm-chart
       CHECKOUT_REF: ${{ needs.bump-chart.outputs.commit-sha }}
+
+  attest-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/attest-helm.yml@v0
+    needs:
+    - release-chart
+    permissions:
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      # Pass published-charts through unchanged: it already carries the digest
+      # each attestation is bound to
+      CHARTS: ${{ needs.release-chart.outputs.published-charts }}
+      PROVENANCE: true
+      SIGN: true
 ```
 
 > The chart and the app deliberately keep **separate versions**: here an app `1.4.0` release might publish chart `0.7.3` with `appVersion: 1.4.0`. A chart-only fix re-runs the same `bump-chart` + `release-chart` pair with `APP_VERSION` omitted. The `CHART_VERSION`/`APP_VERSION` inputs of this workflow remain available as a stateless escape hatch (stamp at package time, no commit), if you accept that `Chart.yaml` in git won't reflect published versions.
