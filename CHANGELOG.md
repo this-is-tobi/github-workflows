@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.32.0](https://github.com/this-is-tobi/github-workflows/compare/v0.31.2...v0.32.0) (2026-09-11)
+
+
+### Features
+
+* **release-helm-local:** surface the digests of the charts it pushed ([6e57034](https://github.com/this-is-tobi/github-workflows/commit/6e57034bfa8396573b14a543dd61e6ac232b5a9a))
+
+
+### Bug Fixes
+
+* **renovate:** drop lookahead RE2 can't compile from the non-Go regex ([8b417a2](https://github.com/this-is-tobi/github-workflows/commit/8b417a2969c5ff3575d8f60c43154a7fd72dc192)), closes [#158](https://github.com/this-is-tobi/github-workflows/issues/158)
+
 ## [0.31.2](https://github.com/this-is-tobi/github-workflows/compare/v0.31.1...v0.31.2) (2026-09-10)
 
 
