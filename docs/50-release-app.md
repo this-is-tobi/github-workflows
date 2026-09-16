@@ -152,6 +152,7 @@ If both are set, the App takes precedence — useful for verifying the switch be
 - If `TAG_MAJOR_AND_MINOR: true`, tags `v<major>` and `v<major>.<minor>` after a release is created.
 - If `AUTOMERGE_*` is enabled and a PAT is provided, attempts to automerge the release PR.
 - **Asserts** that `PRERELEASE_BRANCH` holds everything published on `RELEASE_BRANCH`, before any version is computed — see [Prerelease sync assertion](#prerelease-sync-assertion). The rebase itself belongs to [`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md).
+- **Asserts** that a merged release pull request becomes a tag and a release, and refuses to start while an abandoned one can prevent that — see [Release assertions](#release-assertions). Nothing to configure.
 - `RELEASE_ASSET_PATHS` uploads files that are already present on the runner filesystem. `RELEASE_ARTIFACT_NAMES` accepts a name or glob pattern — the matching artifacts are downloaded via `actions/download-artifact` before being attached to the release; both inputs can be used together.
 - `PUBLISH_DRAFT_RELEASE: true` publishes the release after the assets have been attached. It is a no-op when the release is not a draft, so the step is safe to re-run. See [immutable releases](#immutable-releases).
 
@@ -171,6 +172,42 @@ On failure the run stops with the number of missing commits and what to do. Two 
 > The assertion uses a GitHub API `compare` call rather than `git merge-base --is-ancestor`: ancestry needs real history, and `actions/checkout` leaves the clone shallow — the git form would have to unshallow the repository on every prerelease run.
 
 > A repository that has not created `RELEASE_BRANCH` yet has nothing to compare against: the assertion does nothing rather than blocking its first prereleases.
+
+## Release assertions
+
+Two checks bracket release-please, both unconditional and neither needing configuration. They exist because release-please can push a release commit to the branch and then fail to tag it, and because nothing else in a release pipeline notices.
+
+### Before: no abandoned release pull request
+
+release-please keeps one branch per target — `release-please--branches--<branch>`, plus a `--components--<name>` suffix per package in a monorepo — and reuses it for every release pull request it opens. A pull request **closed on one of those branches while still carrying an `autorelease:` label** stays in release-please's bookkeeping as *the* release pull request for that branch. The next run pushes the new release commit, opens a new pull request, then tries to move the closed one back to open — which GitHub refuses, because the new pull request already occupies that head/base pair:
+
+```
+updated code for <new>, but update requested for <closed>
+state cannot be changed. There is already an open pull request from
+release-please--branches--main to main.
+```
+
+Where release-please exits is the damage: **after** pushing the release commit, **before** labelling the pull request it just opened. `autorelease: pending` is the queue the release phase reads, so an unlabelled release pull request is invisible to it — merge it and nothing tags it.
+
+The assertion fails the run and names the pull request to clean up. Remove every `autorelease:` label from it; the fix is one label removal, and nothing else about the closed pull request matters.
+
+> This is [googleapis/release-please#2566](https://github.com/googleapis/release-please/issues/2566). The `autorelease: snooze` label that produces the state is undocumented, and the crash lands before any tag is written.
+
+> A closed release pull request carrying **no** `autorelease:` label is release-please's own start-fresh state and passes: it opens a new pull request and never looks at the old one again.
+
+### After: a merged release pull request was released
+
+The invariant the whole workflow exists to uphold: when a release pull request merges, the version it wrote becomes a tag and a release.
+
+Nothing else asserts it. release-please reports `release-created` false for an ordinary commit and for a release commit it failed to tag **alike**, and downstream jobs gated on that output read the two the same way — they skip. The binaries, the image, the chart and their attestations are then quietly not published, while the changelog and the manifest on the branch say the version shipped.
+
+It also leaves the *next* release unable to compute. release-please looks for the tag the manifest names; with no floor to measure from it walks the branch to its first commit and proposes **a changelog covering the entire history**. That symptom usually surfaces days later, on an unrelated run, and reads as a different bug entirely.
+
+Recovery is the [upstream procedure](https://github.com/googleapis/release-please/blob/main/docs/troubleshooting.md): add `autorelease: pending` back to the merged release pull request and re-run the workflow. release-please then tags it, relabels it `autorelease: tagged`, and the downstream jobs run.
+
+> Keyed on the commit being built, not on "is any merged pull request still labelled pending": the label is exactly what goes missing in the failure above, and a concurrent run's merge would make a label scan flap. A release pull request whose merge commit **is** this run's commit is unambiguous under rebase, squash and merge-commit alike.
+
+> Runs under `!cancelled()`, so it also reports on a run where release-please crashed and set no outputs at all — the most likely way to get here, and where a raw API validation error is otherwise the only clue.
 
 ## Configuration
 
