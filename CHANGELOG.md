@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.32.1](https://github.com/this-is-tobi/github-workflows/compare/v0.32.0...v0.32.1) (2026-09-17)
+
+
+### Dependencies
+
+* **deps:** update docker/build-push-action to v7.4.0 ([007e027](https://github.com/this-is-tobi/github-workflows/commit/007e027ddf8bd7870fba56510da7536edfc41d01))
+* **deps:** update docker/setup-buildx-action to v4.4.1 ([a03d0cc](https://github.com/this-is-tobi/github-workflows/commit/a03d0ccb2051cc9274b190c3004be52c684f58e2))
+* **deps:** update docker/setup-qemu-action to v4.4.0 ([99eefdb](https://github.com/this-is-tobi/github-workflows/commit/99eefdbe3133e2bb0b60c4453e92161c0460b365))
+* **deps:** update sonarsource/sonarqube-scan-action to v8.2.2 ([e549056](https://github.com/this-is-tobi/github-workflows/commit/e549056e0c3d1f476ca5855cfedd59bd81ddeb5c))
+
 ## [0.32.0](https://github.com/this-is-tobi/github-workflows/compare/v0.31.2...v0.32.0) (2026-09-11)
 
 
