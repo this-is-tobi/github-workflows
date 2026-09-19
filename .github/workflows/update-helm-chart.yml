@@ -52,9 +52,11 @@ on:
         default: rc
       HELM_DOCS_VERSION:
         description: >-
-          Version of helm-docs used to regenerate the chart README (e.g.
-          'v1.14.2'). Pinned rather than tracking ':latest', so a new upstream
-          release cannot silently change what this job runs against your chart.
+          The helm-docs release that regenerates the chart README, as its tag
+          (e.g. 'v1.14.2'). Built from source at exactly that version with
+          `go install`, which verifies the module against the Go checksum
+          database, rather than pulled as a container image whose tag could
+          be repointed. Must be a release tag: 'latest' is refused.
         required: false
         type: string
         default: v1.14.2
@@ -155,6 +157,7 @@ jobs:
         APP_VERSION: ${{ inputs.APP_VERSION }}
         UPGRADE_TYPE: ${{ inputs.UPGRADE_TYPE }}
         PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
+        HELM_DOCS_VERSION: ${{ inputs.HELM_DOCS_VERSION }}
       run: |
         set -euo pipefail
 
@@ -217,6 +220,14 @@ jobs:
           exit 1
         fi
 
+        # A release tag, never 'latest': the tool is built from source at this
+        # version and 'latest' would install whatever is newest on the day,
+        # which is the floating pin this input exists to refuse.
+        if [[ ! "$HELM_DOCS_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::HELM_DOCS_VERSION must be a release tag matching '^v[0-9]+\.[0-9]+\.[0-9]+\$', got '$HELM_DOCS_VERSION'"
+          exit 1
+        fi
+
     # Minted whenever App auth is configured, for either mode: 'called' needs it
     # for the pull request and the merge, and 'local' needs it for the push
     # below - the same precedence as every other credential in this catalog
@@ -258,6 +269,33 @@ jobs:
       with:
         token: ${{ steps.app-token.outputs.token || github.token }}
 
+    # helm-docs is built from source at exactly the version asked for, which
+    # `go install` verifies against the Go checksum database - a transparency
+    # log over the module - rather than pulled as a container image whose tag
+    # could be repointed by whoever holds the upstream account. Stamped with
+    # the same -X main.version the upstream release carries: the README's
+    # footer names the version and a bare `go install` leaves it empty, so an
+    # unstamped build would rewrite every README's last line.
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: stable
+        cache: false
+
+    - name: Install helm-docs
+      env:
+        HELM_DOCS_VERSION: ${{ inputs.HELM_DOCS_VERSION }}
+      run: |
+        set -euo pipefail
+
+        if [[ ! "$HELM_DOCS_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::HELM_DOCS_VERSION must be a release tag matching '^v[0-9]+\.[0-9]+\.[0-9]+\$' - 'latest' would install whatever is newest today - got '$HELM_DOCS_VERSION'"
+          exit 1
+        fi
+        go install -trimpath -ldflags "-s -w -X main.version=${HELM_DOCS_VERSION#v}" \
+          "github.com/norwoodj/helm-docs/cmd/helm-docs@$HELM_DOCS_VERSION"
+        echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
     - name: update chart version
       id: update-chart
       env:
@@ -266,7 +304,6 @@ jobs:
         APP_VERSION: ${{ inputs.APP_VERSION }}
         UPGRADE_TYPE: ${{ inputs.UPGRADE_TYPE }}
         PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
-        HELM_DOCS_VERSION: ${{ inputs.HELM_DOCS_VERSION }}
       run: |
         # Remove trailing slashes
         while [ "${CHART_DIR%/}" != "$CHART_DIR" ]; do CHART_DIR="${CHART_DIR%/}"; done
@@ -457,11 +494,7 @@ jobs:
         yq -i '.version = strenv(NEXT_VERSION)' "$CHART_DIR/$CHART_NAME/Chart.yaml"
 
         echo "Generate chart documentation..."
-        docker run \
-          --rm \
-          --volume "$(pwd)/$CHART_DIR/$CHART_NAME:/helm-docs" \
-          -u "$(id -u)" \
-          "docker.io/jnorwood/helm-docs:$HELM_DOCS_VERSION"
+        helm-docs --chart-search-root "$CHART_DIR/$CHART_NAME"
 
         {
           echo "CURRENT_VERSION=$CURRENT_VERSION"
