@@ -249,6 +249,7 @@ validate_env() {
   export APP_VERSION="1.4.0"
   export UPGRADE_TYPE="patch"
   export PRERELEASE_IDENTIFIER="rc"
+  export HELM_DOCS_VERSION="v1.14.2"
 }
 
 test_validate_accepts_every_upgrade_type() {

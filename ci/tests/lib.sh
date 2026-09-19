@@ -59,6 +59,7 @@ sandbox_setup() {
   install_gh_stub
   install_git_stub
   install_docker_stub
+  install_helm_docs_stub
   export PATH="$SANDBOX/bin:$PATH"
 }
 
@@ -84,6 +85,17 @@ esac
 exit 0
 STUB
   chmod +x "$SANDBOX/bin/docker"
+}
+
+# Records every helm-docs invocation and writes nothing: the README a real
+# run regenerates is not what these suites assert on.
+install_helm_docs_stub() {
+  cat >"$SANDBOX/bin/helm-docs" <<'STUB'
+#!/usr/bin/env bash
+printf 'helm-docs|%s\n' "$*" >>"$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$SANDBOX/bin/helm-docs"
 }
 
 # Records every git invocation. `config --local --get-regexp` answers from
