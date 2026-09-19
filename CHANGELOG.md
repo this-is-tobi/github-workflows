@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.33.0](https://github.com/this-is-tobi/github-workflows/compare/v0.32.1...v0.33.0) (2026-09-19)
+
+
+### Features
+
+* **release-app:** assert a merged release pull request becomes a tag ([51d4c08](https://github.com/this-is-tobi/github-workflows/commit/51d4c086c3d153b9980748718bc2e942185155c8))
+
+
+### Bug Fixes
+
+* **helm:** helm-docs is built from source at a pinned version, not pulled from a tag ([98c01aa](https://github.com/this-is-tobi/github-workflows/commit/98c01aa41f33e52445567df6421d4d678613bd86))
+
+
+### Dependencies
+
+* **deps:** update github/codeql-action to v4.38.1 ([3126c13](https://github.com/this-is-tobi/github-workflows/commit/3126c13bcb5d8bfa42c95ee4f448d3fa4e0244e9))
+
 ## [0.32.1](https://github.com/this-is-tobi/github-workflows/compare/v0.32.0...v0.32.1) (2026-09-17)
 
 
