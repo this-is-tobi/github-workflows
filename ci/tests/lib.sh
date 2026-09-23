@@ -259,7 +259,7 @@ sandbox_teardown() {
 # Runs an extracted block. Environment comes from the caller's exports, matching
 # how Actions passes a step's `env:` block.
 run_block() {
-  RUN_OUTPUT=$(bash -c "$1" 2>&1)
+  RUN_OUTPUT=$(bash -e -o pipefail -c "$1" 2>&1)
   RUN_STATUS=$?
   export RUN_OUTPUT RUN_STATUS
 }
