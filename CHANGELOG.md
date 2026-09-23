@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.34.0](https://github.com/this-is-tobi/github-workflows/compare/v0.33.0...v0.34.0) (2026-09-23)
+
+
+### Features
+
+* **build-docker:** stamp the standard OCI labels and annotations ([70384d8](https://github.com/this-is-tobi/github-workflows/commit/70384d8876990ba9ed1a2e4d5d71f13612f9eb75))
+* **check-jobs:** aggregate every job result into the check a ruleset requires ([38e315a](https://github.com/this-is-tobi/github-workflows/commit/38e315a990e1ace3069f11111ae39e14c38e1086))
+
+
+### Dependencies
+
+* **deps:** update bufbuild/buf-action to v1.6.0 ([2cd6c0f](https://github.com/this-is-tobi/github-workflows/commit/2cd6c0f360b35dd5d1c44259a7f297d201ffaaea))
+* **deps:** update ubuntu to v26 ([ffcd830](https://github.com/this-is-tobi/github-workflows/commit/ffcd83082ab2e887abedd6d7b76f93a54c15209f))
+
 ## [0.33.0](https://github.com/this-is-tobi/github-workflows/compare/v0.32.1...v0.33.0) (2026-09-19)
 
 
