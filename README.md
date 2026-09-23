@@ -91,6 +91,7 @@ For more details, see:
 
 **Utility**
 
+- [Aggregate every job result into the one status check a ruleset requires (`check-jobs.yml`)](./.github/workflows/check-jobs.yml)
 - [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](./.github/workflows/clean-cache.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
 
@@ -137,4 +138,5 @@ For more details, see:
 - [Clean Cache](./docs/70-clean-cache.md) *- GitHub Actions cache cleanup*
 - [Clean Images](./docs/71-clean-images.md) *- GHCR container image cleanup*
 - [Label PR](./docs/80-labeler-pr.md) *- Automatic pull request labeling*
+- [Check Jobs](./docs/81-check-jobs.md) *- One required status check for a pipeline whose jobs vary*
 - [CI/CD Examples](./docs/90-global-workflows-examples.md) *- Complete CI/CD pipeline examples*

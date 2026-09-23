@@ -105,7 +105,6 @@ jobs:
   # (see https://github.com/orgs/community/discussions/13690)
   all-jobs-passed:
     name: Check jobs status
-    runs-on: ubuntu-latest
     if: ${{ always() }}
     needs:
     - lint-commits
@@ -114,21 +113,9 @@ jobs:
     - build-docker
     - scan-sonarqube
     - scan-trivy
-    steps:
-    - name: Check status of all required jobs
-      run: |-
-        NEEDS_CONTEXT='${{ toJson(needs) }}'
-        JOB_IDS=$(echo "$NEEDS_CONTEXT" | jq -r 'keys[]')
-        for JOB_ID in $JOB_IDS; do
-          RESULT=$(echo "$NEEDS_CONTEXT" | jq -r ".[\"$JOB_ID\"].result")
-          echo "$JOB_ID job result: $RESULT"
-          if [[ $RESULT != "success" && $RESULT != "skipped" ]]; then
-            echo "***"
-            echo "Error: The $JOB_ID job did not pass."
-            exit 1
-          fi
-        done
-        echo "All jobs passed or were skipped."
+    uses: this-is-tobi/github-workflows/.github/workflows/check-jobs.yml@v0
+    with:
+      NEEDS: ${{ toJson(needs) }}
 ```
 
 > This pipeline pushes a `pr-<number>` image to GHCR so that `scan-trivy.yml` can pull it. If you would rather not publish PR images at all, set `PUSH: false` on the `build-docker` job: the image is exported as a tarball artifact instead. Downstream jobs consume it directly — `scan-trivy.yml` via `IMAGE_ARTIFACT` (tarball mode, no registry access) and `test-kube-deployment.yml` via `IMAGE_ARTIFACTS` (`kind load image-archive`) — so the PR is fully validated without anything reaching the registry. See [Build Docker](./30-build-docker.md) for the full pattern.
@@ -370,7 +357,6 @@ jobs:
 
   all-jobs-passed:
     name: Check jobs status
-    runs-on: ubuntu-latest
     if: ${{ always() }}
     needs:
     - lint-commits
@@ -380,21 +366,9 @@ jobs:
     - scan-sonarqube
     - scan-trivy-conf
     - scan-trivy-images
-    steps:
-    - name: Check status of all required jobs
-      run: |-
-        NEEDS_CONTEXT='${{ toJson(needs) }}'
-        JOB_IDS=$(echo "$NEEDS_CONTEXT" | jq -r 'keys[]')
-        for JOB_ID in $JOB_IDS; do
-          RESULT=$(echo "$NEEDS_CONTEXT" | jq -r ".[\"$JOB_ID\"].result")
-          echo "$JOB_ID job result: $RESULT"
-          if [[ $RESULT != "success" && $RESULT != "skipped" ]]; then
-            echo "***"
-            echo "Error: The $JOB_ID job did not pass."
-            exit 1
-          fi
-        done
-        echo "All jobs passed or were skipped."
+    uses: this-is-tobi/github-workflows/.github/workflows/check-jobs.yml@v0
+    with:
+      NEEDS: ${{ toJson(needs) }}
 ```
 
 ### CD Pipeline
@@ -844,7 +818,6 @@ jobs:
 
   all-jobs-passed:
     name: Check jobs status
-    runs-on: ubuntu-latest
     if: ${{ always() }}
     needs:
     - lint-helm-docs
@@ -852,21 +825,9 @@ jobs:
     - lint-helm-schema
     - lint-yaml
     - test-helm-charts
-    steps:
-    - name: Check status of all required jobs
-      run: |-
-        NEEDS_CONTEXT='${{ toJson(needs) }}'
-        JOB_IDS=$(echo "$NEEDS_CONTEXT" | jq -r 'keys[]')
-        for JOB_ID in $JOB_IDS; do
-          RESULT=$(echo "$NEEDS_CONTEXT" | jq -r ".[\"$JOB_ID\"].result")
-          echo "$JOB_ID job result: $RESULT"
-          if [[ $RESULT != "success" && $RESULT != "skipped" ]]; then
-            echo "***"
-            echo "Error: The $JOB_ID job did not pass."
-            exit 1
-          fi
-        done
-        echo "All jobs passed or were skipped."
+    uses: this-is-tobi/github-workflows/.github/workflows/check-jobs.yml@v0
+    with:
+      NEEDS: ${{ toJson(needs) }}
 ```
 
 ### CD Pipeline
@@ -1149,7 +1110,6 @@ jobs:
 
   all-jobs-passed:
     name: Check jobs status
-    runs-on: ubuntu-latest
     if: ${{ always() }}
     needs:
     - lint-commits
@@ -1157,21 +1117,9 @@ jobs:
     - lint-deps
     - test-vitest
     - scan-sonarqube
-    steps:
-    - name: Check status of all required jobs
-      run: |-
-        NEEDS_CONTEXT='${{ toJson(needs) }}'
-        JOB_IDS=$(echo "$NEEDS_CONTEXT" | jq -r 'keys[]')
-        for JOB_ID in $JOB_IDS; do
-          RESULT=$(echo "$NEEDS_CONTEXT" | jq -r ".[\"$JOB_ID\"].result")
-          echo "$JOB_ID job result: $RESULT"
-          if [[ $RESULT != "success" && $RESULT != "skipped" ]]; then
-            echo "***"
-            echo "Error: The $JOB_ID job did not pass."
-            exit 1
-          fi
-        done
-        echo "All jobs passed or were skipped."
+    uses: this-is-tobi/github-workflows/.github/workflows/check-jobs.yml@v0
+    with:
+      NEEDS: ${{ toJson(needs) }}
 ```
 
 ### CD Pipeline
@@ -1407,7 +1355,6 @@ jobs:
 
   all-jobs-passed:
     name: Check jobs status
-    runs-on: ubuntu-latest
     if: ${{ always() }}
     needs:
     - lint-commits
@@ -1417,21 +1364,9 @@ jobs:
     - build-go
     - scan-gitleaks
     - scan-sonarqube
-    steps:
-    - name: Check status of all required jobs
-      run: |-
-        NEEDS_CONTEXT='${{ toJson(needs) }}'
-        JOB_IDS=$(echo "$NEEDS_CONTEXT" | jq -r 'keys[]')
-        for JOB_ID in $JOB_IDS; do
-          RESULT=$(echo "$NEEDS_CONTEXT" | jq -r ".[\"$JOB_ID\"].result")
-          echo "$JOB_ID job result: $RESULT"
-          if [[ $RESULT != "success" && $RESULT != "skipped" ]]; then
-            echo "***"
-            echo "Error: The $JOB_ID job did not pass."
-            exit 1
-          fi
-        done
-        echo "All jobs passed or were skipped."
+    uses: this-is-tobi/github-workflows/.github/workflows/check-jobs.yml@v0
+    with:
+      NEEDS: ${{ toJson(needs) }}
 ```
 
 > `build-go` runs `goreleaser build --snapshot` and needs only `contents: read`. That separation is deliberate: a single Go workflow with a "don't publish" switch would declare `contents: write` for every caller, and this one is started by a pull request. Use `PACKAGE: true` to also exercise the archiving and checksumming a plain compile never reaches.
