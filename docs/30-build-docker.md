@@ -13,6 +13,9 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | IMAGE_DOCKERFILE    | string  | Path of the Dockerfile                                                                    | Yes      | -                |
 | IMAGE_CONTEXT       | string  | Path of the build context                                                                 | Yes      | -                |
 | IMAGE_TARGET        | string  | Target stage to build in the Dockerfile (builds the last stage if not set)                | No       | -                |
+| IMAGE_METADATA      | boolean | Stamp the standard `org.opencontainers.image.*` set as image labels and index annotations | No       | true             |
+| IMAGE_LABELS        | string  | Newline-separated list of extra image labels (e.g. `my.label=value`)                      | No       | -                |
+| IMAGE_ANNOTATIONS   | string  | Newline-separated list of extra manifest-list annotations (e.g. `my.annotation=value`)    | No       | -                |
 | PUSH                | boolean | Push the image to the registry. When `false`, the image is exported as a tarball artifact | No       | true             |
 | BUILD_ARGS          | string  | Newline-separated list of Docker build args (e.g. `MY_ARG=value`)                         | No       | -                |
 | BUILD_SECRET_GITHUB_TOKEN | string | Which credential to expose as a `github_token=<token>` build secret, readable at `/run/secrets/github_token`. Raises the GitHub API rate limit for tools resolving releases during the build (mise, aqua, ubi). One of `none`, `app`, `pat`, `job-token` — see [Build secret credential](#build-secret-credential) | No | none |
@@ -102,6 +105,50 @@ This workflow never needs `id-token`/`attestations` — it has no nested call th
 - **Multi-arch**: with `USE_QEMU: false` (native runners), building both architectures produces two independent single-arch tarballs — one per runner — which is usually what you want, since a test job can only run one architecture anyway.
 - **Unsupported combination**: `PUSH: false` + `USE_QEMU: true` + both `BUILD_AMD64` and `BUILD_ARM64`. The `docker` exporter cannot write a multi-platform manifest list to a tarball, so the workflow fails fast in the `infos` job with an explicit error. Either use native runners (`USE_QEMU: false`) or build a single architecture at a time.
 - **Registry login** is skipped when `PUSH` is `false`, unless the image targets `ghcr.io` (where credentials always resolve from the job token) or `REGISTRY_USERNAME` is provided. This means a non-GHCR image can be built without any registry credentials, while private base images can still be pulled by passing the secrets anyway.
+
+## OCI labels and annotations
+
+By default (`IMAGE_METADATA: true`) the workflow stamps the standard `org.opencontainers.image.*` set — `title`, `description`, `url`, `source`, `revision`, `version`, `created`, `licenses` — so a running image can be traced back to the commit and repository it came from without cross-referencing CI logs and hoping the right run is still findable.
+
+**Labels and annotations are the same values at two different levels, and both come off a single `docker/metadata-action` run in the `infos` job.**
+
+- **Labels** live in the image config, so they have to exist before `build` runs.
+- **Annotations** live on the manifest list, so they can only be attached in `merge`, once there is a list to attach them to — with `docker buildx imagetools create --annotation`.
+
+Computed separately they would carry two clock readings of `org.opencontainers.image.created` — and with a matrix, one per architecture — leaving the index disagreeing with the images underneath it about when they were built. Both consumers derive from that one metadata JSON instead, so they agree by construction.
+
+Annotations are attached at **index** level: `imagetools create` accepts index and descriptor annotations only, never manifest, and the index is the one manifest list a caller ever pulls by tag.
+
+### Custom labels and annotations
+
+`IMAGE_LABELS` and `IMAGE_ANNOTATIONS` take bare `KEY=VALUE`, one per line, and apply whether or not `IMAGE_METADATA` is on. They are appended **last**, and the final `--label` or `--annotation` for a key is the one that survives — so a caller can override a single standard value without giving up the rest of the set. Surrounding whitespace is trimmed and blank lines are dropped, since a YAML block scalar strips the common indentation and nothing else.
+
+```yaml
+    with:
+      IMAGE_LABELS: |
+        org.opencontainers.image.vendor=My Org
+        com.example.team=platform
+      IMAGE_ANNOTATIONS: |
+        com.example.channel=stable
+```
+
+### Caveats
+
+- **An unchanged rebuild no longer lands on the same digest.** `org.opencontainers.image.created` carries the build timestamp and is part of the config the digest covers. `IMAGE_METADATA: false` restores the previous result exactly, and is also the answer when the Dockerfile's own `LABEL`s must win.
+- **`org.opencontainers.image.revision` is the run's `github.sha`**, which on a `pull_request` event is the ephemeral merge commit rather than the branch head.
+- **With `PUSH: false` only labels are set** — the `merge` job is skipped, so there is no manifest list to annotate.
+- **Neither labels nor annotations are signed or tamper-proof.** This is discoverability metadata, not provenance: anything that must resist forgery belongs in [`attest-docker.yml`](./31-attest-docker.md) via `PROVENANCE` and `SIGN`.
+
+Reading back what was stamped:
+
+```sh
+# Index annotations
+docker buildx imagetools inspect ghcr.io/my-org/my-image:1.2.3 --raw | jq '.annotations'
+
+# Image labels
+docker buildx imagetools inspect ghcr.io/my-org/my-image:1.2.3 \
+  --format '{{ json .Image.Config.Labels }}'
+```
 
 ## Attestation and signing (`attest-docker.yml`)
 
