@@ -202,6 +202,13 @@ case "$args" in
       exit 1
     fi
     ;;
+  # A pull request's file list, for classify-changes.yml. Ordered before the
+  # generic "api repos/" case for the reason the compare case is. A fixture
+  # holding several arrays back to back is several pages: the filter runs over
+  # each, the way `gh api --paginate --jq` applies it page by page.
+  *"/pulls/"*"/files"*)
+    printf '%s' "${STUB_GH_PR_FILES_JSON:-[]}" | apply_filter
+    ;;
   # Ordered before the generic "api repos/" case: a compare call matches both,
   # and answering it with the repository metadata fixture would make every
   # status look valid.

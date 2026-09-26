@@ -1,0 +1,312 @@
+name: Classify changes
+
+on:
+  workflow_call:
+    inputs:
+      PROSE_PATTERNS:
+        description: >-
+          Files no gate behind the `code` output reads, as a JSON array of shell
+          patterns in which `*` also crosses `/`. A file none of them matches
+          counts as code, so a path nobody anticipated runs the suite rather than
+          skipping it
+        type: string
+        required: false
+        default: '["docs/*", "*.md", "LICENSE", "NOTICE", ".release-please-manifest.json"]'
+      GROUPS:
+        description: >-
+          Named groups of shell patterns, as a JSON object of arrays (e.g.
+          '{"chart": ["charts/*", ".github/ct.yaml"]}'). Each is reported true
+          when any changed file matches one of its patterns, prose or not
+        type: string
+        required: false
+        default: "{}"
+      MODULE_ROOT:
+        description: >-
+          Directory whose subdirectories are separate modules (e.g. 'plugins/').
+          The modules a code change touches are reported by name, and a code file
+          anywhere else is shared. Empty reports no modules, so every code change
+          is shared
+        type: string
+        required: false
+        default: ""
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+    outputs:
+      code:
+        description: >-
+          'true' when any changed file is outside PROSE_PATTERNS, 'false' when
+          every one is prose
+        value: ${{ jobs.classify.outputs.code }}
+      groups:
+        description: >-
+          JSON object naming every group in GROUPS, each true or false (e.g.
+          '{"chart":true}'). Read one with fromJSON(...).chart
+        value: ${{ jobs.classify.outputs.groups }}
+      modules:
+        description: >-
+          JSON array of the modules under MODULE_ROOT a code file changed in,
+          sorted and without duplicates. The names come from file paths, which
+          whoever opened the pull request chose: check them before use
+        value: ${{ jobs.classify.outputs.modules }}
+      shared:
+        description: >-
+          'true' when a code file outside every module changed, which is when
+          every module has to be checked rather than the ones in `modules`
+        value: ${{ jobs.classify.outputs.shared }}
+
+# Every `run:` below is bash. Without this GitHub reads the shell off the runner
+# — PowerShell on Windows — so a caller pointing RUNS_ON at one gets a parse
+# error where a run should be. `bash` is the portable value: GitHub resolves it
+# to Git Bash on Windows and to /usr/bin/bash elsewhere.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # What a pull request changed, sorted into what each gate reads, so a
+  # pipeline runs what a change can affect and skips what it cannot.
+  #
+  # **Shell over the API's own file list, and no filter action.** A
+  # change-detection action sits exactly where a supply-chain attack pays
+  # best: it runs on every pull request, and its answer decides which gates
+  # run at all. tj-actions/changed-files was compromised in March 2025, and
+  # while it lasted every workflow running it printed its own secrets into
+  # its log — a public page, for a public repository. What this needs is one
+  # API call and a pattern match, so that is all it is.
+  #
+  # **Nothing is checked out.** The list comes from the pull request itself —
+  # its own answer to "what does this change" — which costs seconds and runs
+  # none of the branch's code, so the one job every other job waits on never
+  # executes anything the pull request wrote.
+  #
+  # **Every doubt resolves toward running.** A file matching no prose pattern
+  # is code; a listing that cannot be complete, or an event that is not a
+  # pull request, reports everything as changed; an API call that fails fails
+  # the job, which the pipeline's gate then reports. The failure this is built
+  # to avoid is a gate that should have run and silently did not.
+  classify:
+    name: Classify changed files
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      pull-requests: read
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+      groups: ${{ steps.classify.outputs.groups }}
+      modules: ${{ steps.classify.outputs.modules }}
+      shared: ${{ steps.classify.outputs.shared }}
+    steps:
+    # Not GROUPS in the environment: bash reserves that name for the user's
+    # group IDs and ignores an inherited value, so the script would read
+    # numbers where the caller's JSON should be.
+    - name: Classify the pull request's changed files
+      id: classify
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPOSITORY: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+        PROSE_PATTERNS: ${{ inputs.PROSE_PATTERNS }}
+        GROUPS_JSON: ${{ inputs.GROUPS }}
+        MODULE_ROOT: ${{ inputs.MODULE_ROOT }}
+      run: |
+        set -euo pipefail
+
+        if ! jq -e 'type == "array" and all(.[]; type == "string")' <<<"$PROSE_PATTERNS" >/dev/null 2>&1; then
+          echo "::error::PROSE_PATTERNS is not a JSON array of strings. The shape is '[\"docs/*\", \"*.md\"]'."
+          exit 1
+        fi
+        if ! jq -e 'type == "object" and all(.[]; type == "array" and all(.[]; type == "string"))' <<<"$GROUPS_JSON" >/dev/null 2>&1; then
+          echo "::error::GROUPS is not a JSON object of string arrays. The shape is '{\"chart\": [\"charts/*\"]}'."
+          exit 1
+        fi
+
+        # The API speaks in paths relative to the repository root with no
+        # leading `./`, so the root is brought to that form and then carries
+        # one trailing slash: `plugins`, `plugins/` and `./plugins` are the
+        # same directory, and `plugins-old/x` is not inside it. A root that
+        # could never prefix such a path is refused rather than left to match
+        # nothing, which would report every module file as shared and look
+        # like a working configuration.
+        ROOT=""
+        if [ -n "$MODULE_ROOT" ]; then
+          ROOT=${MODULE_ROOT#./}
+          ROOT=${ROOT%/}
+          case "/$ROOT/" in
+          //*|*//*|*/./*|*/../*)
+            echo "::error::MODULE_ROOT must name a directory relative to the repository root, such as 'plugins/'."
+            exit 1
+            ;;
+          esac
+          ROOT="$ROOT/"
+        fi
+
+        report_everything() {
+          echo "$1"
+          echo "Every output says everything changed."
+          {
+            echo "code=true"
+            echo "groups=$(jq -c 'map_values(true)' <<<"$GROUPS_JSON")"
+            echo "modules=[]"
+            echo "shared=true"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+        }
+
+        if [ -z "$PR_NUMBER" ]; then
+          report_everything "This run is not for a pull request, so there is no file list to classify."
+        fi
+
+        # The count is what tells a complete listing from a truncated one
+        # below, so a pull request event without it is classified as though
+        # the listing had been cut short.
+        if ! [[ "$CHANGED_FILES" =~ ^[0-9]+$ ]]; then
+          report_everything "The event does not say how many files pull request #$PR_NUMBER changes, so its listing cannot be checked for completeness."
+        fi
+
+        # Each entry as one JSON line, [filename, previous_filename]. The
+        # previous name matters as much as the new one: a file moved from
+        # main.go to docs/main.go is a Go file gone from the build, and its new
+        # name alone reads as documentation.
+        #
+        # Captured first and parsed after, rather than read through a process
+        # substitution, whose exit status is lost: an API call that failed
+        # would classify an empty list and report that nothing changed. A
+        # hundred to a page, the most the endpoint serves, is thirty calls for
+        # the largest listing it gives rather than a hundred.
+        LISTING=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" --paginate \
+          --jq '.[] | [.filename, .previous_filename] | @json')
+        LISTED=$(printf '%s\n' "$LISTING" | jq -s 'length')
+
+        # The endpoint lists at most 3000 files and says nothing when it
+        # stops. A file it left out could be the one that matters, so a
+        # listing shorter than the pull request's own count is not
+        # classified at all.
+        if [ "$LISTED" -lt "$CHANGED_FILES" ]; then
+          report_everything "The pull request changes $CHANGED_FILES files and the API listed $LISTED of them, so the rest cannot be classified."
+        fi
+
+        # Every loop below reads from jq through a process substitution, and
+        # `wait $!` after each is what surfaces jq's exit status: a jq that
+        # died halfway would otherwise end the loop early, and a list read
+        # short is a gate told to skip.
+        #
+        # The NUL between fields is built from its code point, `[0] |
+        # implode`, rather than spelled as an escape: an escape naming a
+        # control character is one careless edit from being the character
+        # itself, which nobody reading this file would see.
+        PROSE=()
+        while IFS= read -r -d '' PATTERN; do
+          PROSE+=("$PATTERN")
+        done < <(jq -j 'def nul: [0] | implode; .[] | (., nul)' <<<"$PROSE_PATTERNS")
+        wait $!
+
+        # One entry per pattern, the group's position beside it. jq emits a
+        # group's patterns together, which is what lets the loop below stop
+        # at a group's first match. Groups are tracked by position rather
+        # than by name, so no name — "" included — can collide with the
+        # marker for "none yet".
+        GROUP_INDEX=()
+        GROUP_NAME=()
+        GROUP_PATTERN=()
+        while IFS= read -r -d '' INDEX && IFS= read -r -d '' NAME && IFS= read -r -d '' PATTERN; do
+          GROUP_INDEX+=("$INDEX")
+          GROUP_NAME+=("$NAME")
+          GROUP_PATTERN+=("$PATTERN")
+        done < <(jq -j 'def nul: [0] | implode;
+          to_entries | to_entries[] | .key as $i | .value.key as $name
+          | .value.value[] | (($i | tostring), nul, $name, nul, ., nul)' <<<"$GROUPS_JSON")
+        wait $!
+
+        # **File names are whatever the pull request's author chose**, so none
+        # reaches the log as it came. Each is printed JSON-encoded — a newline
+        # in a name cannot start a line of its own — and between
+        # stop-commands markers, because the runner acts on `##[...]` anywhere
+        # in a line and a name can spell one: a file called
+        # `##[set-output name=code;]false` is a valid path. The token is random
+        # per run, so no name can be the line that resumes processing.
+        TOKEN=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+        echo "Pull request #$PR_NUMBER lists $LISTED files:"
+        echo "::stop-commands::$TOKEN"
+
+        # Per path, three fields: the path JSON-encoded for the log, the path
+        # itself for the patterns, and — for a path inside a module — the
+        # module's name, JSON-encoded here and never decoded again. A name
+        # travels to the output as the JSON jq wrote, never as an argument to
+        # a command: a directory called `--indent` is a jq option on a
+        # command line, and would have spread the output over several lines.
+        CODE=false
+        SHARED=false
+        MODULES=()
+        HIT=()
+        while IFS= read -r -d '' SHOWN && IFS= read -r -d '' FILE && IFS= read -r -d '' MODULE; do
+          KIND=code
+          for PATTERN in ${PROSE[@]+"${PROSE[@]}"}; do
+            # shellcheck disable=SC2053 # the right-hand side is a pattern on purpose
+            if [[ $FILE == $PATTERN ]]; then
+              KIND=prose
+              break
+            fi
+          done
+
+          TAGS=""
+          MATCHED=-1
+          i=0
+          while [ "$i" -lt "${#GROUP_INDEX[@]}" ]; do
+            if [ "${GROUP_INDEX[$i]}" -ne "$MATCHED" ]; then
+              # shellcheck disable=SC2053 # the right-hand side is a pattern on purpose
+              if [[ $FILE == ${GROUP_PATTERN[$i]} ]]; then
+                MATCHED=${GROUP_INDEX[$i]}
+                HIT+=("$MATCHED")
+                TAGS="$TAGS ${GROUP_NAME[$i]}"
+              fi
+            fi
+            i=$((i + 1))
+          done
+
+          # A module is a directory below the root with the file somewhere
+          # inside it. A file sitting in the root itself belongs to no module,
+          # and is shared like any other file outside them. Prose widens
+          # nothing: a changelog edited beside a module's code does not make
+          # a second module worth checking.
+          if [ "$KIND" = code ]; then
+            CODE=true
+            if [ -n "$MODULE" ]; then
+              MODULES+=("$MODULE")
+            else
+              SHARED=true
+            fi
+          fi
+
+          printf '  %-5s %s%s\n' "$KIND" "$SHOWN" "${TAGS:+  [${TAGS# }]}"
+        done < <(printf '%s\n' "$LISTING" | jq -j --arg root "$ROOT" '
+          def nul: [0] | implode;
+          def module_name:
+            if $root != "" and startswith($root) then
+              ltrimstr($root) | split("/")
+              | if length > 1 and .[0] != "" then .[0] | tojson else "" end
+            else "" end;
+          .[] | select(. != null) | (tojson, nul, ., nul, module_name, nul)')
+        wait $!
+
+        MODULES_JSON=$(printf '%s\n' ${MODULES[@]+"${MODULES[@]}"} | jq -sc 'unique')
+        GROUPS_OUT=$(printf '%s\n' ${HIT[@]+"${HIT[@]}"} | jq -sc --argjson groups "$GROUPS_JSON" '
+          . as $hit
+          | [$groups | to_entries | to_entries[]
+             | {key: .value.key, value: (.key as $i | any($hit[]; . == $i))}]
+          | from_entries')
+
+        echo "code: $CODE"
+        echo "groups: $GROUPS_OUT"
+        echo "modules: $MODULES_JSON"
+        echo "shared: $SHARED"
+        echo "::$TOKEN::"
+
+        {
+          echo "code=$CODE"
+          echo "groups=$GROUPS_OUT"
+          echo "modules=$MODULES_JSON"
+          echo "shared=$SHARED"
+        } >> "$GITHUB_OUTPUT"
