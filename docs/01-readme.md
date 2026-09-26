@@ -90,6 +90,7 @@ For more details, see:
 
 **Utility**
 
+- [Classify a pull request's changed files into what each gate reads (`classify-changes.yml`)](../.github/workflows/classify-changes.yml)
 - [Delete GitHub action caches belonging to a pull request or branch (`clean-cache.yml`)](../.github/workflows/clean-cache.yml)
 - [Delete GHCR container images by tag, and collect orphaned ones (`clean-images.yml`)](../.github/workflows/clean-images.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](../.github/workflows/label-pr.yml)
