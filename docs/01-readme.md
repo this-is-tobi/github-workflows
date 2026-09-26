@@ -90,6 +90,7 @@ For more details, see:
 
 **Utility**
 
+- [Aggregate every job result into the one status check a ruleset requires (`check-jobs.yml`)](../.github/workflows/check-jobs.yml)
 - [Classify a pull request's changed files into what each gate reads (`classify-changes.yml`)](../.github/workflows/classify-changes.yml)
 - [Delete GitHub action caches belonging to a pull request or branch (`clean-cache.yml`)](../.github/workflows/clean-cache.yml)
 - [Delete GHCR container images by tag, and collect orphaned ones (`clean-images.yml`)](../.github/workflows/clean-images.yml)
