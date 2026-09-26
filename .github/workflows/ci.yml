@@ -27,8 +27,11 @@ jobs:
     with:
       # actionlint's config sits outside `workflows/`, but it decides what the
       # `Test workflows` job accepts, so editing it has to re-run that job the
-      # same way editing a workflow does.
-      GROUPS: '{"workflows": [".github/workflows/*", ".github/actionlint.yaml"], "tests": ["ci/tests/*"]}'
+      # same way editing a workflow does. yamllint's config is the same for
+      # `lint-yaml`, and only for it: its group re-runs that job alone.
+      GROUPS: >-
+        {"workflows": [".github/workflows/*", ".github/actionlint.yaml"],
+        "yamllint": ["ci/configs/yamllint.yaml"], "tests": ["ci/tests/*"]}
 
   lint-commits:
     uses: ./.github/workflows/lint-commits.yml
@@ -38,7 +41,7 @@ jobs:
 
   lint-yaml:
     uses: ./.github/workflows/lint-yaml.yml
-    if: ${{ fromJSON(needs.path-filter.outputs.groups).workflows }}
+    if: ${{ fromJSON(needs.path-filter.outputs.groups).workflows || fromJSON(needs.path-filter.outputs.groups).yamllint }}
     needs:
     - path-filter
     permissions:
