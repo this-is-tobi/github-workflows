@@ -19,7 +19,7 @@ Test Helm charts by installing them in a Kubernetes cluster using `chart-testing
 
 - Uses `helm/chart-testing-action` with `ct install` to test chart installations in a real Kubernetes environment.
 - Creates a temporary Kind (Kubernetes in Docker) cluster using `helm/kind-action` for testing.
-- Dynamically selects target branch: uses PR head branch (`github.head_ref`) when testing pull requests, otherwise falls back to repository default branch.
+- The target branch `ct install` diffs against is the branch the pull request merges into (`github.base_ref`), falling back to the repository's default branch outside a pull request. `ct` installs only the charts that differ from it, so the pull request's own branch would diff to nothing and install nothing.
 - Chart-testing configuration file defines which charts to test, dependencies, and installation parameters.
 - Requires charts to have valid `values.yaml` and proper Kubernetes manifests that can be deployed.
 - Consider adding integration tests or custom validation scripts in your chart-testing configuration.
