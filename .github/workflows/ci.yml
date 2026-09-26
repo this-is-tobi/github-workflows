@@ -14,31 +14,21 @@ defaults:
     shell: bash
 
 jobs:
+  # Which of the jobs below a pull request can affect, answered by this
+  # repository's own classifier rather than by a filter action: the reason
+  # classify-changes.yml exists holds for this pipeline as much as for any
+  # caller's. This is also the one caller that runs the pull request's copy
+  # rather than a released one, so a change to the classifier is tried here,
+  # on its own pull request, before any caller reads it.
   path-filter:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/classify-changes.yml
     permissions:
-      contents: read
       pull-requests: read
-    outputs:
-      workflows: ${{ steps.filter.outputs.workflows }}
-      tests: ${{ steps.filter.outputs.tests }}
-    steps:
-    - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-    - name: Check updated files paths
-      uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-      id: filter
-      with:
-        filters: |
-          workflows:
-            - '.github/workflows/**'
-            # actionlint's config sits outside `workflows/`, but it decides what
-            # the `Test workflows` job accepts, so editing it has to re-run that
-            # job the same way editing a workflow does.
-            - '.github/actionlint.yaml'
-          tests:
-            - 'ci/tests/**'
+    with:
+      # actionlint's config sits outside `workflows/`, but it decides what the
+      # `Test workflows` job accepts, so editing it has to re-run that job the
+      # same way editing a workflow does.
+      GROUPS: '{"workflows": [".github/workflows/*", ".github/actionlint.yaml"], "tests": ["ci/tests/*"]}'
 
   lint-commits:
     uses: ./.github/workflows/lint-commits.yml
@@ -48,7 +38,7 @@ jobs:
 
   lint-yaml:
     uses: ./.github/workflows/lint-yaml.yml
-    if: ${{ needs.path-filter.outputs.workflows == 'true' }}
+    if: ${{ fromJSON(needs.path-filter.outputs.groups).workflows }}
     needs:
     - path-filter
     permissions:
@@ -60,7 +50,7 @@ jobs:
   test-workflows:
     name: Test workflows
     runs-on: ubuntu-26.04
-    if: ${{ needs.path-filter.outputs.workflows == 'true' || needs.path-filter.outputs.tests == 'true' }}
+    if: ${{ fromJSON(needs.path-filter.outputs.groups).workflows || fromJSON(needs.path-filter.outputs.groups).tests }}
     needs:
     - path-filter
     permissions:
