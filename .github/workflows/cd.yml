@@ -5,34 +5,140 @@ on:
     branches:
     - main
 
+# Every `run:` below is bash, and shell-declared.test.sh holds every workflow
+# here to saying so rather than leaving it to whichever runner picks it up.
+defaults:
+  run:
+    shell: bash
+
 jobs:
+  # Whether this push changed what a release of this repository is made of,
+  # answered in shell over the push's own range rather than by a filter
+  # action. The reason classify-changes.yml gives for not running one holds
+  # here as much as anywhere: its answer decides whether a release runs at
+  # all, on the branch releases are cut from. What it needs is one diff and a
+  # pattern match, so that is all it is.
+  #
+  # classify-changes.yml itself does not fit. It reads a pull request's file
+  # list from the API, and a push has no pull request; what a push changed is
+  # the difference between the commit it replaced and the one it landed, and
+  # git answers that from a checkout.
+  #
+  # **Every doubt resolves toward releasing.** A push that created the branch
+  # names no previous commit, and a force push can name one no ref holds any
+  # more; either way there is nothing to diff against, so both outputs say
+  # changed — as the filter action did, which listed every file as added when
+  # a push had no previous commit. A release run with nothing to release
+  # updates the release pull request at most, where one skipped that should
+  # have run leaves a merged change unreleased with nothing saying so. A diff
+  # that fails fails the job, which leaves the release job skipped and this
+  # run red, where somebody sees it.
   path-filter:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
     outputs:
       workflows: ${{ steps.filter.outputs.workflows }}
       release: ${{ steps.filter.outputs.release }}
     steps:
+    # The whole history rather than the last commit: the diff below needs the
+    # commit this push replaced, and a pull request rebased onto main lands
+    # as many commits as it held, so that commit can sit any number back.
+    # Nothing is pushed from this job, so no credential stays in the checkout.
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-    - name: Check updated files paths
-      uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-      id: filter
       with:
-        # 'every' is required for negation patterns (!) to work correctly.
-        # With the default 'some', a file matching any positive rule wins,
-        # so '!ci.yml' exclusions are silently ignored.
-        predicate-quantifier: 'every'
-        filters: |
-          workflows:
-            - '.github/workflows/**'
-            - '!.github/workflows/ci.yml'
-            - '!.github/workflows/cd.yml'
-          release:
-            - '.release-please-manifest.json'
+        fetch-depth: 0
+        persist-credentials: false
+
+    # workflows: a reusable workflow changed, which is what a release of this
+    # repository ships. ci.yml and cd.yml are its own pipeline, which no
+    # caller runs, so a change to them alone releases nothing.
+    #
+    # release: release-please's manifest changed, which is a release pull
+    # request merging, and the release job below cuts the tag it promised.
+    - name: Classify the pushed files
+      id: filter
+      env:
+        BEFORE: ${{ github.event.before }}
+        AFTER: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        report_everything() {
+          echo "$1"
+          echo "Every output says changed."
+          {
+            echo "workflows=true"
+            echo "release=true"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+        }
+
+        # Both ends are commit ids before git sees either, so neither can be
+        # read as an option or a revision expression.
+        SHA='^([0-9a-f]{40}|[0-9a-f]{64})$'
+        if ! [[ "$AFTER" =~ $SHA ]]; then
+          echo "::error::The pushed commit is not a commit id, so what this push changed cannot be listed."
+          exit 1
+        fi
+
+        # GitHub spells "no previous commit" as an id of zeros.
+        if ! [[ "$BEFORE" =~ $SHA ]] || ! [[ "$BEFORE" =~ [1-9a-f] ]]; then
+          report_everything "This push names no commit it replaced, as when it creates the branch, so there is nothing to compare against."
+        fi
+
+        if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+          report_everything "The commit this push replaced, $BEFORE, is in no history this checkout holds, as after a force push, so what changed since cannot be listed."
+        fi
+
+        # **Both names of a moved file**, never only the one it arrived at.
+        # git pairs a deletion with an addition by default and lists the pair
+        # under the new name, and a workflow moved out of .github/workflows/
+        # is one gone from what a release ships. The filter action diffed
+        # with --no-renames for the same reason.
+        #
+        # Read NUL-separated, since a name can hold a newline, and through a
+        # process substitution whose exit status `wait $!` brings back: a
+        # diff that died halfway would otherwise be a list read short, and a
+        # release told there was nothing to release.
+        #
+        # **File names are whatever a merged pull request's author chose**, so
+        # none reaches the log as it came. Each is printed JSON-encoded,
+        # between stop-commands markers, for the reason classify-changes.yml
+        # gives: a valid path can spell a workflow command.
+        TOKEN=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+        echo "The push from $BEFORE to $AFTER changes:"
+        echo "::stop-commands::$TOKEN"
+
+        WORKFLOWS=false
+        RELEASE=false
+        while IFS= read -r -d '' FILE; do
+          TAG=""
+          case "$FILE" in
+          .github/workflows/ci.yml|.github/workflows/cd.yml)
+            ;;
+          .github/workflows/*)
+            WORKFLOWS=true
+            TAG=workflows
+            ;;
+          .release-please-manifest.json)
+            RELEASE=true
+            TAG=release
+            ;;
+          esac
+          printf '  %s%s\n' "$(jq -cn --arg file "$FILE" '$file')" "${TAG:+  [$TAG]}"
+        done < <(git diff --no-renames --name-only -z --end-of-options "$BEFORE" "$AFTER" --)
+        wait $!
+
+        echo "workflows: $WORKFLOWS"
+        echo "release: $RELEASE"
+        echo "::$TOKEN::"
+
+        {
+          echo "workflows=$WORKFLOWS"
+          echo "release=$RELEASE"
+        } >> "$GITHUB_OUTPUT"
 
   release:
     uses: ./.github/workflows/release-app.yml
