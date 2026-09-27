@@ -30,8 +30,6 @@ set -uo pipefail
 # shellcheck source=ci/tests/lib.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
-WORKFLOWS_DIR=".github/workflows"
-
 test_every_workflow_that_runs_a_script_declares_bash() {
   local file name steps shell missing=""
   for file in "$WORKFLOWS_DIR"/*.yml; do
