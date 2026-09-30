@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.36.0](https://github.com/this-is-tobi/github-workflows/compare/v0.35.0...v0.36.0) (2026-09-30)
+
+
+### Features
+
+* **scan-scorecard:** audit supply-chain practices with OpenSSF Scorecard ([da261cf](https://github.com/this-is-tobi/github-workflows/commit/da261cf9718152ca7f363e4c70c3d56c4a2e0e5b))
+
+
+### Dependencies
+
+* **deps:** update sonarsource/sonarqube-scan-action to v8.3.0 ([793a070](https://github.com/this-is-tobi/github-workflows/commit/793a07090be5bd35e76d69b4f216da23fcc51822))
+
 ## [0.35.0](https://github.com/this-is-tobi/github-workflows/compare/v0.34.0...v0.35.0) (2026-09-27)
 
 
