@@ -72,6 +72,7 @@ For more details, see:
 - [Run Trivy vulnerability scans on images and config (`scan-trivy.yml`)](../.github/workflows/scan-trivy.yml)
 - [Scan git history for leaked secrets using gitleaks (`scan-gitleaks.yml`)](../.github/workflows/scan-gitleaks.yml)
 - [Scan a Go module for known vulnerabilities using govulncheck (`scan-govulncheck.yml`)](../.github/workflows/scan-govulncheck.yml)
+- [Audit supply-chain security practices using OpenSSF Scorecard (`scan-scorecard.yml`)](../.github/workflows/scan-scorecard.yml)
 
 **Release**
 
