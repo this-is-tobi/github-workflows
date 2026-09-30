@@ -1,0 +1,94 @@
+name: Scorecard scan
+
+on:
+  workflow_call:
+    inputs:
+      GITHUB_SECURITY_TAB:
+        description: >-
+          Whether to upload the SARIF report to the GitHub Security tab (Code
+          scanning). A private repository needs GitHub Code Security for the
+          upload to succeed; the report is kept as a workflow artifact either way
+        required: false
+        type: boolean
+        default: true
+      RUNS_ON:
+        description: >-
+          Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]').
+          Linux only: the Scorecard action runs in a container
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+
+# Every `run:` below is bash. Without this GitHub reads the shell off the runner
+# — PowerShell on Windows — so a caller pointing RUNS_ON at one gets a parse
+# error where a run should be. `bash` is the portable value: GitHub resolves it
+# to Git Bash on Windows and to /usr/bin/bash elsewhere.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # **Results are never published** (`publish_results: false`), so there is no
+  # badge and no scorecard.dev entry, only the Security tab and the artifact.
+  # Scorecard's API rejects published results from a workflow with top-level
+  # `defaults` or with `run` steps in the scanning job, and this one needs both
+  # (see above, and the report links below). A repository that wants the badge
+  # needs its own local workflow following Scorecard's template.
+  #
+  # **Read-only on the repository.** The reads beyond `contents` are what
+  # Scorecard queries on a private repository (commits over GraphQL, pull
+  # requests, check runs for the SAST and CI checks); on a public one they are
+  # harmless. `security-events: write` is the SARIF upload.
+  scorecard-scan:
+    name: Scan supply-chain security practices
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+      security-events: write
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # Nothing below talks to git, so the job token is not left on disk
+        persist-credentials: false
+
+    - name: Run Scorecard analysis
+      uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+      with:
+        results_file: scorecard-results.sarif
+        results_format: sarif
+        publish_results: false
+
+    - name: Upload the Scorecard report
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: scorecard-report
+        path: scorecard-results.sarif
+        retention-days: 7
+      continue-on-error: true
+
+    - name: Upload Scorecard results to GitHub Security tab
+      id: upload
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      if: ${{ inputs.GITHUB_SECURITY_TAB }}
+      with:
+        sarif_file: scorecard-results.sarif
+      continue-on-error: true
+
+    - name: Warn about error
+      if: ${{ steps.upload.outcome == 'failure' }}
+      run: |
+        echo ":warning: The Scorecard report was not successfully uploaded to the Github Security Panel, it is available in the scorecard-report artifact." >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Link the results
+      if: ${{ steps.upload.outcome == 'success' }}
+      env:
+        REPOSITORY: ${{ github.repository }}
+      # Scorecard names its SARIF tool `Scorecard`, which is what code scanning
+      # filters on. Not narrowed to a branch: Scorecard scores the repository's
+      # settings and default branch, whatever ref the caller ran it from.
+      run: |
+        echo ":bar_chart: The Scorecard results are available in [the GitHub Security Tab](https://github.com/${REPOSITORY}/security/code-scanning?query=is%3Aopen+tool%3AScorecard)." >> "$GITHUB_STEP_SUMMARY"
