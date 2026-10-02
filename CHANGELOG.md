@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.37.0](https://github.com/this-is-tobi/github-workflows/compare/v0.36.0...v0.37.0) (2026-10-02)
+
+
+### Features
+
+* **sync-prerelease-branch:** push with a GitHub App token when one is supplied ([f0941b5](https://github.com/this-is-tobi/github-workflows/commit/f0941b5b8b426ee18f1b71d42661f94f3a820b8c))
+
+
+### Dependencies
+
+* **deps:** update anchore/sbom-action to v0.24.3 ([485848e](https://github.com/this-is-tobi/github-workflows/commit/485848ee538bd9e0a88beb2b8f1c5d6e3a76d669))
+
 ## [0.36.0](https://github.com/this-is-tobi/github-workflows/compare/v0.35.0...v0.36.0) (2026-09-30)
 
 
