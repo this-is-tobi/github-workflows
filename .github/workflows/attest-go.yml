@@ -221,7 +221,7 @@ jobs:
     # the wider inventory - see docs/33-attest-go.md.
     - name: Generate SBOM
       if: ${{ inputs.SBOM }}
-      uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
       with:
         path: ${{ inputs.WORKING_DIRECTORY }}
         format: spdx-json
