@@ -29,11 +29,41 @@ The only thing that decides when it is correct to re-synchronise is "has the rel
 | CREATE_IF_MISSING | boolean | Create `PRERELEASE_BRANCH` from `RELEASE_BRANCH` when it does not exist yet, rather than skipping. Bootstraps a repository adopting the two-branch flow. | No       | true             |
 | RUNS_ON           | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                                  | No       | ["ubuntu-24.04"] |
 
+## Secrets
+
+None is required: by default the push goes out with the job's `GITHUB_TOKEN`.
+
+| Secret          | Description                                                                                                         | Required |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- | -------- |
+| APP_CLIENT_ID   | GitHub App Client ID (`Iv23li...`, not the numeric App ID). Supply with `APP_PRIVATE_KEY`                            | No       |
+| APP_PRIVATE_KEY | GitHub App private key (PEM). Required alongside `APP_CLIENT_ID`                                                    | No       |
+
+Supplying them makes the push go out with an App token, see [When rulesets reject `GITHUB_TOKEN`](#when-rulesets-reject-github_token). Supplying only one of the two fails the job rather than silently falling back to `GITHUB_TOKEN`.
+
 ## Permissions
 
 | Scope    | Access | Description                          |
 | -------- | ------ | ------------------------------------ |
 | contents | write  | Push the rebased prerelease branch   |
+
+With an App, the minted token is narrowed to `contents: write` on the current repository.
+
+## When rulesets reject `GITHUB_TOKEN`
+
+The push (creating the prerelease branch, or `--force-with-lease` after the rebase) is subject to the rulesets of that branch. A ruleset that requires a pull request for every push, forbids non-fast-forward pushes, requires a linear history or required status checks — including on creation — rejects `GITHUB_TOKEN`, which cannot be named in a bypass list. Only a GitHub App can.
+
+In that case, pass the credentials of an App that is in the bypass list:
+
+```yaml
+  sync-prerelease-branch:
+    uses: this-is-tobi/github-workflows/.github/workflows/sync-prerelease-branch.yml@v0
+    # needs, if, permissions, with: as above
+    secrets:
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+```
+
+**The trade-off: the push can start the caller's CD.** An App token, unlike `GITHUB_TOKEN`, triggers workflows. Moving the prerelease branch then starts the workflows that run on it. Only do it if a CD run on that branch that finds nothing new to release is harmless for your pipeline — which release-please, being idempotent, is.
 
 ## Where to put it
 
@@ -88,5 +118,5 @@ Forgetting this job, or forgetting an entry in its `needs:`, would stay invisibl
 - **In the steady state the rebase is a plain fast-forward.** The promotion put the prerelease branch's commits into the release branch, so `RELEASE_BRANCH..PRERELEASE_BRANCH` is empty and nothing is replayed. It only does real work when the prerelease branch moved while the release was running — possible whenever the caller's `concurrency` group is keyed on the branch — and that is exactly the case a plain `git push` would reject.
 - **This assumes the promotion preserves commits** — as ancestors (merge) or as patch-identical copies (rebase-merge, where the rebase recognises each already-applied commit and drops it). A **squash** merge of `PRERELEASE_BRANCH` → `RELEASE_BRANCH` breaks that property: the N original commits are melted into one that none of them is patch-identical to, the rebase replays them all, and conflicts become the norm.
 - **A conflict fails the job** rather than leaving the branch stale — the version regression would otherwise be silent.
-- **The push uses the checkout's `GITHUB_TOKEN`**, which cannot trigger workflow runs, so moving the prerelease branch does not re-enter the caller's CD. Do not give this workflow an App token or a PAT.
+- **The push uses the checkout's `GITHUB_TOKEN` by default**, which cannot trigger workflow runs, so moving the prerelease branch does not re-enter the caller's CD. Only supply an App token when a ruleset rejects that push (see above). PATs are not accepted.
 - `RELEASE_BRANCH` and `PRERELEASE_BRANCH` must differ — otherwise the job fails rather than rebasing a branch onto itself and never synchronising anything.

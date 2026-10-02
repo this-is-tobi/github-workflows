@@ -14,6 +14,7 @@ Start at the top and stop at the first row that matches.
 | need to dispatch a workflow in **another** repository (`dispatch-helm-chart`)           | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
 | need chart releases to fire `release:` triggers (`release-helm`)                        | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
 | need a Go release to fire `release:` triggers (`release-go`)                            | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
+| have branch rulesets that reject `GITHUB_TOKEN`'s push (`sync-prerelease-branch`)        | **GitHub App**                 | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
 | hit GitHub API rate limits during Trivy scans                                           | **GitHub App** (or `GH_PAT`)   | `APP_CLIENT_ID`, `APP_PRIVATE_KEY` |
 | hit GitHub API rate limits **inside a Docker build**                                    | **GitHub App** (or `GH_PAT`)   | the two above, **plus** [`BUILD_SECRET_GITHUB_TOKEN`](#what-build-docker-actually-injects) |
 | already have `GH_PAT` working and don't want to change                                  | **`GH_PAT`** — still supported | `GH_PAT`                           |
@@ -29,6 +30,8 @@ App token  →  GH_PAT  →  GITHUB_TOKEN
 Each step falls through only when the one before it is absent, so adding a credential never removes a capability and removing one never breaks more than it enabled. If both an App and a PAT are configured, **the App wins** — which makes migration a switch you can verify before deleting the PAT.
 
 Supplying only one of `APP_CLIENT_ID` / `APP_PRIVATE_KEY` is never valid and **fails the job** rather than falling through; see [Both App secrets or neither](#both-app-secrets-or-neither).
+
+`sync-prerelease-branch.yml` is the one exception to the three modes: it accepts the App pair only, and uses `GITHUB_TOKEN` otherwise (see [its page](./57-sync-prerelease-branch.md#when-rulesets-reject-github_token)).
 
 ### Where the chain stops early
 
@@ -126,6 +129,7 @@ Each workflow then mints its own token narrowed to just what that job needs:
 | -------------------------------------- | --------------------------------------------- | --------------------- |
 | `release-app.yml`                      | `contents`, `pull-requests`, `issues` = write | current repository    |
 | `update-helm-chart.yml`                | `contents`, `pull-requests` = write           | current repository    |
+| `sync-prerelease-branch.yml`           | `contents: write`                             | current repository    |
 | `dispatch-helm-chart.yml`              | `actions: write`                              | chart repository only |
 | `release-helm.yml`                     | `contents: write`                             | current repository    |
 | `build-docker.yml`                     | `contents`, `metadata` = read                 | current repository    |
@@ -296,7 +300,7 @@ Accepted by every workflow that takes a credential, in the same places as an App
 | Permission    | Access         | Needed for                                                                        |
 | ------------- | -------------- | --------------------------------------------------------------------------------- |
 | Contents      | Read           | `build-docker` build secret, `scan-trivy` database download                       |
-| Contents      | Read and write | `release-app`, `release-helm`, `update-helm-chart` — push commits, tags, releases |
+| Contents      | Read and write | `release-app`, `release-helm`, `update-helm-chart`, `sync-prerelease-branch` — push commits, tags, releases, the prerelease branch |
 | Pull requests | Read and write | Automerge in `release-app` and `update-helm-chart`                                |
 | Actions       | Read and write | `dispatch-helm-chart` only — grant on the **chart** repository                    |
 
