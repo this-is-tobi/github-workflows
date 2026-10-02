@@ -82,6 +82,7 @@ For more details, see:
 - [Release a monorepo Helm chart to an OCI registry (`release-helm-local.yml`)](./.github/workflows/release-helm-local.yml)
 - [Bump a Helm chart hosted in this repository (`update-helm-chart.yml`)](./.github/workflows/update-helm-chart.yml)
 - [Trigger a Helm chart bump in a separate repository (`dispatch-helm-chart.yml`)](./.github/workflows/dispatch-helm-chart.yml)
+- [Resynchronise the prerelease branch onto the release branch after a release (`sync-prerelease-branch.yml`)](./.github/workflows/sync-prerelease-branch.yml)
 - [Publish packages to any NPM-compatible registry (`release-npm.yml`)](./.github/workflows/release-npm.yml)
 - [Publish a Go project with GoReleaser (`release-go.yml`)](./.github/workflows/release-go.yml)
 
@@ -94,7 +95,8 @@ For more details, see:
 
 - [Aggregate every job result into the one status check a ruleset requires (`check-jobs.yml`)](./.github/workflows/check-jobs.yml)
 - [Classify a pull request's changed files into what each gate reads (`classify-changes.yml`)](./.github/workflows/classify-changes.yml)
-- [Delete GitHub action caches and optionally GHCR images (`clean-cache.yml`)](./.github/workflows/clean-cache.yml)
+- [Delete GitHub action caches belonging to a pull request or branch (`clean-cache.yml`)](./.github/workflows/clean-cache.yml)
+- [Delete GHCR container images by tag, and collect orphaned ones (`clean-images.yml`)](./.github/workflows/clean-images.yml)
 - [Add labels to PRs using a labeler configuration file (`label-pr.yml`)](./.github/workflows/label-pr.yml)
 
 

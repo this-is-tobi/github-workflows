@@ -65,6 +65,7 @@ For more details, see:
 - [Compile a Go project across its release matrix with GoReleaser (`build-go.yml`)](../.github/workflows/build-go.yml)
 - [Generate and attach security attestations to a Docker image (`attest-docker.yml`)](../.github/workflows/attest-docker.yml)
 - [Sign and attest published Helm charts (`attest-helm.yml`)](../.github/workflows/attest-helm.yml)
+- [Generate and attach security attestations to a Go release (`attest-go.yml`)](../.github/workflows/attest-go.yml)
 
 **Scan**
 
@@ -81,6 +82,7 @@ For more details, see:
 - [Release a monorepo Helm chart to an OCI registry (`release-helm-local.yml`)](../.github/workflows/release-helm-local.yml)
 - [Bump a Helm chart hosted in this repository (`update-helm-chart.yml`)](../.github/workflows/update-helm-chart.yml)
 - [Trigger a Helm chart bump in a separate repository (`dispatch-helm-chart.yml`)](../.github/workflows/dispatch-helm-chart.yml)
+- [Resynchronise the prerelease branch onto the release branch after a release (`sync-prerelease-branch.yml`)](../.github/workflows/sync-prerelease-branch.yml)
 - [Publish packages to any NPM-compatible registry (`release-npm.yml`)](../.github/workflows/release-npm.yml)
 - [Publish a Go project with GoReleaser (`release-go.yml`)](../.github/workflows/release-go.yml)
 
