@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.38.0](https://github.com/this-is-tobi/github-workflows/compare/v0.37.0...v0.38.0) (2026-10-03)
+
+
+### Features
+
+* **release-helm-local:** accept a CHART_PATH for charts not named after their directory ([a85105b](https://github.com/this-is-tobi/github-workflows/commit/a85105bce4e6c6c76d80091b8f53de4ebcfb02bd))
+* **update-helm-chart:** accept a CHART_PATH and read the chart name from Chart.yaml ([fefccc7](https://github.com/this-is-tobi/github-workflows/commit/fefccc7339fe5452146702b8c31c58e7c406cc3b))
+
+
+### Bug Fixes
+
+* **scan-govulncheck:** read the report where it was written when WORKING_DIRECTORY is set ([d7561dc](https://github.com/this-is-tobi/github-workflows/commit/d7561dc437f087e466341dbac8ad58ef73721f38))
+
 ## [0.37.0](https://github.com/this-is-tobi/github-workflows/compare/v0.36.0...v0.37.0) (2026-10-02)
 
 
