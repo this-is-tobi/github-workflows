@@ -62,6 +62,7 @@ make_chart() {
 }
 
 publish_env() {
+  export CHART_PATH=""
   export CHARTS_DIR="./charts"
   export CHART_NAME="my-chart"
   export CHART_VERSION=""
@@ -190,6 +191,54 @@ test_surfaces_published_charts_to_callers() {
       "$declared" >&2
     exit 1
   fi
+}
+
+# --- CHART_PATH: a chart whose directory is not named after it ---------------
+
+test_chart_path_packages_that_directory() {
+  install_helm_stub
+  in_workspace
+  mkdir -p utils/helm
+  printf 'apiVersion: v2\nname: ohmlab\nversion: 0.1.0\n' >utils/helm/Chart.yaml
+  publish_env
+  export CHART_NAME=""
+  export CHART_PATH="utils/helm/"
+  export STUB_HELM_PUSHED="ghcr.io/owner/repo/ohmlab:0.1.0"
+
+  run_publish
+
+  assert_status 0
+  assert_called "helm|package utils/helm --destination .cr-release-packages"
+  assert_entry name "ohmlab"
+}
+
+test_chart_path_and_chart_name_together_fail() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export CHART_PATH="charts/my-chart"
+
+  run_publish
+
+  assert_status 1 "two ways to name the chart must not silently pick one"
+  assert_output_contains "CHART_PATH and CHART_NAME are mutually exclusive"
+  assert_not_called "helm|package"
+}
+
+test_chart_path_without_a_chart_fails_naming_the_path() {
+  install_helm_stub
+  in_workspace
+  mkdir -p not-a-chart
+  publish_env
+  export CHART_NAME=""
+  export CHART_PATH="not-a-chart"
+
+  run_publish
+
+  assert_status 1
+  assert_output_contains "Chart.yaml not found in not-a-chart"
+  assert_not_called "helm|package"
 }
 
 run_tests

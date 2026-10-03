@@ -23,6 +23,7 @@ The same reasoning splits [`dispatch-helm-chart.yml`](./54-dispatch-helm-chart.m
 | ------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- |
 | CHARTS_DIR    | string | Directory containing the Helm charts                                                                                                                      | No       | ./charts         |
 | CHART_NAME    | string | Chart directory under `CHARTS_DIR` to release (e.g. `my-app`). Leave empty to package every chart directly under `CHARTS_DIR`.                            | No       | -                |
+| CHART_PATH    | string | Path to a single chart directory (the one holding `Chart.yaml`), e.g. `deploy/helm`, for a chart whose directory is not named after it. Mutually exclusive with `CHART_NAME`; `CHARTS_DIR` is ignored when set. | No | - |
 | CHART_VERSION | string | Chart version to stamp (`helm package --version`). Defaults to the `version` already in `Chart.yaml`.                                                     | No       | -                |
 | APP_VERSION   | string | App version to stamp (`helm package --app-version`). Defaults to the `appVersion` already in `Chart.yaml`.                                                | No       | -                |
 | CHECKOUT_REF  | string | Git ref (branch or SHA) to check out before packaging, e.g. the `commit-sha` output of `update-helm-chart.yml` local mode. Defaults to the commit that triggered the workflow. | No | -           |
@@ -150,4 +151,18 @@ jobs:
     secrets:
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+```
+
+### Chart directory not named after the chart
+
+```yaml
+jobs:
+  release-chart:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-helm-local.yml@v0
+    permissions:
+      contents: read
+      packages: write
+    with:
+      # Chart.yaml in deploy/helm says `name: my-app`; it is pushed as my-app
+      CHART_PATH: deploy/helm
 ```

@@ -21,6 +21,14 @@ on:
           directly under CHARTS_DIR.
         type: string
         required: false
+      CHART_PATH:
+        description: >-
+          Path to a single chart directory (the one holding Chart.yaml), e.g.
+          'deploy/helm'. Use it when the directory is not named after the
+          chart. Mutually exclusive with CHART_NAME; CHARTS_DIR is ignored
+          when it is set.
+        type: string
+        required: false
       CHART_VERSION:
         description: >-
           Chart version to stamp when packaging (helm package --version).
@@ -169,6 +177,7 @@ jobs:
       env:
         CHARTS_DIR: ${{ inputs.CHARTS_DIR }}
         CHART_NAME: ${{ inputs.CHART_NAME }}
+        CHART_PATH: ${{ inputs.CHART_PATH }}
         CHART_VERSION: ${{ inputs.CHART_VERSION }}
         APP_VERSION: ${{ inputs.APP_VERSION }}
         REGISTRY: ${{ inputs.REGISTRY }}
@@ -181,10 +190,25 @@ jobs:
         OCI_REPO="${OCI_REPOSITORY:-$GITHUB_REPOSITORY}"
         OCI_REPO=$(echo "$OCI_REPO" | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')
 
-        # Resolve which chart(s) to package: a single CHART_NAME, or every
-        # immediate subdirectory of CHARTS_DIR that holds a Chart.yaml
+        # Resolve which chart(s) to package: an explicit CHART_PATH, a single
+        # CHART_NAME under CHARTS_DIR, or every immediate subdirectory of
+        # CHARTS_DIR that holds a Chart.yaml
+        if [ -n "$CHART_PATH" ] && [ -n "$CHART_NAME" ]; then
+          echo "::error::CHART_PATH and CHART_NAME are mutually exclusive - set one."
+          exit 1
+        fi
+
         CHART_PATHS=()
-        if [ -n "$CHART_NAME" ]; then
+        if [ -n "$CHART_PATH" ]; then
+          while [ "${CHART_PATH%/}" != "$CHART_PATH" ]; do CHART_PATH="${CHART_PATH%/}"; done
+          # An explicit path that holds no chart is a caller mistake, not an
+          # empty directory to skip.
+          if [ ! -f "$CHART_PATH/Chart.yaml" ]; then
+            echo "::error::Chart.yaml not found in $CHART_PATH"
+            exit 1
+          fi
+          CHART_PATHS+=("$CHART_PATH")
+        elif [ -n "$CHART_NAME" ]; then
           CHART_PATHS+=("$CHARTS_DIR/$CHART_NAME")
         else
           while IFS= read -r dir; do
