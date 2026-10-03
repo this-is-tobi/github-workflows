@@ -18,9 +18,21 @@ on:
         type: string
         default: charts
       CHART_NAME:
-        description: Name of the chart to update (in CHART_DIR)
-        required: true
+        description: >-
+          Name of the chart to update, as a directory under CHART_DIR. Set
+          this or CHART_PATH.
+        required: false
         type: string
+        default: ""
+      CHART_PATH:
+        description: >-
+          Path to the chart directory (the one holding Chart.yaml), e.g.
+          'deploy/helm', for a chart whose directory is not named after it.
+          The chart name is read from Chart.yaml. Set this or CHART_NAME;
+          CHART_DIR is ignored when it is set.
+        required: false
+        type: string
+        default: ""
       APP_VERSION:
         description: >-
           The app version to inject in Chart.yaml (appVersion). Leave empty to
@@ -158,6 +170,8 @@ jobs:
         UPGRADE_TYPE: ${{ inputs.UPGRADE_TYPE }}
         PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
         HELM_DOCS_VERSION: ${{ inputs.HELM_DOCS_VERSION }}
+        CHART_NAME: ${{ inputs.CHART_NAME }}
+        CHART_PATH: ${{ inputs.CHART_PATH }}
       run: |
         set -euo pipefail
 
@@ -198,6 +212,15 @@ jobs:
             exit 1
             ;;
         esac
+
+        if [ -n "${CHART_PATH:-}" ] && [ -n "${CHART_NAME:-}" ]; then
+          echo "::error::CHART_PATH and CHART_NAME are mutually exclusive - set one."
+          exit 1
+        fi
+        if [ -z "${CHART_PATH:-}" ] && [ -z "${CHART_NAME:-}" ]; then
+          echo "::error::Set CHART_NAME (with CHART_DIR) or CHART_PATH."
+          exit 1
+        fi
 
         # Both values are written into Chart.yaml, and PRERELEASE_IDENTIFIER
         # additionally becomes part of the chart version and the pull request's
@@ -301,20 +324,38 @@ jobs:
       env:
         CHART_DIR: ${{ inputs.CHART_DIR }}
         CHART_NAME: ${{ inputs.CHART_NAME }}
+        CHART_PATH: ${{ inputs.CHART_PATH }}
         APP_VERSION: ${{ inputs.APP_VERSION }}
         UPGRADE_TYPE: ${{ inputs.UPGRADE_TYPE }}
         PRERELEASE_IDENTIFIER: ${{ inputs.PRERELEASE_IDENTIFIER }}
       run: |
-        # Remove trailing slashes
-        while [ "${CHART_DIR%/}" != "$CHART_DIR" ]; do CHART_DIR="${CHART_DIR%/}"; done
+        # Resolve the chart directory: explicit CHART_PATH, or CHART_DIR/CHART_NAME
+        if [ -n "${CHART_PATH:-}" ]; then
+          while [ "${CHART_PATH%/}" != "$CHART_PATH" ]; do CHART_PATH="${CHART_PATH%/}"; done
+        else
+          while [ "${CHART_DIR%/}" != "$CHART_DIR" ]; do CHART_DIR="${CHART_DIR%/}"; done
+          CHART_PATH="$CHART_DIR/$CHART_NAME"
+        fi
 
-        if [ ! -f "$CHART_DIR/$CHART_NAME/Chart.yaml" ]; then
-          echo "Chart.yaml not found in $CHART_DIR/$CHART_NAME"
+        if [ ! -f "$CHART_PATH/Chart.yaml" ]; then
+          echo "Chart.yaml not found in $CHART_PATH"
           exit 1
         fi
 
-        echo "Update chart '$CHART_NAME' in $CHART_DIR/$CHART_NAME with app version '$APP_VERSION'"
-        CURRENT_VERSION=$(yq '.version' "$CHART_DIR/$CHART_NAME/Chart.yaml")
+        # In CHART_PATH mode the directory says nothing about the chart, so its
+        # name comes from Chart.yaml. It ends up in a branch name and a commit
+        # message, so only a valid Helm chart name is accepted. (Legacy
+        # CHART_NAME callers keep their input as-is.)
+        if [ -z "${CHART_NAME:-}" ]; then
+          CHART_NAME=$(yq '.name' "$CHART_PATH/Chart.yaml")
+          if ! [[ "$CHART_NAME" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
+            echo "::error::'$CHART_NAME' (from $CHART_PATH/Chart.yaml) is not a valid chart name"
+            exit 1
+          fi
+        fi
+
+        echo "Update chart '$CHART_NAME' in $CHART_PATH with app version '$APP_VERSION'"
+        CURRENT_VERSION=$(yq '.version' "$CHART_PATH/Chart.yaml")
 
         # 'auto' mirrors the app's own bump. The level comes from the
         # appVersion delta - what Chart.yaml holds now vs what is being
@@ -348,7 +389,7 @@ jobs:
 
             # Compared on the base X.Y.Z only: mid-cycle both sides are
             # prereleases, and their identifiers say nothing about the level.
-            CURRENT_APP_VERSION=$(yq '.appVersion' "$CHART_DIR/$CHART_NAME/Chart.yaml")
+            CURRENT_APP_VERSION=$(yq '.appVersion' "$CHART_PATH/Chart.yaml")
             if [[ "$CURRENT_APP_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([-+].*)?$ ]]; then
               OLD_APP_MAJOR="${BASH_REMATCH[1]}"
               OLD_APP_MINOR="${BASH_REMATCH[2]}"
@@ -489,16 +530,18 @@ jobs:
         if [ -n "$APP_VERSION" ]; then
           # Empty APP_VERSION = chart-only release: the chart version bumps on
           # its own lifecycle and the current appVersion is left untouched
-          yq -i '.appVersion = strenv(APP_VERSION)' "$CHART_DIR/$CHART_NAME/Chart.yaml"
+          yq -i '.appVersion = strenv(APP_VERSION)' "$CHART_PATH/Chart.yaml"
         fi
-        yq -i '.version = strenv(NEXT_VERSION)' "$CHART_DIR/$CHART_NAME/Chart.yaml"
+        yq -i '.version = strenv(NEXT_VERSION)' "$CHART_PATH/Chart.yaml"
 
         echo "Generate chart documentation..."
-        helm-docs --chart-search-root "$CHART_DIR/$CHART_NAME"
+        helm-docs --chart-search-root "$CHART_PATH"
 
         {
           echo "CURRENT_VERSION=$CURRENT_VERSION"
           echo "NEXT_VERSION=$NEXT_VERSION"
+          echo "CHART_NAME=$CHART_NAME"
+          echo "CHART_PATH=$CHART_PATH"
           echo "BRANCH_NAME=$CHART_NAME-v$NEXT_VERSION"
           # The resolved flow, for the automerge gate: under 'auto' the INPUT
           # never says 'prerelease' even when the bump is one, so gating on
@@ -510,17 +553,16 @@ jobs:
       id: push-local
       if: ${{ inputs.RUN_MODE == 'local' }}
       env:
-        CHART_DIR: ${{ inputs.CHART_DIR }}
-        CHART_NAME: ${{ inputs.CHART_NAME }}
+        CHART_PATH: ${{ steps.update-chart.outputs.CHART_PATH }}
+        CHART_NAME: ${{ steps.update-chart.outputs.CHART_NAME }}
         NEXT_VERSION: ${{ steps.update-chart.outputs.NEXT_VERSION }}
       run: |
         set -euo pipefail
 
-        CHART_DIR="${CHART_DIR%/}"
         git config user.name 'github-actions[bot]'
         git config user.email 'github-actions[bot]@users.noreply.github.com'
 
-        git add "$CHART_DIR/$CHART_NAME"
+        git add "$CHART_PATH"
         # No [skip ci] here on purpose. Without App credentials supplied to this
         # job, this push cannot trigger a new workflow run - on push OR
         # pull_request - because it goes out on the checkout's own GITHUB_TOKEN
@@ -561,10 +603,10 @@ jobs:
         token: ${{ steps.app-token.outputs.token || secrets.GH_PAT || github.token }}
         branch: ${{ steps.update-chart.outputs.BRANCH_NAME }}
         base: ${{ inputs.BASE_BRANCH }}
-        title: "${{ inputs.APP_VERSION != '' && format('Update chart {0} app to v{1}', inputs.CHART_NAME, inputs.APP_VERSION) || format('Update chart {0} to v{1}', inputs.CHART_NAME, steps.update-chart.outputs.NEXT_VERSION) }}"
+        title: "${{ inputs.APP_VERSION != '' && format('Update chart {0} app to v{1}', steps.update-chart.outputs.CHART_NAME, inputs.APP_VERSION) || format('Update chart {0} to v{1}', steps.update-chart.outputs.CHART_NAME, steps.update-chart.outputs.NEXT_VERSION) }}"
         add-paths: |
           **/**
-        commit-message: "${{ inputs.APP_VERSION != '' && format('chore: update chart {0} app to v{1}', inputs.CHART_NAME, inputs.APP_VERSION) || format('chore: update chart {0} to v{1}', inputs.CHART_NAME, steps.update-chart.outputs.NEXT_VERSION) }}"
+        commit-message: "${{ inputs.APP_VERSION != '' && format('chore: update chart {0} app to v{1}', steps.update-chart.outputs.CHART_NAME, inputs.APP_VERSION) || format('chore: update chart {0} to v{1}', steps.update-chart.outputs.CHART_NAME, steps.update-chart.outputs.NEXT_VERSION) }}"
         draft: false
         body: |
           🤖 This PR has been automatically generated, please check updates before merging.

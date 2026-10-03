@@ -7,7 +7,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 BLOCK=$(extract_run update-helm-chart.yml update "Commit and push chart bump")
 
 push_env() {
-  export CHART_DIR="./charts"
+  export CHART_PATH="utils/helm"
   export CHART_NAME="my-app"
   export NEXT_VERSION="1.2.3"
   export GITHUB_REF_NAME="develop"
@@ -59,6 +59,28 @@ test_the_checkout_follows_the_app_token_then_github_token() {
     printf 'FAIL: expected the checkout token to be %q, got %q\n' "$expected" "$token" >&2
     exit 1
   fi
+}
+
+test_stages_the_resolved_chart_path() {
+  push_env
+
+  run_block "$BLOCK"
+
+  assert_status 0
+  assert_called "git|add utils/helm"
+}
+
+test_pull_request_names_the_resolved_chart() {
+  local title commit v
+  title=$(yq '.jobs.update.steps[] | select(.id == "create-pr") | .with.title' "$WORKFLOWS_DIR/update-helm-chart.yml")
+  commit=$(yq '.jobs.update.steps[] | select(.id == "create-pr") | .with."commit-message"' "$WORKFLOWS_DIR/update-helm-chart.yml")
+  # inputs.CHART_NAME is empty in CHART_PATH mode: the PR would read "Update chart  to v1.2.3".
+  for v in "$title" "$commit"; do
+    if [[ "$v" == *"inputs.CHART_NAME"* ]] || [[ "$v" != *"steps.update-chart.outputs.CHART_NAME"* ]]; then
+      printf 'FAIL: expected the resolved chart name, got %q\n' "$v" >&2
+      exit 1
+    fi
+  done
 }
 
 run_tests
