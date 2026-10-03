@@ -41,7 +41,7 @@ This is the publishing half of the Go pipeline. The compiling half is [`build-go
 | contents | write  | Create the release and upload its assets                          |
 | packages | write  | Push images, for a configuration that publishes them to `ghcr.io` |
 
-> `permissions:` takes no expressions, so `packages: write` is declared even with `REGISTRY` empty, where nothing uses it — the same unavoidable shape `release-helm.yml` carries. A caller that publishes no images may grant `packages: none` to take it back; what the job gets is the intersection.
+> `permissions:` takes no expressions, so `packages: write` is declared even with `REGISTRY` empty, where nothing uses it — the same unavoidable shape `release-helm.yml` carries. Callers must grant it even when they publish no images: GitHub refuses to start a run whose called job asks for more than the caller grants, so `packages: none` fails at startup (`The nested job 'release' is requesting 'packages: write', but is only allowed 'packages: none'`) rather than narrowing the token.
 
 ## Authentication
 

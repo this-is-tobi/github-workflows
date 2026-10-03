@@ -119,8 +119,9 @@ jobs:
       # For a configuration that also publishes images to ghcr.io. `permissions:`
       # takes no expressions, so this is granted even with REGISTRY empty, where
       # nothing uses it - the same unavoidable shape release-helm.yml carries for
-      # PUBLISH_OCI. A caller that publishes no images may grant `packages: none`
-      # to take it back; the intersection is what the job actually gets.
+      # PUBLISH_OCI. Callers must grant it even when they publish no images:
+      # GitHub refuses to start a run whose called job asks for more than the
+      # caller grants, so `packages: none` is a startup failure, not a narrowing.
       packages: write
     env:
       # `secrets` is not available in a step-level `if`, but it is here.
