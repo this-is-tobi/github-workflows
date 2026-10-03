@@ -160,6 +160,8 @@ jobs:
     - name: Print govulncheck results
       id: report-text
       if: ${{ !cancelled() && inputs.FORMAT == 'text' && steps.scan.outputs.vulns == 'true' }}
+      # The report is written next to the scanned module, not at the root.
+      working-directory: ${{ inputs.WORKING_DIRECTORY }}
       run: |
         # GITHUB_STEP_SUMMARY is capped at 1 MiB and a write over the cap is
         # dropped whole, not trimmed - budget leaves room for the fences.
@@ -189,7 +191,7 @@ jobs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: govulncheck-report${{ inputs.CATEGORY != '' && format('-{0}', inputs.CATEGORY) || '' }}
-        path: govulncheck-results.text
+        path: ${{ inputs.WORKING_DIRECTORY }}/govulncheck-results.text
         retention-days: 7
       continue-on-error: true
 
@@ -198,7 +200,7 @@ jobs:
       uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
       if: ${{ !cancelled() && inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' }}
       with:
-        sarif_file: govulncheck-results.sarif
+        sarif_file: ${{ inputs.WORKING_DIRECTORY }}/govulncheck-results.sarif
         category: ${{ inputs.CATEGORY }}
       continue-on-error: true
 
