@@ -206,14 +206,16 @@ jobs:
           exit 1
         fi
 
-        if ! gzip -t "$ARTIFACT_FILE" 2>/dev/null || ! tar -tzf "$ARTIFACT_FILE" >/dev/null 2>&1; then
-          echo "::error::$ARTIFACT_FILE is not a gzipped tar archive"
+        # GNU tar lists a gzipped file that is not a tar as an empty archive and
+        # succeeds; a real archive has at least one entry, so that is what is asked.
+        if ! ENTRIES=$(tar -tzf "$ARTIFACT_FILE" 2>/dev/null) || [ -z "$ENTRIES" ]; then
+          echo "::error::$ARTIFACT_FILE is not a gzipped tar archive with at least one entry"
           exit 1
         fi
 
         # A consumer extracts the archive; an entry outside of its root must
         # never be part of one.
-        if tar -tzf "$ARTIFACT_FILE" | grep -q -E '^/|(^|/)\.\.(/|$)'; then
+        if grep -q -E '^/|(^|/)\.\.(/|$)' <<<"$ENTRIES"; then
           echo "::error::$ARTIFACT_FILE holds an entry with an absolute path or a '..' component"
           exit 1
         fi
