@@ -363,6 +363,32 @@ test_build_fails_when_the_gzip_is_not_a_tar() {
   assert_output_contains "is not a gzipped tar archive"
 }
 
+# A truncated download or a build killed half way leaves an archive that lists
+# its first entries and then fails: the entries alone must not pass it.
+test_build_fails_when_the_archive_is_truncated() {
+  in_workspace
+  build_env
+  export BUILD_COMMAND="mkdir -p dist src; head -c 400000 /dev/urandom > src/big; tar -czf full.tgz -C src .; head -c 150000 full.tgz > dist/catalog.tar.gz"
+
+  run_build
+
+  assert_status 1
+  assert_output_contains "at least one entry"
+}
+
+# GNU tar reads an empty tar and a gzipped non-tar alike: as an archive with
+# nothing in it, and succeeds. A bundle with no entry is no bundle.
+test_build_fails_when_the_archive_holds_no_entry() {
+  in_workspace
+  build_env
+  export BUILD_COMMAND="mkdir -p dist; : > empty.list; tar -czf dist/catalog.tar.gz -T empty.list"
+
+  run_build
+
+  assert_status 1
+  assert_output_contains "at least one entry"
+}
+
 test_build_refuses_an_entry_outside_of_the_root() {
   local entry
   for entry in "../evil" "/abs/evil" "a/../../evil" ".."; do
