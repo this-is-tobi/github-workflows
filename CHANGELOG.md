@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.39.0](https://github.com/this-is-tobi/github-workflows/compare/v0.38.0...v0.39.0) (2026-10-06)
+
+
+### Features
+
+* **build-oci-artifact:** push a tar archive as a single-layer OCI artifact ([4af3e69](https://github.com/this-is-tobi/github-workflows/commit/4af3e69c50e9e3c561c25be5917ed6f9f171089b))
+
+
+### Bug Fixes
+
+* **build-oci-artifact:** accept only an archive that lists at least one entry ([745ac80](https://github.com/this-is-tobi/github-workflows/commit/745ac80846b6c702777622ca23305102cbc1f02d))
+
+
+### Dependencies
+
+* **deps:** update helm/kind-action to v1.15.1 ([da8dc8f](https://github.com/this-is-tobi/github-workflows/commit/da8dc8fba70861e7fcabd5676b69d34cfb4b7eb8))
+
 ## [0.38.0](https://github.com/this-is-tobi/github-workflows/compare/v0.37.0...v0.38.0) (2026-10-03)
 
 
