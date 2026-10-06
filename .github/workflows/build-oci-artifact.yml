@@ -1,0 +1,274 @@
+name: Build OCI artifact
+
+on:
+  workflow_call:
+    inputs:
+      ARTIFACT_NAME:
+        description: Full name of the artifact, registry and path without tag (e.g. 'ghcr.io/my-org/my-repo/catalog'). Normalized automatically (lowercase, underscores replaced by dashes).
+        required: true
+        type: string
+      ARTIFACT_TAG:
+        description: Tag to push the artifact under (e.g. a version)
+        required: true
+        type: string
+      BUILD_COMMAND:
+        description: >-
+          Command that builds the artifact, run with bash from the root of the
+          checked-out repository. It must write the gzipped tar archive named by
+          ARTIFACT_FILE.
+        required: true
+        type: string
+      ARTIFACT_FILE:
+        description: Path, relative to the root of the repository, of the gzipped tar archive (.tar.gz or .tgz) BUILD_COMMAND writes. It becomes the single layer of the artifact.
+        required: true
+        type: string
+      SETUP_HELM:
+        description: Install Helm before building, for builds that run helm
+        required: false
+        default: false
+        type: boolean
+      ARTIFACT_TYPE:
+        description: Media type recorded as the artifactType of the manifest (e.g. 'application/vnd.example.catalog.v1'). Left empty, ORAS records its default.
+        required: false
+        type: string
+      ARTIFACT_METADATA:
+        description: >-
+          Whether to stamp org.opencontainers.image.source, .revision and .version
+          as annotations on the manifest (the repository, the commit and the tag).
+          The source annotation is what links a GHCR package to its repository.
+        required: false
+        default: true
+        type: boolean
+      ARTIFACT_ANNOTATIONS:
+        description: Newline-separated list of extra manifest annotations (e.g. 'my.annotation=value'), applied after the standard set
+        required: false
+        type: string
+      ALLOW_OVERWRITE:
+        description: >-
+          Whether to push over a tag that already exists in the registry. Off by
+          default: a consumer that pins a version expects it to keep meaning the
+          same content, and a registry tag can be re-pushed.
+        required: false
+        default: false
+        type: boolean
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+    outputs:
+      digest:
+        description: Digest of the pushed artifact (sha256:...)
+        value: ${{ jobs.build.outputs.digest }}
+      image:
+        description: Normalized artifact name (lowercase, registry-compatible), without tag. Feed it to attest-docker.yml together with the digest.
+        value: ${{ jobs.build.outputs.image }}
+    secrets:
+      REGISTRY_USERNAME:
+        description: Username used to login into the registry (not needed for ghcr.io)
+        required: false
+      REGISTRY_PASSWORD:
+        description: Password used to login into the registry (not needed for ghcr.io)
+        required: false
+
+# Every `run:` below is bash. Without this GitHub reads the shell off the runner
+# — PowerShell on Windows — so a caller pointing RUNS_ON at one gets a parse
+# error where a run should be. `bash` is the portable value: GitHub resolves it
+# to Git Bash on Windows and to /usr/bin/bash elsewhere.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build OCI artifact
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      image: ${{ steps.validate.outputs.image }}
+    env:
+      # `secrets` is not available in a step-level `if`, but it is here.
+      HAS_REGISTRY_AUTH: ${{ secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != '' }}
+    steps:
+    - name: Validate inputs
+      id: validate
+      env:
+        INPUT_ARTIFACT_NAME: ${{ inputs.ARTIFACT_NAME }}
+        ARTIFACT_TAG: ${{ inputs.ARTIFACT_TAG }}
+        BUILD_COMMAND: ${{ inputs.BUILD_COMMAND }}
+        ARTIFACT_FILE: ${{ inputs.ARTIFACT_FILE }}
+      run: |
+        set -euo pipefail
+
+        # The name and the tag are joined into the reference that is pushed and
+        # that cosign signs, so they are held to reference shape here. The first
+        # segment is the registry host and may carry a port; a colon anywhere
+        # after a '/' would be a tag, which stays rejected.
+        if [[ ! "$INPUT_ARTIFACT_NAME" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._-]+)+$ ]]; then
+          echo "::error::ARTIFACT_NAME must be a registry/path reference without tag or digest (a registry port is allowed), got '$INPUT_ARTIFACT_NAME'"
+          exit 1
+        fi
+
+        if [[ ! "$ARTIFACT_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]]; then
+          echo "::error::ARTIFACT_TAG must be a valid OCI tag (letters, digits, '_', '.', '-', at most 128 characters, not starting with '.' or '-'), got '$ARTIFACT_TAG'"
+          exit 1
+        fi
+
+        if [ -z "$BUILD_COMMAND" ]; then
+          echo "::error::BUILD_COMMAND must not be empty"
+          exit 1
+        fi
+
+        # The archive is read from the checkout: an absolute path or a '..'
+        # would point somewhere else on the runner.
+        if [[ ! "$ARTIFACT_FILE" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*\.(tar\.gz|tgz)$ ]] \
+          || [[ "/$ARTIFACT_FILE/" == *"/../"* ]]; then
+          echo "::error::ARTIFACT_FILE must be a relative path inside the repository ending in .tar.gz or .tgz, got '$ARTIFACT_FILE'"
+          exit 1
+        fi
+
+        NORMALIZED=$(echo "$INPUT_ARTIFACT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')
+        {
+          echo "image=$NORMALIZED"
+          echo "registry=$(echo "$NORMALIZED" | cut -d '/' -f 1)"
+          echo "reference=$NORMALIZED:$ARTIFACT_TAG"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Validate registry credentials
+      env:
+        REGISTRY: ${{ steps.validate.outputs.registry }}
+      run: |
+        set -euo pipefail
+
+        # Only ghcr.io can fall back to the built-in GITHUB_TOKEN. Any other
+        # registry needs explicit credentials; without them the login would
+        # fail with an opaque authentication error instead of naming the cause.
+        if [ "$REGISTRY" != "ghcr.io" ] && [ "$HAS_REGISTRY_AUTH" != "true" ]; then
+          echo "::error::REGISTRY_USERNAME and REGISTRY_PASSWORD are required when the registry ('$REGISTRY') is not ghcr.io."
+          exit 1
+        fi
+
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Install Helm
+      if: ${{ inputs.SETUP_HELM }}
+      uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+    - name: Install ORAS
+      uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
+      with:
+        version: 1.3.4
+
+    - name: Login to registry
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      with:
+        registry: ${{ steps.validate.outputs.registry }}
+        username: ${{ steps.validate.outputs.registry == 'ghcr.io' && github.actor || secrets.REGISTRY_USERNAME }}
+        password: ${{ steps.validate.outputs.registry == 'ghcr.io' && github.token || secrets.REGISTRY_PASSWORD }}
+        logout: true
+
+    - name: Refuse to overwrite a published tag
+      if: ${{ !inputs.ALLOW_OVERWRITE }}
+      env:
+        REFERENCE: ${{ steps.validate.outputs.reference }}
+      run: |
+        set -uo pipefail
+
+        if OUTPUT=$(oras manifest fetch --descriptor "$REFERENCE" 2>&1); then
+          echo "::error::$REFERENCE is already published. A pinned version must keep meaning the same content: publish a new tag, or set ALLOW_OVERWRITE to replace it on purpose."
+          exit 1
+        fi
+
+        # Only a missing tag allows the push. An authentication or network
+        # failure must not read as "not published yet".
+        if ! grep -q -i -E 'not found|manifest unknown|name unknown|404' <<<"$OUTPUT"; then
+          echo "::error::Could not tell whether $REFERENCE exists: $OUTPUT"
+          exit 1
+        fi
+
+    - name: Build the artifact
+      env:
+        BUILD_COMMAND: ${{ inputs.BUILD_COMMAND }}
+        ARTIFACT_FILE: ${{ inputs.ARTIFACT_FILE }}
+      run: |
+        set -euo pipefail
+
+        # The same shell options a `run:` step would give the command: one that
+        # fails half way must not leave an archive that gets published.
+        bash -eo pipefail -c "$BUILD_COMMAND"
+
+        if [ ! -s "$ARTIFACT_FILE" ]; then
+          echo "::error::BUILD_COMMAND did not write $ARTIFACT_FILE (or wrote it empty)"
+          exit 1
+        fi
+
+        if ! gzip -t "$ARTIFACT_FILE" 2>/dev/null || ! tar -tzf "$ARTIFACT_FILE" >/dev/null 2>&1; then
+          echo "::error::$ARTIFACT_FILE is not a gzipped tar archive"
+          exit 1
+        fi
+
+        # A consumer extracts the archive; an entry outside of its root must
+        # never be part of one.
+        if tar -tzf "$ARTIFACT_FILE" | grep -q -E '^/|(^|/)\.\.(/|$)'; then
+          echo "::error::$ARTIFACT_FILE holds an entry with an absolute path or a '..' component"
+          exit 1
+        fi
+
+    - name: Push the artifact
+      id: push
+      env:
+        REFERENCE: ${{ steps.validate.outputs.reference }}
+        ARTIFACT_FILE: ${{ inputs.ARTIFACT_FILE }}
+        ARTIFACT_TYPE: ${{ inputs.ARTIFACT_TYPE }}
+        ARTIFACT_TAG: ${{ inputs.ARTIFACT_TAG }}
+        ARTIFACT_METADATA: ${{ inputs.ARTIFACT_METADATA }}
+        ARTIFACT_ANNOTATIONS: ${{ inputs.ARTIFACT_ANNOTATIONS }}
+      run: |
+        set -euo pipefail
+
+        LAYER_TYPE="application/vnd.oci.image.layer.v1.tar+gzip"
+
+        ARGS=()
+        [ -z "$ARTIFACT_TYPE" ] || ARGS+=(--artifact-type "$ARTIFACT_TYPE")
+        if [ "$ARTIFACT_METADATA" = "true" ]; then
+          ARGS+=(
+            --annotation "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+            --annotation "org.opencontainers.image.revision=$GITHUB_SHA"
+            --annotation "org.opencontainers.image.version=$ARTIFACT_TAG"
+          )
+        fi
+        while IFS= read -r ANNOTATION; do
+          [ -z "$ANNOTATION" ] || ARGS+=(--annotation "$ANNOTATION")
+        done <<<"$ARTIFACT_ANNOTATIONS"
+
+        # The digest is read from ORAS's own output: the tag is not a reliable
+        # way back to what was just pushed, and signing pins the digest.
+        PUSH_OUTPUT=$(oras push "$REFERENCE" "$ARTIFACT_FILE:$LAYER_TYPE" ${ARGS[@]+"${ARGS[@]}"} 2>&1 | tee /dev/stderr)
+        DIGEST=$(printf '%s\n' "$PUSH_OUTPUT" | awk '/^Digest:/ { print $2 }' | tail -n 1)
+
+        if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+          echo "::error::Could not read the digest of $REFERENCE back from 'oras push'."
+          exit 1
+        fi
+
+        # Argo CD, the consumer this shape exists for, accepts exactly one layer
+        # of this media type; read it back from the registry rather than trust
+        # the push.
+        MANIFEST=$(oras manifest fetch "${REFERENCE%:*}@$DIGEST")
+        LAYERS=$(jq -r --arg type "$LAYER_TYPE" '[.layers[] | select(.mediaType == $type)] | length' <<<"$MANIFEST")
+        TOTAL=$(jq -r '.layers | length' <<<"$MANIFEST")
+        if [ "$LAYERS" != "1" ] || [ "$TOTAL" != "1" ]; then
+          echo "::error::$REFERENCE@$DIGEST must hold exactly one $LAYER_TYPE layer, found $TOTAL layer(s), $LAYERS of that type."
+          exit 1
+        fi
+
+        echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+        {
+          echo "### Pushed \`${REFERENCE}\`"
+          echo
+          echo "Digest: \`${DIGEST}\`"
+        } >> "$GITHUB_STEP_SUMMARY"

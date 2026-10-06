@@ -63,6 +63,7 @@ For more details, see:
 
 - [Build docker images and optionally push it to a registry (`build-docker.yml`)](../.github/workflows/build-docker.yml)
 - [Compile a Go project across its release matrix with GoReleaser (`build-go.yml`)](../.github/workflows/build-go.yml)
+- [Build a tar archive and push it as an OCI artifact (`build-oci-artifact.yml`)](../.github/workflows/build-oci-artifact.yml)
 - [Generate and attach security attestations to a Docker image (`attest-docker.yml`)](../.github/workflows/attest-docker.yml)
 - [Sign and attest published Helm charts (`attest-helm.yml`)](../.github/workflows/attest-helm.yml)
 - [Generate and attach security attestations to a Go release (`attest-go.yml`)](../.github/workflows/attest-go.yml)
