@@ -152,6 +152,8 @@ If both are set, the App takes precedence — useful for verifying the switch be
 - If `TAG_MAJOR_AND_MINOR: true`, tags `v<major>` and `v<major>.<minor>` after a release is created.
 - If `AUTOMERGE_*` is enabled and a PAT is provided, attempts to automerge the release PR.
 - **Asserts** that `PRERELEASE_BRANCH` holds everything published on `RELEASE_BRANCH`, before any version is computed — see [Prerelease sync assertion](#prerelease-sync-assertion). The rebase itself belongs to [`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md).
+- **Asserts** that release-please's starting point on `PRERELEASE_BRANCH` is in the branch — see [Release anchor assertion](#release-anchor-assertion).
+- **Does not run release-please** when `PRERELEASE_BRANCH` is identical to `RELEASE_BRANCH` — see [Prerelease branch identical to the release branch](#prerelease-branch-identical-to-the-release-branch).
 - **Asserts** that a merged release pull request becomes a tag and a release, and refuses to start while an abandoned one can prevent that — see [Release assertions](#release-assertions). Nothing to configure.
 - `RELEASE_ASSET_PATHS` uploads files that are already present on the runner filesystem. `RELEASE_ARTIFACT_NAMES` accepts a name or glob pattern — the matching artifacts are downloaded via `actions/download-artifact` before being attached to the release; both inputs can be used together.
 - `PUBLISH_DRAFT_RELEASE: true` publishes the release after the assets have been attached. It is a no-op when the release is not a draft, so the step is safe to re-run. See [immutable releases](#immutable-releases).
@@ -172,6 +174,32 @@ On failure the run stops with the number of missing commits and what to do. Two 
 > The assertion uses a GitHub API `compare` call rather than `git merge-base --is-ancestor`: ancestry needs real history, and `actions/checkout` leaves the clone shallow — the git form would have to unshallow the repository on every prerelease run.
 
 > A repository that has not created `RELEASE_BRANCH` yet has nothing to compare against: the assertion does nothing rather than blocking its first prereleases.
+
+## Release anchor assertion
+
+On the prerelease branch, release-please starts from the release named after the version in the prerelease manifest, found by its tag, and reads the branch history down to that tag's commit. After a rebase (typically a hotfix on the release branch, then [`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md)), the commits are replayed under new SHAs: the tag still points to the old commit, which is no longer in the branch. release-please never finds its stop, reads the 500 most recent commits and proposes a wrong version — a major bump from an old breaking commit, `4.0.0-rc.4` instead of `3.5.0-rc.5` — with a changelog repeating everything already released. It says nothing before the pull request exists.
+
+Before release-please, the workflow therefore checks that **one of two** is in the history of the branch:
+
+- the tag of the version in the prerelease manifest;
+- the `last-release-sha` commit of `PRERELEASE_CONFIG_FILE`, which [`sync-prerelease-branch.yml`](./57-sync-prerelease-branch.md#release-anchor-after-a-rebase) sets after each rebase.
+
+Otherwise the run fails, naming the tag and the config file. There are two ways out: check that the caller's `sync-prerelease-branch` job receives the same `PRERELEASE_CONFIG_FILE` and `PRERELEASE_MANIFEST_FILE` as this workflow and that it ran since the rebase, or set `last-release-sha` by hand to the replayed release commit. Never merge the release pull request a run without this assertion would have opened, and do not move the tag: registries and mirrors build versions from tags.
+
+Nothing to configure — `PRERELEASE_CONFIG_FILE` and `PRERELEASE_MANIFEST_FILE` are already inputs. The assertion does nothing when:
+
+- the prerelease manifest does not exist yet;
+- the manifest tracks several packages (`last-release-sha` is one commit for the whole repository): a warning says so, because the problem remains for them;
+- no tag matches its version, or several are candidates (lockstep chart and application versions): a warning, release-please then has its own lookup;
+- the branch is identical to the release branch (see below).
+
+The commit is checked through the API (`compare`), for the same reason as the synchronisation: the clone is shallow. The tag is `v<version>` or `<version>`, else the one tag ending in the version (a component prefix), as in the sync job. When the API does not answer (5xx, rate limit), the run fails with a distinct message instead of blaming the rebase: re-run it.
+
+## Prerelease branch identical to the release branch
+
+When `PRERELEASE_BRANCH` is identical to `RELEASE_BRANCH`, it holds no work of its own: there is no prerelease to cut, and the release-please step is skipped (its outputs are empty, so "no release created").
+
+That is the state right after a synchronisation that had no anchor commit to add (see [the anchor](#release-anchor-assertion)). With an App token, the sync job's push starts a CD run on the branch; without this rule, release-please counts as unreleased on the prerelease line every commit that reached the release branch directly (a hotfix, a hand-carried fix) and opens a `chore(develop): release X.Y.Z-rc` pull request for code that is already out — one nobody should merge, which turns stale and conflicting at the next stable release. As soon as the prerelease branch gets its first commit of its own, the computation resumes normally. The automerge step is skipped as well: it would queue a stale release pull request this run did not refresh.
 
 ## Release assertions
 
