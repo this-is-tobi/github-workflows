@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.40.0](https://github.com/this-is-tobi/github-workflows/compare/v0.39.0...v0.40.0) (2026-10-07)
+
+
+### Features
+
+* **release-app:** assert release-please's anchor and skip an identical prerelease branch ([086d8fd](https://github.com/this-is-tobi/github-workflows/commit/086d8fdd39d8f395c9cffd9c851a3de6d5ba8499))
+* **sync-prerelease-branch:** settle release-file conflicts and anchor release-please ([636babe](https://github.com/this-is-tobi/github-workflows/commit/636babe9d93b8696a44a7b0e6dc6f26b23935938))
+
+
+### Dependencies
+
+* **deps:** update actions/download-artifact to v8.0.2 ([1191cc1](https://github.com/this-is-tobi/github-workflows/commit/1191cc1a8c3068e2178f23aa20cbe0a54168d370))
+* **deps:** update actions/upload-artifact to v7.0.2 ([1e96fa2](https://github.com/this-is-tobi/github-workflows/commit/1e96fa2040cb2f00e75518655171ccd88fd5a1e0))
+
 ## [0.39.0](https://github.com/this-is-tobi/github-workflows/compare/v0.38.0...v0.39.0) (2026-10-06)
 
 
