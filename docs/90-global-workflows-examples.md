@@ -566,6 +566,12 @@ jobs:
     with:
       RELEASE_BRANCH: main
       PRERELEASE_BRANCH: develop
+      # The chart bump rewrites these files on `main`, and `develop` rewrites
+      # them too: a conflict confined to them is settled on `develop`'s side,
+      # any other conflict fails the job. Adapt the path to your chart.
+      MANAGED_FILES: |
+        charts/my-app/Chart.yaml
+        charts/my-app/README.md
 ```
 
 > The bump commit is pushed with `GITHUB_TOKEN`, and such pushes never trigger new workflow runs — no CD loop, which is precisely why the chart must be released in the same run via the `commit-sha` output.
