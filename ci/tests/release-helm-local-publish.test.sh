@@ -34,7 +34,32 @@ case "$1" in
       prev="$arg"
     done
     mkdir -p "$dest"
-    : >"$dest/$(basename "$chart")-${STUB_HELM_PACKAGE_VERSION:-1.2.3-rc.1}.tgz"
+    # Holds the chart metadata so `show chart <package>` can answer from it.
+    # `helm show chart` prints the keys in alphabetical order, so the indented
+    # name: and version: lines of `dependencies:` come before the chart's own.
+    printf 'apiVersion: v2\ndependencies:\n- condition: a-dependency.enabled\n  name: a-dependency\n  repository: https://example.com/charts\n  version: 9.9.9\nname: %s\nversion: %s%s%s\n' "$(basename "$chart")" "${STUB_HELM_QUOTE:-}" "${STUB_HELM_PACKAGE_VERSION:-1.2.3-rc.1}" "${STUB_HELM_QUOTE:-}" \
+      >"$dest/$(basename "$chart")-${STUB_HELM_PACKAGE_VERSION:-1.2.3-rc.1}.tgz"
+    ;;
+  show)
+    # `show chart <package>` reads the local package; `show chart oci://...`
+    # is the "is this version published" probe. A chart named in
+    # STUB_HELM_EXISTING is published; any other answers from STUB_HELM_SHOW
+    # (missing | name-unknown | denied | garbage).
+    ref="$3"
+    if [ "${ref#oci://}" = "$ref" ]; then
+      [ "${STUB_HELM_SHOW:-}" = "garbage" ] && { echo "not yaml: ["; exit 0; }
+      cat "$ref"
+      exit 0
+    fi
+    for existing in ${STUB_HELM_EXISTING:-}; do
+      [ "${ref##*/}" = "$existing" ] && { printf 'name: %s\n' "$existing"; exit 0; }
+    done
+    case "${STUB_HELM_SHOW:-missing}" in
+      missing) echo "Error: failed to perform \"FetchReference\" on source: ${ref#oci://}:$5: not found" >&2; exit 1 ;;
+      name-unknown) echo "Error: GET https://ghcr.io/v2/x/manifests/1: NAME_UNKNOWN: name unknown to registry" >&2; exit 1 ;;
+      denied) echo "Error: unexpected status from GET request: 401 Unauthorized: denied" >&2; exit 1 ;;
+      garbage) echo "Error: failed to perform \"FetchReference\": not found" >&2; exit 1 ;;
+    esac
     ;;
   push)
     [ "${STUB_HELM_PUSH_OMIT:-}" = "reference" ] || \
@@ -62,6 +87,7 @@ make_chart() {
 }
 
 publish_env() {
+  export ALLOW_OVERWRITE="false"
   export CHART_PATH=""
   export CHARTS_DIR="./charts"
   export CHART_NAME="my-chart"
@@ -239,6 +265,130 @@ test_chart_path_without_a_chart_fails_naming_the_path() {
   assert_status 1
   assert_output_contains "Chart.yaml not found in not-a-chart"
   assert_not_called "helm|package"
+}
+
+# --- never over a published version -------------------------------------------
+
+# A consumer pins a chart by version and attest-helm.yml signs the digest it was
+# pushed with: pushing again under the same version silently swaps what that
+# version means and orphans its signature. So every package is checked first,
+# and only a clear "not found" from the registry lets a push through.
+test_refuses_a_version_that_is_already_published() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export STUB_HELM_EXISTING="my-chart"
+
+  run_publish
+
+  assert_status 1 "a published version must not be pushed again"
+  assert_output_contains "my-chart 1.2.3-rc.1 is already published"
+  assert_output_lacks "cannot tell"
+  assert_not_called "helm|push"
+}
+
+test_probes_the_name_and_version_of_the_package() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export STUB_HELM_PACKAGE_VERSION="0.4.0"
+
+  run_publish
+
+  assert_status 0
+  assert_called "helm|show chart oci://ghcr.io/owner/repo/my-chart --version 0.4.0"
+  assert_called_before "helm|show chart oci://ghcr.io/owner/repo/my-chart --version 0.4.0" "helm|push"
+}
+
+test_a_registry_that_does_not_know_the_name_lets_the_push_through() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export STUB_HELM_SHOW="name-unknown"
+
+  run_publish
+
+  assert_status 0
+  assert_called "helm|push"
+}
+
+test_any_other_registry_answer_stops_before_pushing() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export STUB_HELM_SHOW="denied"
+
+  run_publish
+
+  assert_status 1 "an error that is not 'not found' says nothing about the version"
+  assert_output_contains "cannot tell whether my-chart 1.2.3-rc.1 is published"
+  assert_not_called "helm|push"
+}
+
+test_checks_every_chart_before_pushing_any() {
+  install_helm_stub
+  in_workspace
+  make_chart first
+  make_chart second
+  publish_env
+  export CHART_NAME=""
+  export STUB_HELM_EXISTING="second"
+
+  run_publish
+
+  assert_status 1 "a run must not publish half of its charts"
+  assert_output_contains "second 1.2.3-rc.1 is already published"
+  assert_not_called "helm|push"
+}
+
+test_allow_overwrite_pushes_without_probing() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export ALLOW_OVERWRITE="true"
+  export STUB_HELM_EXISTING="my-chart"
+
+  run_publish
+
+  assert_status 0
+  assert_not_called "helm|show chart oci://"
+  assert_called "helm|push"
+}
+
+test_a_quoted_version_in_the_package_is_read() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export STUB_HELM_PACKAGE_VERSION="0.4.0"
+
+  for quote in '"' "'"; do
+    : >"$CALL_LOG"
+    rm -rf .cr-release-packages
+    export STUB_HELM_QUOTE="$quote"
+    run_publish
+    assert_status 0
+    assert_called "helm|show chart oci://ghcr.io/owner/repo/my-chart --version 0.4.0"
+  done
+}
+
+test_a_package_without_a_name_and_version_stops() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export STUB_HELM_SHOW="garbage"
+
+  run_publish
+
+  assert_status 1
+  assert_output_contains "cannot read the name and version"
+  assert_not_called "helm|push"
 }
 
 run_tests
