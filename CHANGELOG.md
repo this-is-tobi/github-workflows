@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.41.0](https://github.com/this-is-tobi/github-workflows/compare/v0.40.1...v0.41.0) (2026-10-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **release-helm-local:** a run that pushes a chart version already in the registry now fails. Set ALLOW_OVERWRITE: true to keep replacing it.
+
+### Features
+
+* **release-helm-local:** refuse to push over a published chart version ([19c1815](https://github.com/this-is-tobi/github-workflows/commit/19c1815a272d1db171e740936bbda4d1300e30ee))
+
 ## [0.40.1](https://github.com/this-is-tobi/github-workflows/compare/v0.40.0...v0.40.1) (2026-10-08)
 
 
