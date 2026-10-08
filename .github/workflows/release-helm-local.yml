@@ -64,6 +64,15 @@ on:
         description: Repository path in the OCI registry (defaults to github.repository)
         type: string
         required: false
+      ALLOW_OVERWRITE:
+        description: >-
+          Whether to push a chart version that is already in the registry.
+          Off by default: a consumer pins a chart by version and its signature
+          is bound to the digest first pushed, so pushing again under the same
+          version silently changes what that version means.
+        type: boolean
+        required: false
+        default: false
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
@@ -182,6 +191,7 @@ jobs:
         APP_VERSION: ${{ inputs.APP_VERSION }}
         REGISTRY: ${{ inputs.REGISTRY }}
         OCI_REPOSITORY: ${{ inputs.REPOSITORY }}
+        ALLOW_OVERWRITE: ${{ inputs.ALLOW_OVERWRITE }}
       run: |
         set -euo pipefail
 
@@ -242,6 +252,33 @@ jobs:
         if [ "$PACKAGED" -eq 0 ]; then
           echo "No chart with a Chart.yaml was found to package under '$CHARTS_DIR'"
           exit 1
+        fi
+
+        # A version already in the registry is never pushed again unless the
+        # caller asks for it, and every package is checked before any is
+        # pushed, so a run cannot publish half of its charts. Only a clear "not
+        # found" lets a push through: any other answer (denied, rate limited,
+        # unreachable) says nothing about the version.
+        if [ "$ALLOW_OVERWRITE" != "true" ]; then
+          for chart_package in .cr-release-packages/*.tgz; do
+            meta=$(helm show chart "$chart_package")
+            # Top-level keys only: `dependencies:` is printed first and holds
+            # indented name: and version: lines of its own.
+            name=$(awk '/^name:/ { print $2; exit }' <<<"$meta" | tr -d "\"'")
+            version=$(awk '/^version:/ { print $2; exit }' <<<"$meta" | tr -d "\"'")
+            if [[ ! "$name" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || [[ ! "$version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.+-][0-9A-Za-z.+-]*)?$ ]]; then
+              echo "::error::cannot read the name and version of $(basename "$chart_package")"
+              exit 1
+            fi
+            if probe=$(helm show chart "oci://$REGISTRY/$OCI_REPO/$name" --version "$version" 2>&1); then
+              echo "::error::$name $version is already published at oci://$REGISTRY/$OCI_REPO; refusing to overwrite it (set ALLOW_OVERWRITE to replace it)."
+              exit 1
+            fi
+            if ! grep -q -i -E 'not found|manifest unknown|name unknown|404' <<<"$probe"; then
+              echo "::error::cannot tell whether $name $version is published at oci://$REGISTRY/$OCI_REPO: $probe"
+              exit 1
+            fi
+          done
         fi
 
         # Each entry is recorded from helm's own Pushed:/Digest: output rather
