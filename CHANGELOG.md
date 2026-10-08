@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.40.1](https://github.com/this-is-tobi/github-workflows/compare/v0.40.0...v0.40.1) (2026-10-08)
+
+
+### Dependencies
+
+* **deps:** update actions/setup-node to v7.1.0 ([442ee0b](https://github.com/this-is-tobi/github-workflows/commit/442ee0b0473e06271d40bdcb1ea803b1452d9bd5))
+* **deps:** update github/codeql-action to v4.38.3 ([528750b](https://github.com/this-is-tobi/github-workflows/commit/528750bc13ec4ac2c6fa3dc99bcdcace1be68e5b))
+
 ## [0.40.0](https://github.com/this-is-tobi/github-workflows/compare/v0.39.0...v0.40.0) (2026-10-07)
 
 
