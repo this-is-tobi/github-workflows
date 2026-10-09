@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.41.1](https://github.com/this-is-tobi/github-workflows/compare/v0.41.0...v0.41.1) (2026-10-09)
+
+
+### Dependencies
+
+* **deps:** update helm/chart-testing-action to v2.9.0 ([67bee28](https://github.com/this-is-tobi/github-workflows/commit/67bee280baca15978380bb767df6db06ed47d19f))
+
 ## [0.41.0](https://github.com/this-is-tobi/github-workflows/compare/v0.40.1...v0.41.0) (2026-10-08)
 
 
