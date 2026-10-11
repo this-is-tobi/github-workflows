@@ -17,6 +17,7 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 | CREATE_GITHUB_RELEASE | boolean | Create a GitHub Release and git tag per changed chart and update `index.yaml` on the pages branch. Requires the pages branch to already exist. Default channel of a dedicated charts repository. | No       | true             |
 | PUBLISH_OCI           | boolean | Push the packaged charts to the OCI registry (see `REGISTRY`/`REPOSITORY`). Independent of `CREATE_GITHUB_RELEASE`; at least one of the two must be enabled | No       | false            |
 | PAGES_BRANCH          | string  | Branch that receives `index.yaml` when `CREATE_GITHUB_RELEASE` is `true`. Must already exist.                                    | No       | gh-pages         |
+| SKIP_EXISTING         | boolean | Leave a chart version that is already published as it is instead of failing the run — see [Charts that did not change version](#charts-that-did-not-change-version) | No       | false            |
 | SIGN_CHART            | boolean | GPG-sign each packaged chart, producing the `.prov` file `helm verify` checks. Requires `CREATE_GITHUB_RELEASE`, `SIGNING_KEY_ID` and the GPG secrets — see [Signing](#signing) | No       | false            |
 | SIGNING_KEY_ID        | string  | Identity of the GPG key to sign with, as it appears in the keyring (e.g. `Jane Doe <jane@example.com>`). Required with `SIGN_CHART`                | No       | -                |
 | HELM_REPOS            | string  | Helm repositories to add for chart dependencies (name=url, comma-separated). Optional; skipped if empty.                          | No       | -                |
@@ -103,9 +104,23 @@ On a private repository, three options, best first:
 
 | Output           | Description                                                                                                                                                     |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| published-charts | JSON array of the charts pushed to the OCI registry — `{name, version, repository, digest}` per entry. Empty array when `PUBLISH_OCI` is false or no chart changed |
+| published-charts | JSON array of the charts pushed to the OCI registry — `{name, version, repository, digest}` per entry. Empty array when `PUBLISH_OCI` is false or no chart changed; a version left alone because it was already published (`SKIP_EXISTING`) is not listed |
 
 `repository` and `digest` are kept apart so they can be fed straight to [`attest-helm.yml`](./56-attest-helm.md), which passes them on as cosign's subject and as the `subject-name`/`subject-digest` pair `actions/attest-build-provenance` expects — the same shape `attest-docker.yml` consumes for images. The name and version are read back from `helm push`'s own output rather than parsed out of the package file name, which cannot be split reliably: a prerelease version contains dashes of its own (`my-chart-1.2.3-rc.1.tgz`).
+
+## Charts that did not change version
+
+chart-releaser packages every chart whose **files** changed since the last tag — a fixed README or a comment in `values.yaml` included — whether or not its `version` was bumped. Such a chart carries a version that is already published, and what happens next is the caller's choice:
+
+| | `SKIP_EXISTING: false` (default) | `SKIP_EXISTING: true` |
+| --- | --- | --- |
+| Classic channel | the run fails: the GitHub Release for that version already exists | the release is left alone (chart-releaser's own `skip-existing`) |
+| OCI channel | the run fails, **before any chart is pushed** | the version is left alone, the other charts are pushed |
+| `published-charts` | — | does not list the version left alone |
+
+The OCI channel never pushes over a version the registry already holds, in either mode: a consumer pins a chart by version, and the [signature](./56-attest-helm.md) is bound to the digest first pushed, so pushing again would silently change what that version means and orphan its signature. Each package is looked up in the registry (`helm show chart oci://…/<name> --version <version>`) before anything is pushed, so a run cannot publish half of its charts, and only a clear "not found" lets a push through — an answer such as *denied*, *rate limited* or *unreachable* stops the run instead of being read as "not published". That holds with `SKIP_EXISTING` too: it leaves a version alone when the registry says it is there, not when the registry could not be asked.
+
+A dedicated chart repository usually wants `SKIP_EXISTING: true`, so a merge that touches a chart without releasing it is not a red run. Because a skipped version is not in `published-charts`, [`attest-helm.yml`](./56-attest-helm.md) does not sign it a second time.
 
 ## Signing
 
@@ -141,7 +156,7 @@ Missing pieces fail up front rather than producing unsigned charts: chart-releas
 - **Registry credentials are validated up front**: with `PUBLISH_OCI: true` and a `REGISTRY` other than `ghcr.io`, missing `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` fail the run with an explicit message rather than reaching `helm registry login` with an empty password and failing on an opaque authentication error.
 - **Credentials are cleared afterwards**: a `helm registry logout` step runs whenever the login succeeded, including after a failed push. Hosted runners are ephemeral so this is a no-op there, but `RUNS_ON` also supports self-hosted runners, where Helm's registry config would otherwise outlive the job.
 - **HELM_REPOS is optional**: The "add repos" step is skipped when `HELM_REPOS` is empty. Provide it when your charts pull dependencies from external repositories.
-- Detects charts via `git diff` from the latest git tag and only releases charts whose `Chart.yaml` version was bumped compared to the previous release; requires SemVer chart versions and `fetch-depth: 0` (the workflow sets it).
+- Detects charts via `git diff` from the latest git tag: a chart with **any** changed file is packaged, whether or not its `Chart.yaml` version was bumped — see [Charts that did not change version](#charts-that-did-not-change-version) for what happens to a version that is already published. Requires SemVer chart versions and `fetch-depth: 0` (the workflow sets it).
 - Charts can be pulled using: `helm pull oci://ghcr.io/<owner>/<repo>/<chart-name> --version <version>`
 
 > [!WARNING]

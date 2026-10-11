@@ -46,6 +46,23 @@ on:
         type: boolean
         required: false
         default: false
+      SKIP_EXISTING:
+        description: >-
+          Leave a chart version that is already published as it is, instead of
+          failing the run. chart-releaser picks up every chart that changed
+          since the last tag, a change that does not bump the version included
+          (a fixed README, a comment in values.yaml), so a dedicated chart
+          repository meets this on ordinary merges. On the classic channel it
+          is chart-releaser's own skip-existing; on the OCI channel the version
+          is looked up in the registry first and, if found, not pushed again -
+          and not listed in published-charts either, so attest-helm.yml has
+          nothing to sign twice. Off by default, where an existing version
+          fails the run on both channels: a consumer pins a chart by version
+          and a signature is bound to the digest first pushed, so one version
+          must never come to mean something else.
+        type: boolean
+        required: false
+        default: false
       SIGN_CHART:
         description: >-
           GPG-sign each packaged chart, producing the .prov provenance file
@@ -131,7 +148,8 @@ on:
           apart so they can be fed straight to attest-helm.yml, which passes
           them on as cosign's subject and as the subject-name/subject-digest
           pair actions/attest-build-provenance expects. Empty array when
-          PUBLISH_OCI is false or no chart changed.
+          PUBLISH_OCI is false or no chart changed. A version left alone
+          because it was already published (SKIP_EXISTING) is not listed.
         value: ${{ jobs.release.outputs.published-charts }}
 
 # Every `run:` below is bash. Without this GitHub reads the shell off the runner
@@ -322,6 +340,9 @@ jobs:
         # refreshed serves no new chart while every run reports success.
         # cr.sh runs `cr upload` whatever this is.
         skip_upload: ${{ !inputs.CREATE_GITHUB_RELEASE && 'true' || '' }}
+        # Same rule as above, and the stakes are higher: 'false' here would
+        # turn the skip ON, since cr.sh only tests that the value is non-empty.
+        skip_existing: ${{ inputs.SKIP_EXISTING && 'true' || '' }}
         pages_branch: ${{ inputs.PAGES_BRANCH }}
       env:
         # `cr index --push` authenticates the PAGES_BRANCH push with this same
@@ -359,6 +380,7 @@ jobs:
       env:
         REGISTRY: ${{ inputs.REGISTRY }}
         OCI_REPOSITORY: ${{ inputs.REPOSITORY }}
+        SKIP_EXISTING: ${{ inputs.SKIP_EXISTING }}
       run: |
         set -euo pipefail
 
@@ -381,13 +403,56 @@ jobs:
           exit 1
         fi
 
+        # A version already in the registry is never pushed over: a consumer
+        # pins a chart by version and attest-helm.yml signs the digest it was
+        # first pushed with, so pushing again would silently change what that
+        # version means and orphan its signature. chart-releaser packages
+        # every chart that changed since the last tag, a change that does not
+        # bump the version included, so meeting one is routine: with
+        # SKIP_EXISTING it is left as it is, without it the run stops.
+        #
+        # Every package is checked before any is pushed, so a run cannot
+        # publish half of its charts. Only a clear "not found" lets a push
+        # through: any other answer (denied, rate limited, unreachable) says
+        # nothing about the version.
+        TO_PUSH=()
+        for chart_package in "${CHART_PACKAGES[@]}"; do
+          meta=$(helm show chart "$chart_package")
+          # Top-level keys only: `dependencies:` is printed first and holds
+          # indented name: and version: lines of its own.
+          name=$(awk '/^name:/ { print $2; exit }' <<<"$meta" | tr -d "\"'")
+          version=$(awk '/^version:/ { print $2; exit }' <<<"$meta" | tr -d "\"'")
+          if [[ ! "$name" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || [[ ! "$version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.+-][0-9A-Za-z.+-]*)?$ ]]; then
+            echo "::error::cannot read the name and version of $(basename "$chart_package")"
+            exit 1
+          fi
+
+          if probe=$(helm show chart "oci://$REGISTRY/$OCI_REPO/$name" --version "$version" 2>&1); then
+            if [ "$SKIP_EXISTING" = "true" ]; then
+              echo "::notice::$name $version is already published at oci://$REGISTRY/$OCI_REPO; leaving it as it is."
+              continue
+            fi
+            echo "::error::$name $version is already published at oci://$REGISTRY/$OCI_REPO; refusing to push over it (set SKIP_EXISTING to leave published versions alone)."
+            exit 1
+          fi
+          if ! grep -q -i -E 'not found|manifest unknown|name unknown|404' <<<"$probe"; then
+            echo "::error::cannot tell whether $name $version is published at oci://$REGISTRY/$OCI_REPO: $probe"
+            exit 1
+          fi
+
+          TO_PUSH+=("$chart_package")
+        done
+
         # Each entry is recorded from helm's own Pushed:/Digest: output rather
         # than rebuilt from the file name: '<name>-<version>.tgz' cannot be
         # split back reliably, because a prerelease version contains dashes of
         # its own ('my-chart-1.2.3-rc.1.tgz').
         PUBLISHED='[]'
 
-        for chart_package in "${CHART_PACKAGES[@]}"; do
+        # The expansion form that stays defined for an empty array: with
+        # SKIP_EXISTING every package can be a version already published, and
+        # an older bash (a self-hosted runner) fails `set -u` on "${TO_PUSH[@]}".
+        for chart_package in ${TO_PUSH[@]+"${TO_PUSH[@]}"}; do
           chart_file=$(basename "$chart_package")
           echo "Publishing $chart_file to oci://$REGISTRY/$OCI_REPO"
           push_output=$(helm push "$chart_package" "oci://$REGISTRY/$OCI_REPO" 2>&1 | tee /dev/stderr)
