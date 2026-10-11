@@ -838,7 +838,7 @@ jobs:
 
 ### CD Pipeline
 
-Triggered on push to `main`. chart-releaser detects which charts had their version bumped and ships them through whichever channel is enabled — `CREATE_GITHUB_RELEASE` (on by default) for GitHub Releases plus a `gh-pages` `index.yaml`, `PUBLISH_OCI: true` for the OCI registry, or both. At least one is required.
+Triggered on push to `main`. chart-releaser detects which charts changed since the last tag and ships them through whichever channel is enabled — `CREATE_GITHUB_RELEASE` (on by default) for GitHub Releases plus a `gh-pages` `index.yaml`, `PUBLISH_OCI: true` for the OCI registry, or both. At least one is required.
 
 > Harmonized alternative: instead of chart-releaser's tag-based detection, you can reuse the exact same guard + `release-helm-local.yml` chart CD as the monorepo (`on: push: paths: charts/**` — see [Helm Chart Release Patterns](#helm-chart-release-patterns)). Keep `release-helm.yml` (chart-releaser) when you want auto-detection across many charts, GitHub Releases, or a classic `gh-pages` `index.yaml`.
 
@@ -862,6 +862,9 @@ jobs:
       # gh-pages. Add PUBLISH_OCI: true to publish to an OCI registry as well,
       # or swap the two on a private repository (see release-helm.yml docs)
       CHARTS_DIR: ./charts
+      # A merge that changes a chart without bumping its version (a README, a
+      # comment) is not a failed release: the published version is left alone
+      SKIP_EXISTING: true
       HELM_REPOS: "bitnami=https://charts.bitnami.com/bitnami,jetstack=https://charts.jetstack.io"
 ```
 
