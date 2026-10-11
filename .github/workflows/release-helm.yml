@@ -314,10 +314,14 @@ jobs:
       with:
         version: v1.8.1
         charts_dir: ${{ inputs.CHARTS_DIR }}
-        # skip_upload=true only packages charts into .cr-release-packages,
-        # which is all the OCI path below needs; false additionally creates
-        # GitHub Releases/tags and updates index.yaml on the pages branch
-        skip_upload: ${{ !inputs.CREATE_GITHUB_RELEASE }}
+        # Either 'true' or empty, never 'false': the action hands this to
+        # cr.sh, which only tests whether it is non-empty, so the string
+        # 'false' skips just like 'true' does. What it skips is the index
+        # update (`cr index`) on the pages branch - that is the channel's
+        # whole output, and a classic repository whose index is never
+        # refreshed serves no new chart while every run reports success.
+        # cr.sh runs `cr upload` whatever this is.
+        skip_upload: ${{ !inputs.CREATE_GITHUB_RELEASE && 'true' || '' }}
         pages_branch: ${{ inputs.PAGES_BRANCH }}
       env:
         # `cr index --push` authenticates the PAGES_BRANCH push with this same
