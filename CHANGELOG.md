@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.42.0](https://github.com/this-is-tobi/github-workflows/compare/v0.41.0...v0.42.0) (2026-10-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* **release-helm:** the OCI channel no longer pushes over a chart version that is already in the registry. The run fails instead, before any chart is pushed. Set SKIP_EXISTING to leave such versions alone and publish the others.
+
+### Features
+
+* **release-helm:** skip or refuse a chart version that is already published ([387a6d9](https://github.com/this-is-tobi/github-workflows/commit/387a6d9e38567d34ca1e30834b1b992c28333093))
+
+
+### Bug Fixes
+
+* **release-helm:** refresh the index of the classic channel ([7272dde](https://github.com/this-is-tobi/github-workflows/commit/7272dde67a59527077c55587bde2a530649a3987))
+
+
+### Dependencies
+
+* **deps:** update golang.org/x/vuln/cmd/govulncheck to v1.9.0 ([12bf7f7](https://github.com/this-is-tobi/github-workflows/commit/12bf7f706f023af10d7588a01dea1092d6f21278))
+* **deps:** update helm/chart-testing-action to v2.9.0 ([67bee28](https://github.com/this-is-tobi/github-workflows/commit/67bee280baca15978380bb767df6db06ed47d19f))
+
 ## [0.41.0](https://github.com/this-is-tobi/github-workflows/compare/v0.40.1...v0.41.0) (2026-10-08)
 
 
