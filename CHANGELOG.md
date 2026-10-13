@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.42.1](https://github.com/this-is-tobi/github-workflows/compare/v0.42.0...v0.42.1) (2026-10-13)
+
+
+### Dependencies
+
+* **deps:** update actions/create-github-app-token to v3.3.0 ([4f7a2de](https://github.com/this-is-tobi/github-workflows/commit/4f7a2def2af06e36f0939bbd665f6280dd5afe33))
+* **deps:** update goreleaser/goreleaser-action to v7.3.0 ([f252cd4](https://github.com/this-is-tobi/github-workflows/commit/f252cd433ebe52349247cf75ab910858ad7e3ccb))
+* **deps:** update ossf/scorecard-action to v2.5.0 ([0f943ec](https://github.com/this-is-tobi/github-workflows/commit/0f943ecebf5155de79d4df1f32ecdf96d650ae05))
+
 ## [0.42.0](https://github.com/this-is-tobi/github-workflows/compare/v0.41.0...v0.42.0) (2026-10-11)
 
 
