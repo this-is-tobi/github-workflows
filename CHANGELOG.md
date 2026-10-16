@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.43.0](https://github.com/this-is-tobi/github-workflows/compare/v0.42.1...v0.43.0) (2026-10-16)
+
+
+### Features
+
+* **scan-zizmor:** add a reusable workflow auditing workflows with zizmor ([3ba4176](https://github.com/this-is-tobi/github-workflows/commit/3ba417687a240e39af7e576ee540e94f4537f8a3))
+
+
+### Bug Fixes
+
+* **release-go:** build without the Go cache ([63e7d87](https://github.com/this-is-tobi/github-workflows/commit/63e7d87f9ef415f93062a32b11e00df91f593d52))
+* **workflows:** declare persist-credentials on every checkout ([29cd2c3](https://github.com/this-is-tobi/github-workflows/commit/29cd2c307865782b5b8b7b5ec1d61cf0fe21d9b7))
+* **workflows:** run caller-supplied commands through env and eval ([8e6ee0a](https://github.com/this-is-tobi/github-workflows/commit/8e6ee0abb745a969fae2f68058d045028db46752))
+
+
+### Dependencies
+
+* **deps:** update github/codeql-action to v4.39.0 ([1e88004](https://github.com/this-is-tobi/github-workflows/commit/1e8800456a8152b89767202c3f6a367d0e68acf5))
+
 ## [0.42.1](https://github.com/this-is-tobi/github-workflows/compare/v0.42.0...v0.42.1) (2026-10-13)
 
 
