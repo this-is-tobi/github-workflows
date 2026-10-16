@@ -154,8 +154,9 @@ jobs:
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
-        # No later step talks to the git remote, so the job's token need not
-        # stay in .git/config while the rest of the job runs.
+        # No step of this workflow talks to the git remote, so the job's token
+        # need not stay in .git/config while the rest of the job runs. That holds
+        # for BUILD_COMMAND too: one that needs the remote authenticates itself.
         persist-credentials: false
 
     - name: Install Helm
