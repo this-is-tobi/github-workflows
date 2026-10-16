@@ -150,7 +150,12 @@ jobs:
       with:
         go-version: ${{ inputs.GO_VERSION }}
         go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
-        cache: ${{ inputs.CACHE }}
+        # zizmor expects GoReleaser to publish what it builds. `goreleaser build`
+        # does not: this job verifies that the project builds and hands the
+        # binaries back as a workflow artifact, while publishing is
+        # release-go.yml's job, which runs uncached. A caller that ships this
+        # artifact itself should pass CACHE: false.
+        cache: ${{ inputs.CACHE }} # zizmor: ignore[cache-poisoning]
         cache-dependency-path: ${{ format('{0}/go.sum', inputs.WORKING_DIRECTORY) }}
 
     # Before the build rather than after it. A configuration error that only
