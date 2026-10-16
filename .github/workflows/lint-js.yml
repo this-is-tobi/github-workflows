@@ -216,11 +216,11 @@ jobs:
 
     - name: Setup Corepack
       if: ${{ needs.detect-setup.outputs.package-manager == 'pnpm' || needs.detect-setup.outputs.package-manager == 'yarn' }}
-      run: |
+      run: | # zizmor: ignore[adhoc-packages]
         # Exact version: 'latest' would let a new upstream release change
-        # what runs here without any change on our side. The one install outside a
-        # lockfile: it is the bootstrap that lets the package manager honour the
-        # project's own.
+        # what runs here without any change on our side. This install sits outside a
+        # lockfile by necessity: it is the bootstrap that lets the package manager
+        # honour the project's own.
         npm install -g corepack@0.34.0
         corepack enable
 
@@ -261,7 +261,7 @@ jobs:
         PKG_MANAGER: ${{ needs.detect-setup.outputs.package-manager }}
         PACKAGE_FILE: ${{ needs.detect-setup.outputs.package-file }}
         ESLINT_CONFIG: ${{ inputs.ESLINT_CONFIG }}
-      run: |
+      run: | # zizmor: ignore[adhoc-packages]
         # ESLINT_CONFIG is both an install target and the module specifier of
         # the generated import below, so it is held to package-spec shape: no
         # quotes, spaces or newlines, nothing that could close the JS string
