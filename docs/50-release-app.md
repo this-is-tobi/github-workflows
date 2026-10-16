@@ -235,6 +235,8 @@ Recovery is the [upstream procedure](https://github.com/googleapis/release-pleas
 
 > Keyed on the commit being built, not on "is any merged pull request still labelled pending": the label is exactly what goes missing in the failure above, and a concurrent run's merge would make a label scan flap. A release pull request whose merge commit **is** this run's commit is unambiguous under rebase, squash and merge-commit alike.
 
+> A run on a release commit that an earlier run already released - a re-run, or a manual dispatch of the caller's CD on that commit - passes: release-please finds the release in place and creates nothing, and the merged release pull request carries `autorelease: tagged`, which is only ever set once the release exists. A pull request left `pending` or unlabelled still fails.
+
 > Runs under `!cancelled()`, so it also reports on a run where release-please crashed and set no outputs at all — the most likely way to get here, and where a raw API validation error is otherwise the only clue.
 
 ## Configuration
