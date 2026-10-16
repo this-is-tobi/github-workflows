@@ -75,6 +75,7 @@ For more details, see:
 - [Scan git history for leaked secrets using gitleaks (`scan-gitleaks.yml`)](../.github/workflows/scan-gitleaks.yml)
 - [Scan a Go module for known vulnerabilities using govulncheck (`scan-govulncheck.yml`)](../.github/workflows/scan-govulncheck.yml)
 - [Audit supply-chain security practices using OpenSSF Scorecard (`scan-scorecard.yml`)](../.github/workflows/scan-scorecard.yml)
+- [Audit GitHub Actions workflows for security issues using zizmor (`scan-zizmor.yml`)](../.github/workflows/scan-zizmor.yml)
 
 **Release**
 
