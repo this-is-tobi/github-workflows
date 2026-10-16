@@ -190,10 +190,11 @@ jobs:
       with:
         go-version: ${{ inputs.GO_VERSION }}
         go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
-        # No module or build cache: this job publishes, and an entry restored
-        # from it was written by an earlier run - possibly another workflow's -
-        # and goes straight into what ships. A release is rare enough that
-        # building from scratch costs little.
+        # No Actions cache: this job publishes, and an entry restored from it was
+        # written by an earlier run - possibly another workflow's - and goes
+        # straight into what ships. A release is rare enough that building from
+        # scratch costs little. Only that cache: a persistent self-hosted runner
+        # keeps its own Go caches on disk, which this does not touch.
         cache: false
 
     - name: Log into the container registry

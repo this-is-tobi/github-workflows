@@ -51,6 +51,8 @@ It returns the digest of what it pushed, so [`attest-docker.yml`](./31-attest-do
 
 A `BUILD_COMMAND` that fails, even half way, fails the run: it is run with `-e` and `pipefail`, like a `run:` step.
 
+The checkout does not leave the job's token in `.git/config` (`persist-credentials: false`), so a `BUILD_COMMAND` that runs `git fetch`, `git push` or anything else against the remote has to authenticate itself. Local git commands (`git ls-files`, `git rev-parse`, `git log`) work as usual.
+
 ## Example
 
 ```yaml
