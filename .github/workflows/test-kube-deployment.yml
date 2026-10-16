@@ -119,7 +119,12 @@ jobs:
 
     - name: Run pre-command
       if: ${{ inputs.PRE_COMMAND != '' }}
-      run: ${{ inputs.PRE_COMMAND }}
+      # PRE_COMMAND, DEPLOY_COMMAND and TEST_COMMAND are shell commands by contract, so they are evaluated -
+      # through `eval` from `env:` rather than interpolated into this script,
+      # which keeps the program text fixed whatever a caller passes.
+      run: eval "$PRE_COMMAND"
+      env:
+        PRE_COMMAND: ${{ inputs.PRE_COMMAND }}
 
     - name: Create Kind cluster
       uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
@@ -233,7 +238,9 @@ jobs:
 
     - name: Deploy application (custom)
       if: ${{ inputs.HELM_CHART == '' && inputs.DEPLOY_COMMAND != '' }}
-      run: ${{ inputs.DEPLOY_COMMAND }}
+      run: eval "$DEPLOY_COMMAND"
+      env:
+        DEPLOY_COMMAND: ${{ inputs.DEPLOY_COMMAND }}
 
     - name: Wait for rollout
       if: ${{ inputs.HELM_CHART != '' || inputs.DEPLOY_COMMAND != '' }}
@@ -266,7 +273,9 @@ jobs:
       # silently resolves to true even with FAIL_ON_ERROR set, so the gate never
       # gated. The gating decision is an explicit step at the end of the job.
       continue-on-error: true
-      run: ${{ inputs.TEST_COMMAND }}
+      run: eval "$TEST_COMMAND"
+      env:
+        TEST_COMMAND: ${{ inputs.TEST_COMMAND }}
 
     - name: Show logs on failure
       # Also keyed on the step outcome: the test step is continue-on-error,
