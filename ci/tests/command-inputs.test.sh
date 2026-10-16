@@ -48,14 +48,34 @@ test_every_command_step_is_covered() {
       if ! printf '%s\n' "${STEPS[@]}" | grep -qxF "$(basename "$file")|$found"; then
         missing="${missing}  $(basename "$file")|$found"$'\n'
       fi
+    # The script may be written `run: eval "$X"` or as a `run: |` block, which
+    # ends in a newline; both are the same step.
     done < <(yq -r '.jobs | to_entries[] | .key as $j | .value.steps[]?
-      | select((.run // "") | test("^eval \"\\$[A-Z_]+_COMMAND\"$"))
-      | $j + "|" + .name + "|" + (.run | sub("eval \"\\$"; "") | sub("\""; ""))' "$file")
+      | ((.run // "") | sub("\n+$"; "")) as $script
+      | select($script | test("^eval \"\\$[A-Z_]+_COMMAND\"$"))
+      | $j + "|" + .name + "|" + ($script | sub("eval \"\\$"; "") | sub("\""; ""))' "$file")
   done
   if [ -n "$missing" ]; then
     printf 'FAIL: command steps missing from STEPS:\n%s' "$missing" >&2
     exit 1
   fi
+}
+
+# The tests below hand each step its variable themselves, so they cannot see a
+# step whose `env:` forgot to pass the input in: `eval ""` exits 0, and a red
+# suite or a publish that never ran would read as green.
+test_every_step_passes_its_own_input_in() {
+  local entry workflow job step input mapped
+  for entry in "${STEPS[@]}"; do
+    IFS='|' read -r workflow job step input <<<"$entry"
+    mapped=$(yq -r ".jobs.\"$job\".steps[] | select(.name == \"$step\") | .env.\"$input\"" "$WORKFLOWS_DIR/$workflow")
+    # shellcheck disable=SC2016 # the Actions marker is meant to stay literal
+    if [ "$mapped" != "\${{ inputs.$input }}" ]; then
+      printf 'FAIL: %s: step "%s" sets %s to %q, expected ${{ inputs.%s }}\n' \
+        "$workflow" "$step" "$input" "$mapped" "$input" >&2
+      exit 1
+    fi
+  done
 }
 
 test_the_command_runs_as_written() {
