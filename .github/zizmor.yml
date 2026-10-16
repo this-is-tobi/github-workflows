@@ -1,4 +1,3 @@
-
 # zizmor configuration, read by the `scan-zizmor` job of ci.yml. Every entry
 # says why the finding is not fixed instead; delete it once the reason stops
 # being true.
@@ -12,19 +11,3 @@ rules:
   # for a red lint. Switch once the pinned actionlint accepts `$/`.
   self-repository:
     disable: true
-
-  # `npm install -g corepack@<exact version>`: the bootstrap that lets the
-  # package manager honour the caller's own lockfile, so it cannot come from
-  # one, and the version is pinned to keep a new release from changing what
-  # runs. lint-js.yml also adds the caller's ESLINT_CONFIG package to a
-  # repository that has no ESLint of its own - installing it is what the input
-  # is for, and its spec is validated first. Whole-file entries because
-  # zizmor reads ignore comments only from YAML, never from a `run:` script;
-  # these files hold no other ad-hoc install.
-  adhoc-packages:
-    ignore:
-    - lint-deps.yml
-    - lint-js.yml
-    - release-npm.yml
-    - test-playwright.yml
-    - test-vitest.yml
