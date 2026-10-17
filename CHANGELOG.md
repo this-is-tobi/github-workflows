@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.43.1](https://github.com/this-is-tobi/github-workflows/compare/v0.43.0...v0.43.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **release-app:** accept a release commit an earlier run already tagged ([c2c457c](https://github.com/this-is-tobi/github-workflows/commit/c2c457cf694dd7192e49e6130028f2db5baea37f))
+* **release-helm:** create no release when CREATE_GITHUB_RELEASE is off ([f174948](https://github.com/this-is-tobi/github-workflows/commit/f174948b1123995355372ffaefb642b9d505e8f2))
+* **workflows:** keep the credential only where it is used ([f1edd5e](https://github.com/this-is-tobi/github-workflows/commit/f1edd5e8d9112b4a6592ee9e85ec0d7dfe2de8eb))
+
 ## [0.43.0](https://github.com/this-is-tobi/github-workflows/compare/v0.42.1...v0.43.0) (2026-10-16)
 
 
