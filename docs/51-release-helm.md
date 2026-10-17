@@ -39,9 +39,9 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 
 > **Why supply App credentials here.** Releases created with `GITHUB_TOKEN` cannot fire `release:` triggers — GitHub's anti-recursion rule. If you have a workflow that should run when a chart release is published, chart-releaser needs an App token. Otherwise `GITHUB_TOKEN` is fine.
 >
-> `cr index --push` authenticates the `PAGES_BRANCH` push with the same token, so an App token or `GH_PAT` also lets **that** push trigger workflows. Harmless unless a workflow triggers on the pages branch — check before pointing one at it.
+> The `PAGES_BRANCH` pull and push use the same token as the release creation: the checkout is given it, and git sends the credential a checkout persists in preference to any token embedded in a push URL. So an App token or `GH_PAT` also lets **that** push trigger workflows. Harmless unless a workflow triggers on the pages branch — check before pointing one at it.
 >
-> The App token is only minted when `CREATE_GITHUB_RELEASE` is `true` — with it `false` nothing in the run writes through that token (chart-releaser only packages, and the OCI push authenticates against the registry instead), so there is nothing for a write-capable token to do.
+> The App token is only minted when `CREATE_GITHUB_RELEASE` is `true` — with it `false` nothing in the run writes through that token (chart-releaser is not run, the charts are packaged with `helm package`, and the OCI push authenticates against the registry instead), so there is nothing for a write-capable token to do.
 >
 > `APP_CLIENT_ID` and `APP_PRIVATE_KEY` must be supplied **together**. Setting only one fails the job rather than falling back to `GH_PAT` or `GITHUB_TOKEN`.
 
@@ -151,7 +151,7 @@ Missing pieces fail up front rather than producing unsigned charts: chart-releas
 
 ## Notes
 
-- **CREATE_GITHUB_RELEASE behavior**: When `true`, creates a GitHub Release and git tag for each changed chart and updates `index.yaml` on the pages branch (e.g. `gh-pages`); this **requires that pages branch to already exist**. When `false`, no GitHub Pages branch is required.
+- **CREATE_GITHUB_RELEASE behavior**: When `true`, creates a GitHub Release and git tag for each changed chart and updates `index.yaml` on the pages branch (e.g. `gh-pages`); this **requires that pages branch to already exist**. When `false`, chart-releaser is not run at all: no GitHub Release, no tag and no pages branch are involved, and no git credential is kept in the checkout. The charts that changed since the latest tag (the same set chart-releaser would pick) are packaged with `helm package` for the OCI channel. `SIGN_CHART` requires `true`.
 - **PUBLISH_OCI behavior**: When `true`, logs in to `REGISTRY` and pushes each packaged chart. The login is skipped entirely when `false`, so no registry credential is read or needed.
 - **Registry credentials are validated up front**: with `PUBLISH_OCI: true` and a `REGISTRY` other than `ghcr.io`, missing `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` fail the run with an explicit message rather than reaching `helm registry login` with an empty password and failing on an opaque authentication error.
 - **Credentials are cleared afterwards**: a `helm registry logout` step runs whenever the login succeeded, including after a failed push. Hosted runners are ephemeral so this is a no-op there, but `RUNS_ON` also supports self-hosted runners, where Helm's registry config would otherwise outlive the job.
