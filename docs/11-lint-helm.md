@@ -23,7 +23,7 @@ Comprehensive Helm chart validation with two parallel jobs: chart structure lint
 
 - **Two conditional jobs for flexible validation:**
   - **`lint-charts`**: Uses `helm/chart-testing-action` with `ct lint` to validate chart structure, syntax, dependencies, best practices, and version increment requirements. Runs only if `LINT_CHARTS=true`.
-  - **`lint-docs`**: Builds `helm-docs` from source at `HELM_DOCS_VERSION` (verified against the Go checksum database), regenerates the READMEs under `CHARTS_DIR` and fails if any differs from what is committed, printing the drift. Runs only if `LINT_DOCS=true`.
+  - **`lint-docs`**: Builds `helm-docs` from source at `HELM_DOCS_VERSION` (verified against the Go checksum database), regenerates the READMEs under `CHARTS_DIR` and fails if any differs from what is committed, printing the drift. It compiles with the Go the runner already ships when that is 1.21 or later (every GitHub-hosted Ubuntu runner), and installs the latest stable Go first otherwise. Runs only if `LINT_DOCS=true`.
 - Set `LINT_CHARTS=false` to skip chart structure validation (useful for docs-only changes).
 - Set `LINT_DOCS=false` to skip documentation validation (useful for chart logic changes without doc updates).
 - Chart-testing requires a configuration file (typically `.github/ct.yaml`) to define linting rules, target branch, chart directories, and validation options.

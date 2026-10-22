@@ -119,7 +119,7 @@ Add the token as a **repository secret** named `GH_PAT` in this repository:
   - Merge strategy is `--rebase`.
 - **Injection**: `APP_VERSION` and `PRERELEASE_IDENTIFIER` are written into `Chart.yaml` with `yq` + `strenv()`, never `sed`, so they can only ever be stored, never interpreted. They are validated at the top of the job as well.
 - Branch naming pattern (called mode): `<chart-name>-v<NEXT_VERSION>`.
-- Tooling requirements: `yq` and `docker` (for `jnorwood/helm-docs`).
+- Tooling requirements: `yq`, and a Go toolchain to build helm-docs. The Go the runner already ships is used when it is 1.21 or later (every GitHub-hosted Ubuntu runner); otherwise the latest stable Go is installed first, which costs 7 to 10 seconds.
 
 ## Examples
 
