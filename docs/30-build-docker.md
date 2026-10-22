@@ -62,7 +62,7 @@ See [Authentication](./05-authentication.md#what-build-docker-actually-injects).
 
 | Output          | Description                                                                          |
 | --------------- | ------------------------------------------------------------------------------------ |
-| digest          | SHA256 digest of the pushed multi-arch manifest (empty when `PUSH` is `false`)       |
+| digest          | SHA256 digest of the pushed manifest or manifest list (empty when `PUSH` is `false`) |
 | image           | Normalized image name (lowercase, `_` replaced with `-`)                             |
 | artifact-prefix | Prefix of the image tarball artifacts when `PUSH` is `false` (e.g. `image-my-image`) |
 
@@ -82,9 +82,8 @@ This workflow never needs `id-token`/`attestations` — it has no nested call th
 - `LATEST_TAG` input allows tagging images as `latest`.
 - `TAG_MAJOR_AND_MINOR` creates additional tags for stable releases (e.g., `1.2.3` also tags `1.2` and `1`). Only applies to non-prerelease versions.
 - Registry login logic: uses GitHub token for `ghcr.io`, otherwise uses provided credentials via secrets.
-- Digest artifacts are uploaded and merged for multi-arch images.
-- Manifest list is created and pushed after build.
-- The workflow exposes three outputs: `digest` (the SHA256 digest of the pushed manifest), `image` (the normalized image name) and `artifact-prefix` (the tarball artifact prefix used when `PUSH` is `false`). The first two are designed to be consumed by a following [`attest-docker.yml`](#attestation-and-signing-attest-dockeryml) call.
+- A build that runs as a single job pushes its tags itself - see [Single-job builds](#single-job-builds). Only a native build of both architectures (`USE_QEMU: false` with `BUILD_AMD64` and `BUILD_ARM64`) runs two build jobs: each pushes its image by digest, the digests are uploaded as artifacts, and a `merge` job creates and pushes the manifest list.
+- The workflow exposes three outputs: `digest` (the SHA256 digest of the pushed manifest or manifest list), `image` (the normalized image name) and `artifact-prefix` (the tarball artifact prefix used when `PUSH` is `false`). The first two are designed to be consumed by a following [`attest-docker.yml`](#attestation-and-signing-attest-dockeryml) call.
 - Prerelease versions (containing `-alpha`, `-beta`, `-rc`, etc.) are detected and handled appropriately.
 - Short SHA tag is automatically added for traceability.
 - Branch-based tags exclude `main` and `develop` branches.
@@ -100,11 +99,34 @@ This workflow never needs `id-token`/`attestations` — it has no nested call th
 - A reusable workflow's jobs run on their own runners, so an image loaded into the build job's Docker daemon is **not** visible to the caller's test job. The tarball artifact is what bridges the two.
 - **Artifact naming**: one artifact per architecture, named `<artifact-prefix>-amd64` / `<artifact-prefix>-arm64`, each containing a single `image.tar`. Use the `artifact-prefix` output rather than hardcoding the name — it is derived from the normalized image name (e.g. `ghcr.io/my-org/my_image` -> `image-my-image`).
 - The tarball embeds the image under `<IMAGE_NAME>:<IMAGE_TAG>`, so after `docker load -i image.tar` the image is directly runnable under that reference.
-- The `merge` job (manifest list creation) is **skipped** when `PUSH` is `false` — there is nothing in a registry to merge. Consequently the `digest` output is empty, so a following [`attest-docker.yml`](#attestation-and-signing-attest-dockeryml) call must not be wired to a non-pushing build.
+- Nothing is pushed, so the `merge` job (manifest list creation) is **skipped**. Consequently the `digest` output is empty, so a following [`attest-docker.yml`](#attestation-and-signing-attest-dockeryml) call must not be wired to a non-pushing build.
 - Two workflows in this repository consume the tarball artifact directly, so a non-pushed image can still be fully validated: `scan-trivy.yml` via its `IMAGE_ARTIFACT` input (Trivy tarball mode) and `test-kube-deployment.yml` via its `IMAGE_ARTIFACTS` input (`kind load image-archive`). Attestation is the one thing that genuinely cannot work without a push, since attestations are bound to a registry digest.
 - **Multi-arch**: with `USE_QEMU: false` (native runners), building both architectures produces two independent single-arch tarballs — one per runner — which is usually what you want, since a test job can only run one architecture anyway.
 - **Unsupported combination**: `PUSH: false` + `USE_QEMU: true` + both `BUILD_AMD64` and `BUILD_ARM64`. The `docker` exporter cannot write a multi-platform manifest list to a tarball, so the workflow fails fast in the `infos` job with an explicit error. Either use native runners (`USE_QEMU: false`) or build a single architecture at a time.
 - **Registry login** is skipped when `PUSH` is `false`, unless the image targets `ghcr.io` (where credentials always resolve from the job token) or `REGISTRY_USERNAME` is provided. This means a non-GHCR image can be built without any registry credentials, while private base images can still be pulled by passing the secrets anyway.
+
+### Single-job builds
+
+A `merge` job exists to put one set of tags on images that two runners built apart. When `PUSH` is `true` and the build is a single job, there is nothing to merge, so that job pushes the tags itself and the `merge` job is skipped — no extra runner, no artifact round trip, no second buildx setup and registry login. That covers:
+
+- a single architecture (`BUILD_AMD64: false` or `BUILD_ARM64: false`);
+- both architectures with `USE_QEMU: true`, where one job builds both platforms.
+
+Only a native build of both architectures (`USE_QEMU: false`, both `BUILD_*` true) still goes through `merge`.
+
+What the registry ends up holding differs by case:
+
+| Build                                    | Pushed as                               | Annotations on |
+| ---------------------------------------- | --------------------------------------- | -------------- |
+| Native, both architectures (`merge`)     | Manifest list over the two images       | the index      |
+| `USE_QEMU: true`, both architectures     | Manifest list over the two images       | the index      |
+| A single architecture                    | **A plain image manifest, no index**    | the manifest   |
+
+A single-architecture image is therefore not wrapped in a one-entry manifest list any more. Three consequences:
+
+- **Annotations sit on the manifest.** buildx refuses an index annotation for a single-platform export, so there is no index to put them on. The same values are in the image's labels either way, and `docker buildx imagetools inspect <image> --raw | jq '.annotations'` reads them in both shapes.
+- **The `digest` output is the manifest's digest.** It is the digest of what the build pushed, read from the push itself rather than resolved afterwards from a mutable tag, and [`attest-docker.yml`](#attestation-and-signing-attest-dockeryml) accepts it as it does the digest of a list. An image built before and after this change has a different digest for that reason alone, not because its content changed.
+- **A platform mismatch no longer fails at pull time.** Pulling a list that has no entry for the host's platform fails with `no matching manifest`. A plain manifest is pulled whatever the host, with a platform-mismatch warning, and fails when it runs. Pull with `--platform` to pin it.
 
 ## OCI labels and annotations
 
@@ -113,11 +135,11 @@ By default (`IMAGE_METADATA: true`) the workflow stamps the standard `org.openco
 **Labels and annotations are the same values at two different levels, and both come off a single `docker/metadata-action` run in the `infos` job.**
 
 - **Labels** live in the image config, so they have to exist before `build` runs.
-- **Annotations** live on the manifest list, so they can only be attached in `merge`, once there is a list to attach them to — with `docker buildx imagetools create --annotation`.
+- **Annotations** live on the manifest list, so for a native build of both architectures they can only be attached in `merge`, once there is a list to attach them to — with `docker buildx imagetools create --annotation`. A [single-job build](#single-job-builds) passes them to the build that pushes.
 
 Computed separately they would carry two clock readings of `org.opencontainers.image.created` — and with a matrix, one per architecture — leaving the index disagreeing with the images underneath it about when they were built. Both consumers derive from that one metadata JSON instead, so they agree by construction.
 
-Annotations are attached at **index** level: `imagetools create` accepts index and descriptor annotations only, never manifest, and the index is the one manifest list a caller ever pulls by tag.
+Annotations are attached at **index** level wherever there is an index: `imagetools create` accepts index and descriptor annotations only, never manifest, and the index is the one manifest list a caller ever pulls by tag. A single-architecture image has no index, so its annotations are attached to the **manifest**.
 
 ### Custom labels and annotations
 
@@ -136,13 +158,13 @@ Annotations are attached at **index** level: `imagetools create` accepts index a
 
 - **An unchanged rebuild no longer lands on the same digest.** `org.opencontainers.image.created` carries the build timestamp and is part of the config the digest covers. `IMAGE_METADATA: false` restores the previous result exactly, and is also the answer when the Dockerfile's own `LABEL`s must win.
 - **`org.opencontainers.image.revision` is the run's `github.sha`**, which on a `pull_request` event is the ephemeral merge commit rather than the branch head.
-- **With `PUSH: false` only labels are set** — the `merge` job is skipped, so there is no manifest list to annotate.
+- **With `PUSH: false` only labels are set** — nothing is pushed, so there is no manifest or manifest list to annotate.
 - **Neither labels nor annotations are signed or tamper-proof.** This is discoverability metadata, not provenance: anything that must resist forgery belongs in [`attest-docker.yml`](./31-attest-docker.md) via `PROVENANCE` and `SIGN`.
 
 Reading back what was stamped:
 
 ```sh
-# Index annotations
+# Annotations (on the index, or on the manifest of a single-architecture image)
 docker buildx imagetools inspect ghcr.io/my-org/my-image:1.2.3 --raw | jq '.annotations'
 
 # Image labels
@@ -251,7 +273,7 @@ The examples below cover the most common build scenarios: a basic multi-architec
 
 ### Simple example
 
-Builds a multi-arch image (AMD64 + ARM64) and pushes it to GHCR. Each architecture is built in a separate job and then merged into a single manifest list. With `USE_QEMU: false`, native ARM runners are expected; set `USE_QEMU: true` to emulate ARM on an AMD64 runner.
+Builds a multi-arch image (AMD64 + ARM64) and pushes it to GHCR. With `USE_QEMU: false`, each architecture is built in a separate job on a native runner and then merged into a single manifest list. Set `USE_QEMU: true` to emulate ARM on an AMD64 runner instead: one job builds both platforms and pushes the manifest list itself, with no `merge` job (see [Single-job builds](#single-job-builds)).
 
 ```yaml
 jobs:

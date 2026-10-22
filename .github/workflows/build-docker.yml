@@ -124,8 +124,8 @@ on:
         default: '["ubuntu-24.04"]'
     outputs:
       digest:
-        description: Digest of the built image (sha256:...), empty when PUSH is false
-        value: ${{ jobs.merge.outputs.digest }}
+        description: Digest of the pushed image (sha256:...), empty when PUSH is false
+        value: ${{ jobs.merge.outputs.digest || jobs.build.outputs.digest }}
       image:
         description: Normalized image name (lowercase, registry-compatible)
         value: ${{ jobs.infos.outputs.normalized-image }}
@@ -187,14 +187,14 @@ jobs:
       registry: ${{ steps.infos.outputs.REGISTRY }}
       normalized-image: ${{ steps.infos.outputs.NORMALIZED_IMAGE }}
       lower-image: ${{ steps.infos.outputs.LOWER_IMAGE }}
-      major-tag: ${{ steps.infos.outputs.MAJOR_TAG }}
-      minor-tag: ${{ steps.infos.outputs.MINOR_TAG }}
       patch-tag: ${{ steps.infos.outputs.PATCH_TAG }}
-      prerelease-tag: ${{ steps.infos.outputs.PRERELEASE_TAG }}
-      short-sha: ${{ steps.infos.outputs.SHORT_SHA }}
-      lower-branch: ${{ steps.infos.outputs.LOWER_BRANCH }}
       artifact-prefix: image-${{ steps.infos.outputs.LOWER_IMAGE }}
       metadata-json: ${{ steps.meta.outputs.json }}
+      direct-push: ${{ steps.plan.outputs.DIRECT_PUSH }}
+      needs-merge: ${{ steps.plan.outputs.NEEDS_MERGE }}
+      tags: ${{ steps.tags.outputs.tags }}
+      image-version: ${{ steps.tags.outputs.version }}
+      annotations: ${{ steps.annotations.outputs.ANNOTATIONS }}
     steps:
     - name: Validate inputs
       env:
@@ -212,6 +212,35 @@ jobs:
           echo "::error::PUSH=false cannot be combined with USE_QEMU=true and both BUILD_AMD64 and BUILD_ARM64: the docker exporter cannot write a multi-platform tarball. Either set USE_QEMU=false to build each architecture on a native runner (one tarball artifact per architecture), or build a single architecture at a time."
           exit 1
         fi
+
+    # Two build jobs exist only for a native build of both architectures, the
+    # shape of the `build` matrix below. Any other build is one job, and that job
+    # can push the tags itself: a merge job would only copy its result under the
+    # same tags, at the price of a runner, an artifact round trip and a second
+    # buildx and registry login.
+    - name: Plan the push
+      id: plan
+      env:
+        PUSH: ${{ inputs.PUSH }}
+        USE_QEMU: ${{ inputs.USE_QEMU }}
+        BUILD_AMD64: ${{ inputs.BUILD_AMD64 }}
+        BUILD_ARM64: ${{ inputs.BUILD_ARM64 }}
+      run: |
+        DIRECT_PUSH=false
+        NEEDS_MERGE=false
+
+        if [ "$PUSH" = "true" ]; then
+          if [ "$BUILD_AMD64" = "true" ] && [ "$BUILD_ARM64" = "true" ] && [ "$USE_QEMU" != "true" ]; then
+            NEEDS_MERGE=true
+          else
+            DIRECT_PUSH=true
+          fi
+        fi
+
+        {
+          echo "DIRECT_PUSH=$DIRECT_PUSH"
+          echo "NEEDS_MERGE=$NEEDS_MERGE"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Checks-out repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -264,6 +293,54 @@ jobs:
       with:
         images: ${{ steps.infos.outputs.NORMALIZED_IMAGE }}
 
+    # The tags are needed by whichever job ends up pushing them - `build` when it
+    # is the only build job, `merge` otherwise - so they are resolved once here.
+    # Kept apart from the run above: that one carries no `tags:`, and giving it
+    # some would move org.opencontainers.image.version to the first of them.
+    - name: Docker tags
+      id: tags
+      if: ${{ inputs.PUSH }}
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+      with:
+        images: ${{ steps.infos.outputs.NORMALIZED_IMAGE }}
+        tags: |
+          type=raw,value=${{ steps.infos.outputs.LOWER_BRANCH }},enable=${{ steps.infos.outputs.LOWER_BRANCH != 'main' && steps.infos.outputs.LOWER_BRANCH != 'develop' }}
+          type=raw,value=${{ steps.infos.outputs.SHORT_SHA }},enable=${{ steps.infos.outputs.SHORT_SHA != '' }}
+          type=raw,value=${{ inputs.IMAGE_TAG }},enable=${{ inputs.IMAGE_TAG != '' }}
+          type=raw,value=${{ format('{0}.{1}', steps.infos.outputs.MAJOR_TAG, steps.infos.outputs.MINOR_TAG) }},enable=${{ inputs.TAG_MAJOR_AND_MINOR && steps.infos.outputs.MAJOR_TAG != '' && steps.infos.outputs.MINOR_TAG != '' && steps.infos.outputs.PRERELEASE_TAG == '' }}
+          type=raw,value=${{ steps.infos.outputs.MAJOR_TAG }},enable=${{ inputs.TAG_MAJOR_AND_MINOR && steps.infos.outputs.MAJOR_TAG != '' && steps.infos.outputs.PRERELEASE_TAG == '' }}
+          type=raw,value=latest,enable=${{ inputs.LATEST_TAG == true }}
+
+    # One KEY=VALUE per line, bare: each consumer adds the level its manifest
+    # takes. The caller's own annotations come last, because the final
+    # annotation for a key is the one that survives, as for the labels.
+    - name: Compose image annotations
+      id: annotations
+      if: ${{ inputs.PUSH }}
+      env:
+        METADATA_JSON: ${{ steps.meta.outputs.json }}
+        EXTRA_ANNOTATIONS: ${{ inputs.IMAGE_ANNOTATIONS }}
+      run: |
+        set -euo pipefail
+
+        {
+          echo "ANNOTATIONS<<EOF_ANNOTATIONS"
+
+          if [ -n "${METADATA_JSON:-}" ]; then
+            jq -r '.labels // {} | to_entries[] | "\(.key)=\(.value)"' <<< "$METADATA_JSON"
+          fi
+
+          while IFS= read -r ANNOTATION; do
+            ANNOTATION="${ANNOTATION#"${ANNOTATION%%[![:space:]]*}"}"
+            ANNOTATION="${ANNOTATION%"${ANNOTATION##*[![:space:]]}"}"
+            if [ -n "$ANNOTATION" ]; then
+              echo "$ANNOTATION"
+            fi
+          done <<< "${EXTRA_ANNOTATIONS:-}"
+
+          echo "EOF_ANNOTATIONS"
+        } >> "$GITHUB_OUTPUT"
+
   build:
     name: Build application
     runs-on: ${{ matrix.runners }}
@@ -272,6 +349,10 @@ jobs:
       contents: read
     needs:
     - infos
+    outputs:
+      # Only a lone build job has a digest worth publishing: with two, each
+      # holds one architecture's and `merge` reports the list over them.
+      digest: ${{ needs.infos.outputs.direct-push == 'true' && steps.build.outputs.digest || '' }}
     env:
       # Registry login is required to push, and also to pull private base images even when not pushing.
       # For ghcr.io the credentials always resolve from the job token, so login is free of charge there.
@@ -397,6 +478,32 @@ jobs:
           echo "EOF_LABELS"
         } >> "$GITHUB_OUTPUT"
 
+    # A build that pushes its own tags has no `merge` to attach the annotations
+    # to an index, so they go on what it pushes. Where that is a manifest list
+    # (both platforms through QEMU) they sit on the index, as `merge` puts them;
+    # where it is a lone image there is no index, and buildx refuses an index
+    # annotation for a single platform, so they sit on the manifest.
+    - name: Level image annotations
+      id: annotations
+      if: ${{ needs.infos.outputs.direct-push == 'true' }}
+      env:
+        ANNOTATIONS: ${{ needs.infos.outputs.annotations }}
+        LEVEL: ${{ (inputs.BUILD_AMD64 && inputs.BUILD_ARM64 && 'index') || 'manifest' }}
+      run: |
+        set -euo pipefail
+
+        {
+          echo "ANNOTATIONS<<EOF_ANNOTATIONS"
+
+          while IFS= read -r ANNOTATION; do
+            if [ -n "$ANNOTATION" ]; then
+              echo "$LEVEL:$ANNOTATION"
+            fi
+          done <<< "${ANNOTATIONS:-}"
+
+          echo "EOF_ANNOTATIONS"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Build docker image
       id: build
       uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -408,7 +515,12 @@ jobs:
         sbom: false
         labels: ${{ steps.labels.outputs.LABELS }}
         platforms: ${{ (inputs.USE_QEMU && ((inputs.BUILD_AMD64 && inputs.BUILD_ARM64 && 'linux/amd64,linux/arm64') || (inputs.BUILD_ARM64 && 'linux/arm64') || 'linux/amd64')) || (matrix.runners == 'ubuntu-24.04-arm' && 'linux/arm64') || 'linux/amd64' }}
-        outputs: ${{ inputs.PUSH && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', needs.infos.outputs.normalized-image) || format('type=docker,name={0}:{1},dest=/tmp/image.tar', needs.infos.outputs.normalized-image, inputs.IMAGE_TAG) }}
+        # Three destinations: a tarball when not pushing, the tagged registry
+        # image when this is the only build job, and an untagged image addressed
+        # by digest when `merge` will tag the architectures together afterwards.
+        outputs: ${{ (!inputs.PUSH && format('type=docker,name={0}:{1},dest=/tmp/image.tar', needs.infos.outputs.normalized-image, inputs.IMAGE_TAG)) || (needs.infos.outputs.direct-push == 'true' && 'type=image,push=true') || format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', needs.infos.outputs.normalized-image) }}
+        tags: ${{ (needs.infos.outputs.direct-push == 'true' && needs.infos.outputs.tags) || '' }}
+        annotations: ${{ steps.annotations.outputs.ANNOTATIONS }}
         cache-from: ${{ inputs.CACHE && format('type=gha,scope={0}-{1}', needs.infos.outputs.lower-image, matrix.runners) || '' }}
         cache-to: ${{ inputs.CACHE && format('type=gha,mode={0},scope={1}-{2}', inputs.CACHE_MODE, needs.infos.outputs.lower-image, matrix.runners) || '' }}
         build-args: |
@@ -428,7 +540,7 @@ jobs:
           ${{ inputs.BUILD_SECRET_GITHUB_TOKEN != 'none' && format('github_token={0}', steps.app-token.outputs.token || secrets.GH_PAT || (inputs.BUILD_SECRET_GITHUB_TOKEN == 'job-token' && github.token) || '') || '' }}
 
     - name: Export digest
-      if: ${{ inputs.PUSH }}
+      if: ${{ needs.infos.outputs.needs-merge == 'true' }}
       env:
         LOWER_IMAGE: ${{ needs.infos.outputs.lower-image }}
         DIGEST: ${{ steps.build.outputs.digest }}
@@ -439,10 +551,10 @@ jobs:
         touch "/tmp/digests/$LOWER_IMAGE/${DIGEST#sha256:}"
 
     - name: Upload digest
-      if: ${{ inputs.PUSH }}
+      if: ${{ needs.infos.outputs.needs-merge == 'true' }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: digests-${{ needs.infos.outputs.lower-image }}-${{ (inputs.USE_QEMU && 'multiarch') || (matrix.runners == 'ubuntu-24.04-arm' && 'arm64') || 'amd64' }}
+        name: digests-${{ needs.infos.outputs.lower-image }}-${{ (matrix.runners == 'ubuntu-24.04-arm' && 'arm64') || 'amd64' }}
         path: /tmp/digests/${{ needs.infos.outputs.lower-image }}/*
         if-no-files-found: error
         retention-days: 1
@@ -458,7 +570,7 @@ jobs:
 
   merge:
     name: Merge digest
-    if: ${{ inputs.PUSH }}
+    if: ${{ needs.infos.outputs.needs-merge == 'true' }}
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
     permissions:
       packages: write
@@ -474,25 +586,12 @@ jobs:
         # Anchored to the suffixes produced by the upload above: a bare `-*`
         # also matches images whose name extends this one (`dev` picking up
         # `dev-lite`), whose digests then get pushed under the wrong repository.
-        pattern: digests-${{ needs.infos.outputs.lower-image }}-@(amd64|arm64|multiarch)
+        pattern: digests-${{ needs.infos.outputs.lower-image }}-@(amd64|arm64)
         path: /tmp/digests/${{ needs.infos.outputs.lower-image }}
         merge-multiple: true
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-    - name: Docker meta
-      id: meta
-      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-      with:
-        images: ${{ needs.infos.outputs.normalized-image }}
-        tags: |
-          type=raw,value=${{ needs.infos.outputs.lower-branch }},enable=${{ needs.infos.outputs.lower-branch != 'main' && needs.infos.outputs.lower-branch != 'develop' }}
-          type=raw,value=${{ needs.infos.outputs.short-sha }},enable=${{ needs.infos.outputs.short-sha != '' }}
-          type=raw,value=${{ inputs.IMAGE_TAG }},enable=${{ inputs.IMAGE_TAG != '' }}
-          type=raw,value=${{ format('{0}.{1}', needs.infos.outputs.major-tag, needs.infos.outputs.minor-tag) }},enable=${{ inputs.TAG_MAJOR_AND_MINOR && needs.infos.outputs.major-tag != '' && needs.infos.outputs.minor-tag != '' && needs.infos.outputs.prerelease-tag == '' }}
-          type=raw,value=${{ needs.infos.outputs.major-tag }},enable=${{ inputs.TAG_MAJOR_AND_MINOR && needs.infos.outputs.major-tag != '' && needs.infos.outputs.prerelease-tag == '' }}
-          type=raw,value=latest,enable=${{ inputs.LATEST_TAG == true }}
 
     - name: Login to GitHub Container Registry
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -506,14 +605,19 @@ jobs:
       working-directory: /tmp/digests/${{ needs.infos.outputs.lower-image }}
       env:
         NORMALIZED_IMAGE: ${{ needs.infos.outputs.normalized-image }}
-        METADATA_JSON: ${{ needs.infos.outputs.metadata-json }}
-        EXTRA_ANNOTATIONS: ${{ inputs.IMAGE_ANNOTATIONS }}
+        IMAGE_TAGS: ${{ needs.infos.outputs.tags }}
+        ANNOTATIONS: ${{ needs.infos.outputs.annotations }}
       run: |
         # Both lists have to reach imagetools as separate arguments: one
         # `-t <tag>` pair per tag, then one reference per digest file in the
         # working directory. Building them as arrays keeps that explicit
         # instead of leaning on word-splitting.
-        mapfile -t TAG_ARGS < <(jq -r '.tags[] | "-t", .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+        TAG_ARGS=()
+        while IFS= read -r TAG; do
+          if [ -n "$TAG" ]; then
+            TAG_ARGS+=(-t "$TAG")
+          fi
+        done <<< "$IMAGE_TAGS"
 
         # One reference per digest file in this directory. Built with a loop
         # rather than `printf` with two placeholders - printf reuses its format
@@ -540,19 +644,11 @@ jobs:
         # caller ever pulls by tag. The values are the labels the images already
         # carry, from the same metadata run, so the two cannot drift apart.
         ANNOTATION_ARGS=()
-        if [ -n "${METADATA_JSON:-}" ]; then
-          while IFS= read -r ANNOTATION; do
-            ANNOTATION_ARGS+=(--annotation "index:$ANNOTATION")
-          done < <(jq -r '.labels // {} | to_entries[] | "\(.key)=\(.value)"' <<< "$METADATA_JSON")
-        fi
-
         while IFS= read -r ANNOTATION; do
-          ANNOTATION="${ANNOTATION#"${ANNOTATION%%[![:space:]]*}"}"
-          ANNOTATION="${ANNOTATION%"${ANNOTATION##*[![:space:]]}"}"
           if [ -n "$ANNOTATION" ]; then
             ANNOTATION_ARGS+=(--annotation "index:$ANNOTATION")
           fi
-        done <<< "${EXTRA_ANNOTATIONS:-}"
+        done <<< "${ANNOTATIONS:-}"
 
         docker buildx imagetools create "${ANNOTATION_ARGS[@]}" "${TAG_ARGS[@]}" "${DIGEST_REFS[@]}"
 
@@ -560,7 +656,7 @@ jobs:
       id: digest
       env:
         NORMALIZED_IMAGE: ${{ needs.infos.outputs.normalized-image }}
-        IMAGE_VERSION: ${{ steps.meta.outputs.version }}
+        IMAGE_VERSION: ${{ needs.infos.outputs.image-version }}
         DIGESTS_DIR: /tmp/digests/${{ needs.infos.outputs.lower-image }}
       run: |
         set -euo pipefail
@@ -597,6 +693,6 @@ jobs:
     - name: Inspect image
       env:
         NORMALIZED_IMAGE: ${{ needs.infos.outputs.normalized-image }}
-        IMAGE_VERSION: ${{ steps.meta.outputs.version }}
+        IMAGE_VERSION: ${{ needs.infos.outputs.image-version }}
       run: |
         docker buildx imagetools inspect "$NORMALIZED_IMAGE:$IMAGE_VERSION"
