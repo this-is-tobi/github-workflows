@@ -63,6 +63,28 @@ jobs:
     permissions:
       contents: read
 
+  # A job of its own rather than a step of the one below: shellcheck is about 9
+  # seconds that would otherwise sit in front of the tests, and nothing here
+  # needs either to have finished before the other starts.
+  lint-test-scripts:
+    name: Lint test scripts
+    runs-on: ubuntu-26.04
+    if: ${{ fromJSON(needs.path-filter.outputs.groups).workflows || fromJSON(needs.path-filter.outputs.groups).tests }}
+    needs:
+    - path-filter
+    permissions:
+      contents: read
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # No later step talks to the git remote, so the job's token need not
+        # stay in .git/config while the rest of the job runs.
+        persist-credentials: false
+
+    - name: Lint test scripts
+      run: shellcheck ci/tests/*.sh
+
   test-workflows:
     name: Test workflows
     runs-on: ubuntu-26.04
@@ -86,10 +108,8 @@ jobs:
       with:
         args: -color
 
-    - name: Lint test scripts
-      run: shellcheck ci/tests/*.sh
-
     # Executes the shell logic straight out of the workflow YAML against stubbed
-    # credentials and a stubbed `gh`. See ci/tests/lib.sh.
+    # credentials and a stubbed `gh`, one suite per CPU at a time. See
+    # ci/tests/lib.sh and ci/tests/run.sh.
     - name: Run workflow tests
       run: ./ci/tests/run.sh
