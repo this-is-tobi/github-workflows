@@ -50,7 +50,7 @@ Run Trivy vulnerability scans on container images and/or configuration files and
 - `IMAGE_ARTIFACT` takes precedence over `IMAGE` when both are set — the local tarball is scanned and nothing is pulled.
 - The artifact must have been produced by the **same workflow run**; downloading from another run is not supported.
 - `FORMAT` controls output format: `table` (default) prints results to workflow summary, `sarif` enables GitHub Security Tab integration.
-- When `GITHUB_SECURITY_TAB: true` and `FORMAT: sarif`, uploads results to the Security tab.
+- When `GITHUB_SECURITY_TAB: true` and `FORMAT: sarif`, uploads results to the Security tab. The job does not wait for GitHub to process the upload: the alerts appear a few seconds after it ends, and the job's warning covers a failed upload, not a processing error.
 - PR comments link to either the GitHub Security Tab (when `GITHUB_SECURITY_TAB: true`) or the Workflow Summary page.
 - The Security tab link in the PR comment is filtered on the ref the SARIF was actually uploaded against: `pr:<number>` for a `pull_request` run, `branch:<name>` for a push, and no ref filter at all for anything else (a tag). Code scanning only indexes alerts under that ref, so a caller that scans on `push` and passes `PR_NUMBER` by hand still gets a link that resolves - a hardcoded `pr:` filter would land on an empty tab there.
 - Registry authentication: uses GitHub token for `ghcr.io`, otherwise uses provided credentials.
