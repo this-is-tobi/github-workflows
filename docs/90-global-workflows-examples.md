@@ -34,6 +34,12 @@ on:
     - "**"
   workflow_dispatch:
 
+# A new push to a pull request supersedes the run in flight. A manual
+# workflow_dispatch run gets a group of its own, so it is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   lint-commits:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
@@ -238,6 +244,12 @@ on:
     branches:
     - "**"
   workflow_dispatch:
+
+# A new push to a pull request supersedes the run in flight. A manual
+# workflow_dispatch run gets a group of its own, so it is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 env:
   IMAGE_TAG: ${{ github.event.pull_request.number || github.sha }}
@@ -759,6 +771,12 @@ on:
     - "charts/**"
   workflow_dispatch:
 
+# A new push to a pull request supersedes the run in flight. A manual
+# workflow_dispatch run gets a group of its own, so it is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 env:
   CT_CONF_PATH: .github/ct.yaml
 
@@ -1069,6 +1087,12 @@ on:
     - "**"
   workflow_dispatch:
 
+# A new push to a pull request supersedes the run in flight. A manual
+# workflow_dispatch run gets a group of its own, so it is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   lint-commits:
     uses: this-is-tobi/github-workflows/.github/workflows/lint-commits.yml@v0
@@ -1290,6 +1314,12 @@ on:
     branches:
     - "**"
   workflow_dispatch:
+
+# A new push to a pull request supersedes the run in flight. A manual
+# workflow_dispatch run gets a group of its own, so it is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   lint-commits:
