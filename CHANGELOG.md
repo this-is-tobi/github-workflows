@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.44.0](https://github.com/this-is-tobi/github-workflows/compare/v0.43.1...v0.44.0) (2026-10-22)
+
+
+### Features
+
+* **build-docker:** push single-job builds directly instead of merging ([e70551f](https://github.com/this-is-tobi/github-workflows/commit/e70551f3d5cd506bc019cabd2cad05bc25a83674))
+
+
+### Performance Improvements
+
+* **build-docker:** do not set up a buildx builder in the merge job ([f1884ba](https://github.com/this-is-tobi/github-workflows/commit/f1884ba903631c55d203843e9baca1611256c03d))
+* **scan:** do not wait for GitHub to process an uploaded SARIF file ([a578c09](https://github.com/this-is-tobi/github-workflows/commit/a578c0941ebe2daf0ba384bcf66353bb814cf15f))
+* **test-helm:** create the kind cluster only when there is a chart to install ([e4b6473](https://github.com/this-is-tobi/github-workflows/commit/e4b64730bbb61782ed32c0a9f3ded73c1c878882))
+* **workflows:** build helm-docs with the Go the runner already has ([fdab90a](https://github.com/this-is-tobi/github-workflows/commit/fdab90ab59cb8978438e4d025f1adf9c3ad9202e))
+
+
+### Dependencies
+
+* **deps:** update actions/setup-python to v7.1.0 ([96da8d8](https://github.com/this-is-tobi/github-workflows/commit/96da8d8091fe9404a97f8b078af0c696bfec8208))
+* **deps:** update github/codeql-action to v4.39.1 ([3b0eac6](https://github.com/this-is-tobi/github-workflows/commit/3b0eac67eeab2bce0955fef976342721c70816aa))
+
 ## [0.43.1](https://github.com/this-is-tobi/github-workflows/compare/v0.43.0...v0.43.1) (2026-10-17)
 
 
