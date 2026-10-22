@@ -112,7 +112,7 @@ A `merge` job exists to put one set of tags on images that two runners built apa
 - a single architecture (`BUILD_AMD64: false` or `BUILD_ARM64: false`);
 - both architectures with `USE_QEMU: true`, where one job builds both platforms.
 
-Only a native build of both architectures (`USE_QEMU: false`, both `BUILD_*` true) still goes through `merge`.
+Only a native build of both architectures (`USE_QEMU: false`, both `BUILD_*` true) still goes through `merge`. That job runs on `RUNS_ON` and needs the buildx plugin but no builder, since `imagetools` talks to the registry directly: GitHub-hosted runners have the plugin, and a self-hosted runner without it gets it installed first.
 
 What the registry ends up holding differs by case:
 

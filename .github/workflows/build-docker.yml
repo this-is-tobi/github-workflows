@@ -590,7 +590,20 @@ jobs:
         path: /tmp/digests/${{ needs.infos.outputs.lower-image }}
         merge-multiple: true
 
+    # `imagetools` talks to the registry directly, so this job needs the buildx
+    # plugin and no builder. Setting one up (the docker-container driver boots a
+    # BuildKit container) is about 8 of this job's 20 seconds, and nothing below
+    # uses it. GitHub-hosted runners ship the plugin; the install stays for a
+    # RUNS_ON runner that does not, which the action downloads it onto.
+    - name: Check for buildx
+      id: buildx
+      run: |
+        if docker buildx version > /dev/null 2>&1; then
+          echo "present=true" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Set up Docker Buildx
+      if: ${{ steps.buildx.outputs.present != 'true' }}
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
     - name: Login to GitHub Container Registry
