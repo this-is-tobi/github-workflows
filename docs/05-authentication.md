@@ -122,6 +122,7 @@ Everything below is one-time setup. It works identically under a personal accoun
 | Pull requests | Read and write | Open and merge pull requests         |
 | Issues        | Read and write | release-please labels                |
 | Actions       | Read and write | `dispatch-helm-chart` only           |
+| Workflows     | Read and write | `sync-prerelease-branch` only        |
 
 Each workflow then mints its own token narrowed to just what that job needs:
 
@@ -129,7 +130,7 @@ Each workflow then mints its own token narrowed to just what that job needs:
 | -------------------------------------- | --------------------------------------------- | --------------------- |
 | `release-app.yml`                      | `contents`, `pull-requests`, `issues` = write | current repository    |
 | `update-helm-chart.yml`                | `contents`, `pull-requests` = write           | current repository    |
-| `sync-prerelease-branch.yml`           | `contents: write`                             | current repository    |
+| `sync-prerelease-branch.yml`           | `contents`, `workflows` = write               | current repository    |
 | `dispatch-helm-chart.yml`              | `actions: write`                              | chart repository only |
 | `release-helm.yml`                     | `contents: write`                             | current repository    |
 | `build-docker.yml`                     | `contents`, `metadata` = read                 | current repository    |

@@ -197,4 +197,32 @@ test_mints_are_pinned_to_a_commit_sha() {
   )
 }
 
+test_sync_prerelease_mint_can_write_workflows() {
+  local workflow job keys pairs found=0
+  while IFS=$'\t' read -r workflow job keys pairs; do
+    [ "$workflow" = "sync-prerelease-branch.yml" ] || continue
+    found=1
+
+    # The rebase replays the prerelease branch's commits under new SHAs and the
+    # push force-updates the branch. A replayed commit touching a file under
+    # .github/workflows/ makes GitHub reject the push of a token that cannot
+    # write workflows - "refusing to allow a GitHub App to create or update
+    # workflow ... without workflows permission" - even though the same content
+    # already sits on the release branch. A fast-forward push carries no such
+    # commit of the App's own making, which is why the gap only shows on the
+    # first diverged rebase and cannot be caught by a caller's own runs.
+    if [[ ";$pairs;" != *';permission-workflows=write;'* ]]; then
+      printf 'FAIL: %s job %q mints a token that cannot write workflows: %s\n' \
+        "$workflow" "$job" "$pairs" >&2
+      exit 1
+    fi
+  done < <(each_mint)
+
+  if [ "$found" -ne 1 ]; then
+    printf 'FAIL: expected exactly one mint in sync-prerelease-branch.yml, found %d\n' \
+      "$found" >&2
+    exit 1
+  fi
+}
+
 run_tests
