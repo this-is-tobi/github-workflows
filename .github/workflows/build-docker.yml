@@ -302,6 +302,14 @@ jobs:
       uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
       with:
         images: ${{ steps.infos.outputs.NORMALIZED_IMAGE }}
+        # With no `tags:` the action stamps the version it derives from the ref:
+        # the branch name on a push, the pull request number on a pull request.
+        # A release built from a push to main would carry `version=main` on an
+        # image tagged 1.2.3, so the build's own tag is set here instead. A label
+        # given here overrides the action's, and the annotations are composed
+        # from these labels, so both follow.
+        labels: |
+          org.opencontainers.image.version=${{ inputs.IMAGE_TAG }}
 
     # The tags are needed by whichever job ends up pushing them - `build` when it
     # is the only build job, `merge` otherwise - so they are resolved once here.

@@ -159,6 +159,7 @@ Annotations are attached at **index** level wherever there is an index: `imageto
 
 - **An unchanged rebuild no longer lands on the same digest.** `org.opencontainers.image.created` carries the build timestamp and is part of the config the digest covers. `IMAGE_METADATA: false` restores the previous result exactly, and is also the answer when the Dockerfile's own `LABEL`s must win.
 - **`org.opencontainers.image.revision` is the run's `github.sha`**, which on a `pull_request` event is the ephemeral merge commit rather than the branch head.
+- **`org.opencontainers.image.version` is `IMAGE_TAG`**, the tag the caller names for this build. It is not read off the ref: `docker/metadata-action` would stamp the branch name on a push and the pull request number on a pull request, so a release built from a push to `main` would be tagged `1.2.3` and labelled `main`. `IMAGE_LABELS` and `IMAGE_ANNOTATIONS` can still override it.
 - **With `PUSH: false` only labels are set** — nothing is pushed, so there is no manifest or manifest list to annotate.
 - **Neither labels nor annotations are signed or tamper-proof.** This is discoverability metadata, not provenance: anything that must resist forgery belongs in [`attest-docker.yml`](./31-attest-docker.md) via `PROVENANCE` and `SIGN`.
 
