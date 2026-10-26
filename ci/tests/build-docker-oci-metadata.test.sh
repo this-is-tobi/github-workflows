@@ -266,4 +266,24 @@ test_no_annotation_argument_at_all_when_there_is_nothing_to_annotate() {
   assert_called "-t ghcr.io/owner/app:1.2.3"
 }
 
+# docker/metadata-action takes the version it stamps from the first tag it
+# computes, and this run asks for no `tags:`, so that is its default rules: the
+# branch name on a push, the pull request number on a pull request, the tag name
+# on a tag. A release built from a push to main would then be tagged 1.2.3 and
+# labelled `version=main`. The caller's IMAGE_TAG is what names this build, and a
+# `labels:` entry is what overrides the action's own, so that is where it is set.
+# The annotations are composed from these labels, so they follow.
+test_the_version_label_is_the_image_tag_and_not_what_the_ref_implies() {
+  local labels
+  labels=$(yq '.jobs.infos.steps[] | select(.id == "meta") | .with.labels' \
+    "$WORKFLOWS_DIR/build-docker.yml")
+
+  # shellcheck disable=SC2016 # the Actions marker is meant to stay literal
+  if ! grep -qxF 'org.opencontainers.image.version=${{ inputs.IMAGE_TAG }}' <<<"$labels"; then
+    printf 'FAIL: the metadata run does not pin the version label to IMAGE_TAG; labels input is:\n%s\n' \
+      "$labels" >&2
+    exit 1
+  fi
+}
+
 run_tests
