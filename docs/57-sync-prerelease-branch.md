@@ -50,7 +50,7 @@ Supplying them makes the push go out with an App token, see [When rulesets rejec
 | -------- | ------ | ------------------------------------ |
 | contents | write  | Push the rebased prerelease branch   |
 
-With an App, the minted token is narrowed to `contents: write` on the current repository.
+With an App, the minted token is narrowed to `contents: write` and `workflows: write` on the current repository. The second one is what lets the force-push carry a replayed commit that touches `.github/workflows/`: without it GitHub rejects the push even though the same content already sits on the release branch, and only on a rebase that actually diverged. The App therefore needs the **Workflows** permission, see [Authentication](./05-authentication.md). Grant it before upgrading: GitHub rejects a token request for a permission the installation does not hold, so the job fails at the mint step until it does.
 
 ## When rulesets reject `GITHUB_TOKEN`
 
