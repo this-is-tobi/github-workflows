@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.45.0](https://github.com/this-is-tobi/github-workflows/compare/v0.44.1...v0.45.0) (2026-10-26)
+
+
+### Features
+
+* **build-docker:** make the short-sha tag optional ([22e81de](https://github.com/this-is-tobi/github-workflows/commit/22e81de532f1fe9211b35d9acdc605750d9037d8))
+
+
+### Bug Fixes
+
+* **build-docker:** stamp the image tag as org.opencontainers.image.version ([ef0f773](https://github.com/this-is-tobi/github-workflows/commit/ef0f773b44e87ca7843621f29692133c8925dc67))
+* **clean-images:** don't fail when a package's last tagged version can't be deleted ([68a9ce6](https://github.com/this-is-tobi/github-workflows/commit/68a9ce64b4080c5655f5e8881ffa5e0a413f6c4b))
+* **sync-prerelease-branch:** let the app token write workflows ([f0db82f](https://github.com/this-is-tobi/github-workflows/commit/f0db82f31db4013f28843a41917d50e8fde6a861))
+
 ## [0.44.1](https://github.com/this-is-tobi/github-workflows/compare/v0.44.0...v0.44.1) (2026-10-23)
 
 
