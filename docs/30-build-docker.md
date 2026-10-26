@@ -10,6 +10,7 @@ Build and push container images using Docker Buildx with optional multi-arch sup
 | IMAGE_TAG           | string  | Tag used to build image                                                                   | Yes      | -                |
 | LATEST_TAG          | boolean | Whether to tag the image with 'latest'                                                    | No       | false            |
 | TAG_MAJOR_AND_MINOR | boolean | Tag with major and minor versions (e.g. '1.2.3' -> '1.2' & '1')                           | No       | false            |
+| TAG_SHORT_SHA       | boolean | Whether to tag the image with the short commit SHA                                        | No       | true             |
 | IMAGE_DOCKERFILE    | string  | Path of the Dockerfile                                                                    | Yes      | -                |
 | IMAGE_CONTEXT       | string  | Path of the build context                                                                 | Yes      | -                |
 | IMAGE_TARGET        | string  | Target stage to build in the Dockerfile (builds the last stage if not set)                | No       | -                |
@@ -85,7 +86,7 @@ This workflow never needs `id-token`/`attestations` — it has no nested call th
 - A build that runs as a single job pushes its tags itself - see [Single-job builds](#single-job-builds). Only a native build of both architectures (`USE_QEMU: false` with `BUILD_AMD64` and `BUILD_ARM64`) runs two build jobs: each pushes its image by digest, the digests are uploaded as artifacts, and a `merge` job creates and pushes the manifest list.
 - The workflow exposes three outputs: `digest` (the SHA256 digest of the pushed manifest or manifest list), `image` (the normalized image name) and `artifact-prefix` (the tarball artifact prefix used when `PUSH` is `false`). The first two are designed to be consumed by a following [`attest-docker.yml`](#attestation-and-signing-attest-dockeryml) call.
 - Prerelease versions (containing `-alpha`, `-beta`, `-rc`, etc.) are detected and handled appropriately.
-- Short SHA tag is automatically added for traceability.
+- A short SHA tag is added for traceability, unless `TAG_SHORT_SHA` is `false`. Turn it off when the caller's branches get rebased or force-pushed: unchanged image content rebuilt on an unrelated commit reuses the previous digest, so the new SHA becomes one more tag on a version that is still live instead of marking anything new, and those tags pile up for as long as the branch stays alive, since only a whole version can be deleted, never a single tag.
 - Branch-based tags exclude `main` and `develop` branches.
 - `IMAGE_TARGET` allows targeting a specific stage in a multi-stage Dockerfile; if omitted, the last stage is built.
 - `BUILD_ARGS` accepts a newline-separated list of `KEY=value` pairs passed as Docker build arguments.
