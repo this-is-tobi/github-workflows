@@ -152,7 +152,7 @@ jobs:
         fi
 
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No step of this workflow talks to the git remote, so the job's token
         # need not stay in .git/config while the rest of the job runs. That holds
@@ -161,15 +161,15 @@ jobs:
 
     - name: Install Helm
       if: ${{ inputs.SETUP_HELM }}
-      uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
 
     - name: Install ORAS
-      uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
+      uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4  # v2.0.2
       with:
         version: 1.3.4
 
     - name: Login to registry
-      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
       with:
         registry: ${{ steps.validate.outputs.registry }}
         username: ${{ steps.validate.outputs.registry == 'ghcr.io' && github.actor || secrets.REGISTRY_USERNAME }}

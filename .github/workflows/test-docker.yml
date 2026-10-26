@@ -95,7 +95,7 @@ jobs:
 
     - name: Checks-out repository
       if: ${{ inputs.WORKSPACE_PATH != '' }}
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # The checkout only exists to mount WORKSPACE_PATH into the container
         # under test; nothing runs git afterwards. Persisted, the job's token
@@ -105,7 +105,7 @@ jobs:
 
     - name: Download image artifact
       if: ${{ inputs.IMAGE_ARTIFACT != '' }}
-      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
       with:
         name: ${{ inputs.IMAGE_ARTIFACT }}
         path: /tmp/test-image
@@ -114,7 +114,7 @@ jobs:
       # Only needed to pull IMAGE. A loaded tarball is already local, and for
       # ghcr.io the job token always resolves, so login there costs nothing.
       if: ${{ env.REGISTRY_LOGIN == 'true' }}
-      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
       with:
         registry: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && 'ghcr.io' || '' }}
         username: ${{ startsWith(inputs.IMAGE, 'ghcr.io') && github.actor || secrets.REGISTRY_USERNAME }}

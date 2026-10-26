@@ -96,7 +96,7 @@ jobs:
       tags: ${{ steps.detect.outputs.tags }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No step after checkout runs git against the remote, so the job's
         # token has no reason to stay readable in .git/config while the
@@ -163,12 +163,12 @@ jobs:
       contents: read
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         persist-credentials: false
 
     - name: Setup Go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
       with:
         go-version: ${{ inputs.GO_VERSION }}
         go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
@@ -238,7 +238,7 @@ jobs:
 
     - name: Run golangci-lint
       if: ${{ needs.detect-setup.outputs.golangci == 'true' }}
-      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # v9.3.0
       with:
         version: ${{ inputs.GOLANGCI_LINT_VERSION }}
         working-directory: ${{ inputs.WORKING_DIRECTORY }}

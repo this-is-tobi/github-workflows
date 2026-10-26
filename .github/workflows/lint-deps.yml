@@ -69,7 +69,7 @@ jobs:
       runtime-version: ${{ steps.detect.outputs.runtime-version }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No step after checkout runs git against the remote, so the job's
         # token has no reason to stay readable in .git/config while installs
@@ -180,7 +180,7 @@ jobs:
         working-directory: ${{ inputs.WORKING_DIRECTORY }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No step after checkout runs git against the remote, so the job's
         # token has no reason to stay readable in .git/config while installs
@@ -189,13 +189,13 @@ jobs:
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' }}
-      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
       with:
         node-version: ${{ needs.detect-setup.outputs.runtime-version }}
 
     - name: Setup Bun
       if: ${{ needs.detect-setup.outputs.runtime == 'bun' }}
-      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2.2.0
       with:
         bun-version: ${{ needs.detect-setup.outputs.runtime-version }}
 
