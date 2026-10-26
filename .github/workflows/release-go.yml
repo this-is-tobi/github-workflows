@@ -160,14 +160,14 @@ jobs:
     - name: Generate GitHub App token
       id: app-token
       if: ${{ env.HAS_APP_AUTH == 'true' }}
-      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
       with:
         client-id: ${{ secrets.APP_CLIENT_ID }}
         private-key: ${{ secrets.APP_PRIVATE_KEY }}
         permission-contents: write
 
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         fetch-depth: ${{ inputs.FETCH_DEPTH }}
         # Deliberately the job's own GITHUB_TOKEN and not the App token above:
@@ -186,7 +186,7 @@ jobs:
       run: git fetch --force --tags
 
     - name: Setup Go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
       with:
         go-version: ${{ inputs.GO_VERSION }}
         go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
@@ -199,7 +199,7 @@ jobs:
 
     - name: Log into the container registry
       if: ${{ inputs.REGISTRY != '' }}
-      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
       with:
         registry: ${{ inputs.REGISTRY }}
         # ghcr.io accepts the job's own token, so a caller pushing there supplies
@@ -212,7 +212,7 @@ jobs:
     # a way GoReleaser only notices at the publish step leaves a half-finished
     # release behind, which is the one outcome a release workflow must not have.
     - name: Check the GoReleaser configuration
-      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de  # v7.3.0
       with:
         distribution: ${{ inputs.DISTRIBUTION }}
         version: ${{ inputs.GORELEASER_VERSION }}
@@ -280,7 +280,7 @@ jobs:
         echo "Loaded $COUNT extra environment entries."
 
     - name: Run GoReleaser
-      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de  # v7.3.0
       with:
         distribution: ${{ inputs.DISTRIBUTION }}
         version: ${{ inputs.GORELEASER_VERSION }}
@@ -298,7 +298,7 @@ jobs:
 
     - name: Upload the distribution
       if: ${{ inputs.ARTIFACT_NAME != '' }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: ${{ inputs.ARTIFACT_NAME }}
         path: ${{ format('{0}/dist', inputs.WORKING_DIRECTORY) }}

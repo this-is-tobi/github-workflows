@@ -88,7 +88,7 @@ jobs:
       test-command: ${{ steps.detect.outputs.test-command }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No step after checkout runs git against the remote, so the job's
         # token has no reason to stay readable in .git/config while installs
@@ -253,7 +253,7 @@ jobs:
     if: ${{ needs.detect-setup.outputs.has-tests == 'true' && needs.detect-setup.outputs.has-vitest == 'true' }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No step after checkout runs git against the remote, so the job's
         # token has no reason to stay readable in .git/config while installs
@@ -262,13 +262,13 @@ jobs:
 
     - name: Setup Node.js
       if: ${{ needs.detect-setup.outputs.runtime == 'node' || needs.detect-setup.outputs.package-manager != 'bun' }}
-      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
       with:
         node-version: ${{ needs.detect-setup.outputs.runtime == 'node' && needs.detect-setup.outputs.runtime-version || '24' }}
 
     - name: Setup Bun
       if: ${{ needs.detect-setup.outputs.runtime == 'bun' || needs.detect-setup.outputs.package-manager == 'bun' }}
-      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2.2.0
       with:
         bun-version: ${{ needs.detect-setup.outputs.runtime-version }}
 
@@ -394,7 +394,7 @@ jobs:
 
     - name: Upload coverage reports
       if: ${{ inputs.COVERAGE == true && inputs.COVERAGE_REPORTER == 'lcov' }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: ${{ inputs.COVERAGE_ARTIFACT_NAME }}
         path: ${{ inputs.COVERAGE_ARTIFACT_PATH }}

@@ -110,7 +110,7 @@ jobs:
       contents: read
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No step after checkout runs git against the remote, so the job's
         # token has no reason to stay readable in .git/config while installs
@@ -127,7 +127,7 @@ jobs:
         PRE_COMMAND: ${{ inputs.PRE_COMMAND }}
 
     - name: Create Kind cluster
-      uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+      uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa  # v1.15.1
       with:
         version: v${{ inputs.KIND_VERSION }}
         cluster_name: ${{ inputs.KIND_CLUSTER_NAME }}
@@ -136,7 +136,7 @@ jobs:
 
     - name: Login to GHCR
       if: ${{ inputs.IMAGES != '' }}
-      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -165,7 +165,7 @@ jobs:
 
     - name: Download image artifacts
       if: ${{ inputs.IMAGE_ARTIFACTS != '' }}
-      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
       with:
         pattern: ${{ inputs.IMAGE_ARTIFACTS }}
         path: /tmp/kind-images

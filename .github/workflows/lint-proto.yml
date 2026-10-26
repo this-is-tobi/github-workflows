@@ -92,7 +92,7 @@ jobs:
       breaking-against: ${{ steps.detect.outputs.breaking-against }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         fetch-depth: ${{ inputs.FETCH_DEPTH }}
         # No step after checkout runs git against the remote, so the job's
@@ -178,7 +178,7 @@ jobs:
       contents: read
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         fetch-depth: ${{ inputs.FETCH_DEPTH }}
         persist-credentials: false
@@ -188,7 +188,7 @@ jobs:
     # install because it is the maintained one - buf-setup-action has not been
     # released since January 2025.
     - name: Setup buf
-      uses: bufbuild/buf-action@85aebf73123b5c15fd5528aaecbf9129cddf7fa7 # v1.6.0
+      uses: bufbuild/buf-action@85aebf73123b5c15fd5528aaecbf9129cddf7fa7  # v1.6.0
       with:
         setup_only: true
         version: ${{ inputs.BUF_VERSION }}

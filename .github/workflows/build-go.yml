@@ -138,7 +138,7 @@ jobs:
         fi
 
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         fetch-depth: ${{ inputs.FETCH_DEPTH }}
         # Nothing here reaches the remote: GoReleaser reads the working tree and
@@ -146,7 +146,7 @@ jobs:
         persist-credentials: false
 
     - name: Setup Go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
       with:
         go-version: ${{ inputs.GO_VERSION }}
         go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
@@ -155,7 +155,7 @@ jobs:
         # binaries back as a workflow artifact, while publishing is
         # release-go.yml's job, which runs uncached. A caller that ships this
         # artifact itself should pass CACHE: false.
-        cache: ${{ inputs.CACHE }} # zizmor: ignore[cache-poisoning]
+        cache: ${{ inputs.CACHE }}  # zizmor: ignore[cache-poisoning]
         cache-dependency-path: ${{ format('{0}/go.sum', inputs.WORKING_DIRECTORY) }}
 
     # Before the build rather than after it. A configuration error that only
@@ -163,7 +163,7 @@ jobs:
     # pull request that introduced it, which is the reason to run it here where
     # nothing is at stake.
     - name: Check the GoReleaser configuration
-      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de  # v7.3.0
       with:
         distribution: ${{ inputs.DISTRIBUTION }}
         version: ${{ inputs.GORELEASER_VERSION }}
@@ -178,7 +178,7 @@ jobs:
     # step nor the one below takes one.
     - name: Build the binaries
       if: ${{ !inputs.PACKAGE }}
-      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de  # v7.3.0
       with:
         distribution: ${{ inputs.DISTRIBUTION }}
         version: ${{ inputs.GORELEASER_VERSION }}
@@ -198,7 +198,7 @@ jobs:
     # for a caller to attach to a release, not to hand out on their own.
     - name: Build the full distribution
       if: ${{ inputs.PACKAGE }}
-      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de  # v7.3.0
       with:
         distribution: ${{ inputs.DISTRIBUTION }}
         version: ${{ inputs.GORELEASER_VERSION }}
@@ -212,7 +212,7 @@ jobs:
 
     - name: Upload the distribution
       if: ${{ inputs.ARTIFACT_NAME != '' }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: ${{ inputs.ARTIFACT_NAME }}
         path: ${{ format('{0}/dist', inputs.WORKING_DIRECTORY) }}

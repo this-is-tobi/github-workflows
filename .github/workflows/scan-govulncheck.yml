@@ -85,12 +85,12 @@ jobs:
       vulns: ${{ steps.scan.outputs.vulns }}
     steps:
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         persist-credentials: false
 
     - name: Setup Go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
       with:
         go-version: ${{ inputs.GO_VERSION }}
         go-version-file: ${{ inputs.GO_VERSION == '' && format('{0}/go.mod', inputs.WORKING_DIRECTORY) || '' }}
@@ -188,7 +188,7 @@ jobs:
 
     - name: Upload the complete govulncheck report
       if: ${{ !cancelled() && steps.report-text.outputs.truncated == 'true' }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: govulncheck-report${{ inputs.CATEGORY != '' && format('-{0}', inputs.CATEGORY) || '' }}
         path: ${{ inputs.WORKING_DIRECTORY }}/govulncheck-results.text
@@ -197,7 +197,7 @@ jobs:
 
     - name: Upload govulncheck scan results to GitHub Security tab
       id: upload
-      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
       if: ${{ !cancelled() && inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' }}
       with:
         sarif_file: ${{ inputs.WORKING_DIRECTORY }}/govulncheck-results.sarif
@@ -296,7 +296,7 @@ jobs:
         echo "link=[the GitHub Security Tab](https://github.com/${REPOSITORY}/security/code-scanning?query=is%3Aopen${FILTER})" >> "$GITHUB_OUTPUT"
 
     - name: Comment PR
-      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88  # v3.0.5
       with:
         message: |
           🤖 Hey !

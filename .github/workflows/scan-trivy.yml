@@ -144,7 +144,7 @@ jobs:
     - name: Generate read-only GitHub App token
       id: app-token
       if: ${{ env.HAS_APP_AUTH == 'true' }}
-      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
       with:
         client-id: ${{ secrets.APP_CLIENT_ID }}
         private-key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -152,7 +152,7 @@ jobs:
         permission-metadata: read
 
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No later step talks to the git remote, so the job's token need not
         # stay in .git/config while the rest of the job runs.
@@ -160,14 +160,14 @@ jobs:
 
     - name: Download image artifact
       if: ${{ inputs.IMAGE_ARTIFACT != '' }}
-      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
       with:
         name: ${{ inputs.IMAGE_ARTIFACT }}
         path: /tmp/trivy-image
 
     - name: Run Trivy vulnerability scanner on images
       id: scan
-      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
       with:
         image-ref: ${{ inputs.IMAGE_ARTIFACT == '' && inputs.IMAGE || '' }}
         input: ${{ inputs.IMAGE_ARTIFACT != '' && format('/tmp/trivy-image/{0}', inputs.IMAGE_ARTIFACT_FILE) || '' }}
@@ -235,7 +235,7 @@ jobs:
       # Only when the summary could not hold it - otherwise the summary already
       # is the report and an artifact is a second copy nobody opens
       if: ${{ !cancelled() && steps.report.outputs.truncated == 'true' }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: trivy-report-${{ steps.report.outputs.slug }}
         path: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
@@ -244,7 +244,7 @@ jobs:
 
     - name: Upload Trivy scan results to GitHub Security tab
       id: upload
-      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
       if: ${{ !cancelled() && inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' && steps.scan.outcome != 'skipped' }}
       with:
         sarif_file: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
@@ -304,7 +304,7 @@ jobs:
     - name: Generate read-only GitHub App token
       id: app-token
       if: ${{ env.HAS_APP_AUTH == 'true' }}
-      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
       with:
         client-id: ${{ secrets.APP_CLIENT_ID }}
         private-key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -312,7 +312,7 @@ jobs:
         permission-metadata: read
 
     - name: Checks-out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # No later step talks to the git remote, so the job's token need not
         # stay in .git/config while the rest of the job runs.
@@ -320,7 +320,7 @@ jobs:
 
     - name: Run Trivy vulnerability scanner on config files
       id: scan
-      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
       with:
         scan-ref: "${{ inputs.PATH }}"
         scan-type: config
@@ -375,7 +375,7 @@ jobs:
     - name: Upload the complete Trivy report
       # See the image scan above
       if: ${{ !cancelled() && steps.report.outputs.truncated == 'true' }}
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: trivy-report-${{ steps.report.outputs.slug }}
         path: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
@@ -384,7 +384,7 @@ jobs:
 
     - name: Upload Trivy scan results to GitHub Security tab
       id: upload
-      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
       if: ${{ !cancelled() && inputs.GITHUB_SECURITY_TAB && inputs.FORMAT == 'sarif' && steps.scan.outcome != 'skipped' }}
       with:
         sarif_file: ${{ format('trivy-results.{0}', inputs.FORMAT) }}
@@ -483,7 +483,7 @@ jobs:
         echo "link=[the GitHub Security Tab](https://github.com/${REPOSITORY}/security/code-scanning?query=is%3Aopen${FILTER})" >> "$GITHUB_OUTPUT"
 
     - name: Comment PR
-      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88  # v3.0.5
       if: ${{ inputs.PR_NUMBER != '' }}
       with:
         message: |
