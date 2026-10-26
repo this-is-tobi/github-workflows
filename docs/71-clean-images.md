@@ -41,6 +41,7 @@ This guard is about the **content of the version**, not about pull request state
 - When a deleted version is a multi-arch manifest list, the per-platform images it references — never tagged themselves — are deleted with it, since nothing could find them afterwards.
 - Untagged versions are never deleted directly: they are the per-platform images of a manifest list, and removing one on its own would break the image referencing it.
 - A failed deletion — a version already gone, for instance — is logged without failing the job.
+- When the version targeted by `CLEAN_TAGGED` is the last tagged version of its package, GitHub refuses to delete it rather than delete the whole package (`cannot delete the last tagged version of a package`, HTTP 400). That is routine for a package with no `latest`/`main`/`develop` tag of its own, once the other pull requests sharing it have already been swept. It is logged as a warning without failing the job: the version is swept normally as soon as another tagged version exists in the same package.
 
 ## Examples
 
