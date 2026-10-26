@@ -57,6 +57,16 @@ on:
         required: false
         default: false
         type: boolean
+      TAG_SHORT_SHA:
+        description: >-
+          Whether to tag with the short commit SHA. Turn it off when the
+          caller's branches get rebased or force-pushed: unchanged image content
+          rebuilt on an unrelated commit reuses the previous digest, so the SHA
+          tag would pile up on that one still-live version forever, since only a
+          whole version can be deleted, never a single tag.
+        required: false
+        default: true
+        type: boolean
       BUILD_AMD64:
         description: Build for amd64
         required: false
@@ -305,7 +315,7 @@ jobs:
         images: ${{ steps.infos.outputs.NORMALIZED_IMAGE }}
         tags: |
           type=raw,value=${{ steps.infos.outputs.LOWER_BRANCH }},enable=${{ steps.infos.outputs.LOWER_BRANCH != 'main' && steps.infos.outputs.LOWER_BRANCH != 'develop' }}
-          type=raw,value=${{ steps.infos.outputs.SHORT_SHA }},enable=${{ steps.infos.outputs.SHORT_SHA != '' }}
+          type=raw,value=${{ steps.infos.outputs.SHORT_SHA }},enable=${{ inputs.TAG_SHORT_SHA && steps.infos.outputs.SHORT_SHA != '' }}
           type=raw,value=${{ inputs.IMAGE_TAG }},enable=${{ inputs.IMAGE_TAG != '' }}
           type=raw,value=${{ format('{0}.{1}', steps.infos.outputs.MAJOR_TAG, steps.infos.outputs.MINOR_TAG) }},enable=${{ inputs.TAG_MAJOR_AND_MINOR && steps.infos.outputs.MAJOR_TAG != '' && steps.infos.outputs.MINOR_TAG != '' && steps.infos.outputs.PRERELEASE_TAG == '' }}
           type=raw,value=${{ steps.infos.outputs.MAJOR_TAG }},enable=${{ inputs.TAG_MAJOR_AND_MINOR && steps.infos.outputs.MAJOR_TAG != '' && steps.infos.outputs.PRERELEASE_TAG == '' }}
