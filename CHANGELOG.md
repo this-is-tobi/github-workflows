@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.1](https://github.com/this-is-tobi/github-workflows/compare/v0.46.0...v0.46.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **sync-prerelease-branch:** keep a single anchor commit on the prerelease branch ([fe32303](https://github.com/this-is-tobi/github-workflows/commit/fe323037cc9112e49b13c02e85cb109dd1515f37))
+
 ## [0.46.0](https://github.com/this-is-tobi/github-workflows/compare/v0.45.0...v0.46.0) (2026-10-28)
 
 
