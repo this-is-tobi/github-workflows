@@ -391,6 +391,21 @@ land_on_develop() {
   )
 }
 
+# What the stacking left behind on a prerelease branch: an anchor commit whose
+# key names a SHA that is no longer on the branch.
+land_stale_anchor() {
+  seed_on_develop
+  (
+    set -e
+    cd "$SANDBOX/seed"
+    jq --arg sha "$1" '.["last-release-sha"] = $sha' release-please-config-rc.json >config.tmp
+    mv config.tmp release-please-config-rc.json
+    git add release-please-config-rc.json
+    git commit -q -m "chore(develop): anchor release-please on 1.1.0-rc.1"
+    git push -q origin develop
+  )
+}
+
 test_a_later_rebase_moves_the_anchor_instead_of_stacking_another_commit() {
   use_real_git
   build_history
@@ -468,21 +483,8 @@ test_anchor_commits_that_already_piled_up_collapse_into_one() {
   run_block "$BLOCK"
   assert_status 0
 
-  # What the stacking left behind on a prerelease branch: older anchor commits,
-  # each naming a SHA that is no longer on the branch.
-  local stale
-  for stale in 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222; do
-    seed_on_develop
-    (
-      set -e
-      cd "$SANDBOX/seed"
-      jq --arg sha "$stale" '.["last-release-sha"] = $sha' release-please-config-rc.json >config.tmp
-      mv config.tmp release-please-config-rc.json
-      git add release-please-config-rc.json
-      git commit -q -m "chore(develop): anchor release-please on 1.1.0-rc.1"
-      git push -q origin develop
-    )
-  done
+  land_stale_anchor 1111111111111111111111111111111111111111
+  land_stale_anchor 2222222222222222222222222222222222222222
   land_on_main second
   run_block "$BLOCK"
 
@@ -552,6 +554,57 @@ test_anchors_on_the_promoted_copy_of_the_release_commit_after_a_rebase_merge_pro
   assert_equal "$promoted" "$(jq -r '.["last-release-sha"]' release-please-config-rc.json)" "last-release-sha"
   assert_equal "1" "$(git rev-list --count origin/main..HEAD)" "the anchor is the only commit of its own"
   assert_equal "chore(develop): anchor release-please on 1.1.0-rc.1" "$(git log -1 --format=%s)" "anchor commit subject"
+}
+
+test_stale_anchors_after_a_promotion_fold_onto_the_release_branch() {
+  use_real_git
+  WITH_HOTFIX=false WITH_PROMOTION=true build_history
+  sync_env
+
+  run_block "$BLOCK"
+  assert_status 0
+
+  # The release commit lives on the release branch, so the base of the fold is
+  # that branch and every prerelease-only commit is replayed on top of it.
+  land_stale_anchor 1111111111111111111111111111111111111111
+  land_stale_anchor 2222222222222222222222222222222222222222
+  land_on_main second
+  run_block "$BLOCK"
+
+  assert_status 0
+  assert_output_contains "Folded 3 earlier anchor commit(s) of 1.1.0-rc.1 into the new one."
+  assert_equal "1" "$(anchor_commits | wc -l | tr -d ' ')" "anchor commits"
+  assert_equal "1" "$(git rev-list --count origin/main..HEAD)" "the anchor is the only commit of its own"
+  local promoted
+  promoted=$(git log --format=%H --grep='^chore(develop): release 1.1.0-rc.1$' -1 origin/main)
+  assert_equal "$promoted" "$(jq -r '.["last-release-sha"]' release-please-config-rc.json)" "last-release-sha"
+  git merge-base --is-ancestor origin/main HEAD
+  assert_equal "$(git rev-parse HEAD)" "$(remote_develop)" "the remote carries the single anchor"
+}
+
+test_work_landed_between_stale_anchors_survives_a_fold_after_a_promotion() {
+  use_real_git
+  WITH_HOTFIX=false WITH_PROMOTION=true build_history
+  sync_env
+
+  run_block "$BLOCK"
+  assert_status 0
+
+  land_stale_anchor 1111111111111111111111111111111111111111
+  land_on_develop later-feature
+  land_stale_anchor 2222222222222222222222222222222222222222
+  land_on_main second
+  run_block "$BLOCK"
+
+  assert_status 0
+  assert_equal "1" "$(anchor_commits | wc -l | tr -d ' ')" "anchor commits"
+  assert_equal "2" "$(git rev-list --count origin/main..HEAD)" "the feature and the anchor are the only commits of their own"
+  assert_equal "chore(develop): anchor release-please on 1.1.0-rc.1" "$(git log -1 --format=%s)" "the anchor is the tip"
+  assert_equal "feat: later-feature" "$(git log -2 --format=%s | tail -1)" "the feature stays right below it"
+  git cat-file -e "HEAD:later-feature.txt"
+  local promoted
+  promoted=$(git log --format=%H --grep='^chore(develop): release 1.1.0-rc.1$' -1 origin/main)
+  assert_equal "$promoted" "$(jq -r '.["last-release-sha"]' release-please-config-rc.json)" "last-release-sha"
 }
 
 test_warns_when_the_release_commit_is_nowhere_to_be_found() {
