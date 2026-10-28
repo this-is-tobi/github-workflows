@@ -348,8 +348,8 @@ Worth knowing:
 - **A mid-run failure leaves a draft**, which you can publish with `gh release edit <tag> --draft=false` or by re-running. That is exactly what this setup buys you: without it, on a repository with immutable releases, a failed asset upload leaves a published, incomplete release that is **unrecoverable** — the tag name stays burned even after deleting the release.
 - **The floating `v<major>`/`v<major>.<minor>` tags from `TAG_MAJOR_AND_MINOR` are unaffected.** Immutability locks only tags carrying a published release, and release-please only ever creates releases on `v<major>.<minor>.<patch>`.
 
-> [!WARNING]
-> [`release-helm.yml`](./51-release-helm.md) with `CREATE_GITHUB_RELEASE: true` is **not** compatible with immutable releases: `chart-releaser` creates the release and then attaches the chart `.tgz` in two separate API calls, with no draft option ([helm/chart-releaser#591](https://github.com/helm/chart-releaser/issues/591)). Publishing charts to an OCI registry instead (`PUBLISH_OCI: true`, `CREATE_GITHUB_RELEASE: false`) creates no GitHub Release and is unaffected.
+> [!NOTE]
+> [`release-helm.yml`](./51-release-helm.md) with `CREATE_GITHUB_RELEASE: true` is compatible too, and needs no draft configuration: chart-releaser goes through the same draft → attach → publish ordering on its own. Turn on its `SKIP_EXISTING` — see its [Immutable releases](./51-release-helm.md#immutable-releases) section.
 
 ## Examples
 
