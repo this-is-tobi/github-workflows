@@ -1,9 +1,14 @@
 name: Attest Go release
 
 # Generate and attach security attestations (SLSA provenance and/or SBOM)
-# and/or a cosign keyless signature to an already-published Go release.
-# Designed to run after release-go.yml, once release-go.yml's GoReleaser step
-# has published the GitHub Release.
+# and/or a cosign keyless signature to a Go release, published or still a
+# draft. Designed to run after release-go.yml, once its GoReleaser step has
+# attached the binaries to the GitHub Release.
+#
+# On a repository with immutable releases, a published release takes no more
+# assets, so the release has to reach this workflow as a draft and be
+# published here, last: PUBLISH_DRAFT_RELEASE. Without immutable releases
+# either order works, and GoReleaser publishing the release is fine.
 #
 # Reads the release back through the GitHub API rather than reusing
 # release-go.yml's local `dist/` - the same reason attest-docker.yml takes a
@@ -110,11 +115,39 @@ on:
         required: false
         default: false
         type: boolean
+      PUBLISH_DRAFT_RELEASE:
+        description: >-
+          Publish the release once everything above is attached, if it is
+          still a draft. For a repository with immutable releases, where the
+          release has to stay a draft until this workflow has uploaded the
+          SBOM and the signature bundle: GoReleaser then runs with
+          `release.draft: true`. A no-op on a release that is already
+          published, so safe to re-run.
+        required: false
+        default: false
+        type: boolean
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
         type: string
         default: '["ubuntu-24.04"]'
+    secrets:
+      APP_CLIENT_ID:
+        description: >-
+          GitHub App Client ID (e.g. Iv23li..., NOT the numeric App ID). Supply
+          with APP_PRIVATE_KEY to publish the release as a GitHub App, so its
+          publication fires `release: published` triggers - a release
+          published with GITHUB_TOKEN fires none. Only used with
+          PUBLISH_DRAFT_RELEASE. See docs/05-authentication.md.
+        required: false
+      APP_PRIVATE_KEY:
+        description: GitHub App private key (PEM). Required alongside APP_CLIENT_ID.
+        required: false
+      GH_PAT:
+        description: >-
+          Personal access token, used for the same purpose as the App
+          credentials above and resolved after them.
+        required: false
 
 # Every `run:` below is bash. Without this GitHub reads the shell off the runner
 # — PowerShell on Windows — so a caller pointing RUNS_ON at one gets a parse
@@ -129,13 +162,19 @@ jobs:
     name: Attest release
     runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
     permissions:
-      # gh release download (read) and gh release upload (write, the SBOM
-      # file and the cosign signature bundle - the only way either survives
-      # past this job).
+      # gh release download (read), gh release upload (write, the SBOM file
+      # and the cosign signature bundle - the only way either survives past
+      # this job) and publishing a draft (write, PUBLISH_DRAFT_RELEASE).
       contents: write
       # OIDC for cosign and for actions/attest*.
       id-token: write
       attestations: write
+    env:
+      # `secrets` is not available in a step-level `if`, but it is here.
+      HAS_APP_AUTH: ${{ secrets.APP_CLIENT_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
+      # Exactly one of the two set: a typo or a half-finished setup. Never a
+      # valid configuration, and silently falling back would downgrade auth.
+      HAS_PARTIAL_APP_AUTH: ${{ (secrets.APP_CLIENT_ID != '') != (secrets.APP_PRIVATE_KEY != '') }}
     steps:
     - name: Validate inputs
       env:
@@ -145,6 +184,11 @@ jobs:
         SIGN: ${{ inputs.SIGN }}
       run: |
         set -euo pipefail
+
+        if [ "$HAS_PARTIAL_APP_AUTH" = "true" ]; then
+          echo "::error::APP_CLIENT_ID and APP_PRIVATE_KEY must be supplied together, but only one was. Continuing would silently fall back to GH_PAT or GITHUB_TOKEN instead of authenticating as the App."
+          exit 1
+        fi
 
         if [ -z "$TAG" ]; then
           echo "::error::TAG must name the release to attest - e.g. the 'tag-name' output of release-app.yml, or github.ref_name on a tag-push trigger."
@@ -157,6 +201,33 @@ jobs:
           echo "::error::Nothing to attest: PROVENANCE, SBOM and SIGN are all false. Enable PROVENANCE for a SLSA build provenance attestation, SBOM for a dependency inventory, SIGN for a cosign keyless signature over the checksums file, or any combination."
           exit 1
         fi
+
+    # SBOM and SIGN both end in an upload, which a published immutable release
+    # refuses. Asked here rather than left to that upload: by then cosign has
+    # already written a signature to the public transparency log for a bundle
+    # the release will never carry, and the error is an API status with no
+    # word of why. PROVENANCE uploads nothing, so it is not held to this.
+    #
+    # Captured into a variable first, NOT inlined in the `[` test: a test
+    # discards the exit status of its own command substitutions, so a failing
+    # `gh` would read as "not immutable" and let the run through.
+    - name: Check the release still takes assets
+      if: ${{ inputs.SBOM || inputs.SIGN }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        TAG: ${{ inputs.TAG }}
+      run: |
+        set -euo pipefail
+
+        STATE="$(gh release view "$TAG" --json isDraft,isImmutable --jq '"\(.isDraft) \(.isImmutable)"')"
+
+        if [ "$STATE" = "false true" ]; then
+          echo "::error::Release '$TAG' is already published and immutable, so it takes no more assets: the SBOM and the signature bundle cannot be attached. The release has to reach this workflow as a draft - GoReleaser with 'release.draft: true' (and 'release.use_existing_draft: true' when release-please created it) - and be published here with PUBLISH_DRAFT_RELEASE. See docs/33-attest-go.md#immutable-releases."
+          exit 1
+        fi
+
+        echo "Release '$TAG' takes assets (isDraft isImmutable: $STATE)"
 
     # Only for SBOM, and deliberately before the checksums file is
     # downloaded below: actions/checkout's default clean step removes
@@ -272,3 +343,49 @@ jobs:
         # the input's own description ties it to push-to-registry, which has
         # no meaning for a file subject - there is no registry for it to
         # duplicate a record from or into.
+
+    # Minted so that publishing the release fires `release:` triggers, which a
+    # release published with GITHUB_TOKEN never does. Only for that one step:
+    # every other call here keeps the job's own token. Scoped to this repository
+    # only: passing `owner:` without `repositories:` would widen the token to
+    # every repo in the installation.
+    - name: Generate GitHub App token
+      id: app-token
+      if: ${{ env.HAS_APP_AUTH == 'true' && inputs.PUBLISH_DRAFT_RELEASE }}
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
+      with:
+        client-id: ${{ secrets.APP_CLIENT_ID }}
+        private-key: ${{ secrets.APP_PRIVATE_KEY }}
+        permission-contents: write
+
+    # Last, and only once every step above succeeded - provenance included,
+    # which runs even after an SBOM or signing failure: a release published
+    # without them would stay that way for good under immutable releases. A
+    # failure leaves the draft, and a re-run attaches what is missing.
+    #
+    # Idempotent: an already-published release is left alone. `gh` resolves a
+    # draft by tag name even though the REST "release by tag" endpoint only
+    # returns published releases. Same shape as release-app.yml's step.
+    - name: Publish draft release
+      if: ${{ inputs.PUBLISH_DRAFT_RELEASE }}
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GH_PAT || github.token }}
+        GH_REPO: ${{ github.repository }}
+        TAG: ${{ inputs.TAG }}
+      run: |
+        set -euo pipefail
+
+        # Captured into a variable first, NOT inlined in the `[` test: a test
+        # discards the exit status of its own command substitutions, so a
+        # failing `gh` would read as an empty string, take the "already
+        # published" branch and pass the step green while the release stays an
+        # unpublished draft.
+        IS_DRAFT="$(gh release view "$TAG" --json isDraft --jq '.isDraft')"
+
+        if [ "$IS_DRAFT" != "true" ]; then
+          echo "Release '$TAG' is already published, nothing to do"
+          exit 0
+        fi
+
+        echo "Publishing draft release '$TAG'"
+        gh release edit "$TAG" --draft=false

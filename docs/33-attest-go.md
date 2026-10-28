@@ -1,6 +1,6 @@
 # `attest-go.yml`
 
-Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a cosign keyless signature to an already-published Go release. Designed to run **after** [`release-go.yml`](./58-release-go.md), once its GoReleaser step has published the GitHub Release.
+Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a cosign keyless signature to a Go release, published or still a draft. Designed to run **after** [`release-go.yml`](./58-release-go.md), once its GoReleaser step has attached the binaries to the GitHub Release. On a repository with [immutable releases](#immutable-releases), it is also the job that publishes the release.
 
 ## Inputs
 
@@ -12,17 +12,24 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a
 | PROVENANCE          | boolean | Generate GitHub's standard [SLSA](https://slsa.dev/) build provenance attestation, covering every asset listed in `CHECKSUMS_FILE` | No       | false               |
 | SBOM                | boolean | Generate an SBOM from the Go module at `WORKING_DIRECTORY`, attest it, and upload it to the release                | No       | false               |
 | SIGN                | boolean | Keyless-sign `CHECKSUMS_FILE` with [cosign](https://github.com/sigstore/cosign)                                     | No       | false               |
+| PUBLISH_DRAFT_RELEASE | boolean | Publish the release once everything is attached, if it is still a draft. For [immutable releases](#immutable-releases); a no-op on a published release | No | false |
 | RUNS_ON             | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                            | No       | `["ubuntu-24.04"]` |
 
 ## Secrets
 
-None. Unlike [`attest-docker.yml`](./31-attest-docker.md) and [`attest-helm.yml`](./56-attest-helm.md), there is no registry involved - everything this workflow reads or writes is a GitHub Release asset, reached with the job's own `GITHUB_TOKEN`.
+| Secret          | Description                                                                                                         | Required |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- | -------- |
+| APP_CLIENT_ID   | GitHub App **Client ID** (not the numeric App ID). With `APP_PRIVATE_KEY`, the release is published as the App, so `release: published` triggers fire. Only used with `PUBLISH_DRAFT_RELEASE`. See [Authentication](./05-authentication.md) | No |
+| APP_PRIVATE_KEY | GitHub App private key (PEM). Required alongside `APP_CLIENT_ID`                                                     | No       |
+| GH_PAT          | Personal access token, same purpose as the App credentials and resolved after them                                  | No       |
+
+Unlike [`attest-docker.yml`](./31-attest-docker.md) and [`attest-helm.yml`](./56-attest-helm.md), there is no registry involved - everything this workflow reads or writes is a GitHub Release asset, reached with the job's own `GITHUB_TOKEN`. The credentials above serve one step only: publishing the draft, because a release published with `GITHUB_TOKEN` fires no `release:` trigger. Supplying only one of `APP_CLIENT_ID`/`APP_PRIVATE_KEY` fails the job rather than falling back.
 
 ## Permissions
 
 | Scope        | Access | Description                                                                          |
 | ------------ | ------ | ------------------------------------------------------------------------------------- |
-| contents     | write  | `gh release download` (read) and `gh release upload` (write - the SBOM file and the cosign signature bundle) |
+| contents     | write  | `gh release download` (read), `gh release upload` (write - the SBOM file and the cosign signature bundle) and publishing the draft with `PUBLISH_DRAFT_RELEASE` (write) |
 | id-token     | write  | Required to sign with cosign and to attest via OIDC                                   |
 | attestations | write  | Required to create GitHub attestations                                                |
 
@@ -40,6 +47,26 @@ None. Unlike [`attest-docker.yml`](./31-attest-docker.md) and [`attest-helm.yml`
 - **Signing uses cosign's blob commands**, not the OCI ones `attest-docker.yml`/`attest-helm.yml` use: `cosign sign-blob --bundle` against the downloaded checksums file, uploaded back to the release as `<CHECKSUMS_FILE>.cosign.bundle`.
 - **Provenance is not gated on the SBOM or SIGN steps succeeding.** It is the attestation that establishes where and from what the release was built, so a problem generating an SBOM or signing the checksums file must never be the reason a release ships without it.
 - The checksums file's absence is diagnosed once, in its own step, with one message naming `CHECKSUMS_FILE` - rather than as whichever of three different, more opaque `cosign`/`actions/attest` failures happened to run first.
+
+## Immutable releases
+
+[Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) lock a release's assets the moment it is published. `SBOM` and `SIGN` both upload to the release, so on such a repository the release has to **stay a draft until this workflow has run**, and be published here, last. `PROVENANCE` uploads nothing and works on a published release either way.
+
+| Job | Without immutable releases | With immutable releases |
+| --- | --- | --- |
+| release-please ([`release-app.yml`](./50-release-app.md)), if used | as usual | `"draft": true` and `"force-tag-creation": true` in its config; `PUBLISH_DRAFT_RELEASE` **off** |
+| GoReleaser ([`release-go.yml`](./58-release-go.md)) | as usual | `release.draft: true`, plus `release.use_existing_draft: true` when release-please created the release |
+| `attest-go.yml` | as usual | `PUBLISH_DRAFT_RELEASE: true` |
+
+Whichever job comes last publishes. Without `SBOM`/`SIGN` there is nothing to attach after GoReleaser, so GoReleaser can publish itself (`release.draft: false`) and this workflow needs no `PUBLISH_DRAFT_RELEASE` - see [`release-go.yml`](./58-release-go.md#immutable-releases).
+
+Worth knowing:
+
+- **A release that is already published and immutable is refused up front.** With `SBOM` or `SIGN`, the first step after the input check asks whether the release can still take assets, and stops with an explanation if not - before cosign writes a signature to the public transparency log for a bundle the release would never carry.
+- **Publishing comes last, and only after every step succeeded.** Provenance runs even after an SBOM or signing failure; publishing does not, because a release published without them stays that way for good. A failure leaves the draft, and a re-run attaches what is missing - `--clobber` replaces what the first attempt already uploaded.
+- **The step is idempotent.** A published release is left alone, so it is safe to re-run.
+- **`release:` events fire on publication, here.** A draft fires nothing; `release: published` comes from this workflow's last step - and only under the App credentials or `GH_PAT`, since a release published with `GITHUB_TOKEN` triggers no workflow.
+- **The release also gets GitHub's own [release attestation](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/verifying-the-integrity-of-a-release)** on publication, covering the tag, the commit and every asset's digest: `gh release verify <tag>`, `gh release verify-asset <tag> <file>`. It records what the release holds, not how it was built - `PROVENANCE` stays the record of that.
 
 ## Verifying attestations
 
@@ -137,6 +164,73 @@ jobs:
       PROVENANCE: true
       SIGN: true
 ```
+
+### On a repository with immutable releases
+
+release-please creates the release as a draft, GoReleaser attaches the binaries to that draft and leaves it one, and this workflow attaches the SBOM and the signature and then publishes. In `release-please-config.json`:
+
+```json
+{
+  "packages": {
+    ".": {
+      "draft": true,
+      "force-tag-creation": true
+    }
+  }
+}
+```
+
+In `.goreleaser.yaml` (`name_template` has to render the name release-please gave the release - the bare tag, `{{ .Tag }}`, for a single package - since GoReleaser finds a draft by name):
+
+```yaml
+release:
+  draft: true
+  use_existing_draft: true
+  name_template: "{{ .Tag }}"
+```
+
+```yaml
+jobs:
+  release:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-app.yml@v0
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    secrets:
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+
+  binaries:
+    uses: this-is-tobi/github-workflows/.github/workflows/release-go.yml@v0
+    if: ${{ needs.release.outputs.release-created == 'true' }}
+    needs:
+    - release
+    permissions:
+      contents: write
+      packages: write
+
+  attest:
+    uses: this-is-tobi/github-workflows/.github/workflows/attest-go.yml@v0
+    needs:
+    - release
+    - binaries
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      TAG: ${{ needs.release.outputs.tag-name }}
+      PROVENANCE: true
+      SBOM: true
+      SIGN: true
+      PUBLISH_DRAFT_RELEASE: true
+    secrets:
+      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+```
+
+`binaries` needs no App credentials here: it no longer publishes, so nothing it does fires a trigger. The App credentials move to `attest`, which does.
 
 ### A module in a subdirectory, with a renamed checksum file
 

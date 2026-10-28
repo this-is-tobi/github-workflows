@@ -13,6 +13,8 @@ VALIDATE=$(extract_run attest-go.yml attest "Validate inputs")
 DOWNLOAD=$(extract_run attest-go.yml attest "Download the checksums file")
 
 validate_env() {
+  # Set by the job's own env in the workflow; covered in credential-validation.test.sh.
+  export HAS_PARTIAL_APP_AUTH="false"
   export TAG="v1.2.3"
   export PROVENANCE="false"
   export SBOM="false"

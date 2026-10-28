@@ -279,6 +279,14 @@ case "$args" in
     ;;
   "release upload"*)
     ;;
+  # A release's state, for the steps that ask whether it is a draft or
+  # immutable. Defaults to an ordinary published release; the --jq filter is
+  # applied the way gh would.
+  "release view"*)
+    printf '%s' "${STUB_GH_RELEASE_VIEW_JSON:-{\"isDraft\":false,\"isImmutable\":false\}}" | apply_filter
+    ;;
+  "release edit"*)
+    ;;
   *)
     printf 'stub gh: unhandled invocation: %s\n' "$args" >&2
     exit 127
