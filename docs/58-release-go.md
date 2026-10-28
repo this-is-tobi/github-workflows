@@ -62,7 +62,7 @@ Two things creating the same GitHub Release is the failure mode to avoid, so pic
 | No release-please in the repository  | GoReleaser           | **This workflow**, on `push: tags:`                                              |
 | release-please is already there      | release-please       | [`release-app.yml`](./50-release-app.md) first, then **this workflow** after it   |
 
-In the second row release-please owns the version, the tag and the notes, and this workflow only attaches the binaries to the release it made. That works because GoReleaser's [`release.mode`](https://goreleaser.com/customization/release/) defaults to `keep-existing`, which leaves an existing release's notes alone — setting it to `replace` would overwrite the changelog release-please generated. A `.goreleaser.yaml` written for the standalone case usually also carries `release.draft: true`, which is worth dropping here: the release is already published by the time GoReleaser sees it.
+In the second row release-please owns the version, the tag and the notes, and this workflow only attaches the binaries to the release it made. That works because GoReleaser's [`release.mode`](https://goreleaser.com/customization/release/) defaults to `keep-existing`, which leaves an existing release's notes alone — setting it to `replace` would overwrite the changelog release-please generated. A `.goreleaser.yaml` written for the standalone case usually also carries `release.draft: true`, which is worth dropping here: the release is already published by the time GoReleaser sees it. On a repository with immutable releases that order no longer works — see [Immutable releases](#immutable-releases).
 
 Chain it as a `needs:` job rather than on `on: release: published`. Both work, but the trigger only fires if release-please itself ran under App or PAT credentials — [`GITHUB_TOKEN` cannot trigger workflows](./05-authentication.md#why-the-app-mode-exists) — whereas `needs:` does not care.
 
@@ -123,6 +123,23 @@ attest:
 ```
 
 See [`attest-go.yml`](./33-attest-go.md) for the full input list and how `TAG` is supplied on a plain tag-push trigger instead.
+
+## Immutable releases
+
+[Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) lock a release's assets the moment it is published, so every asset has to be attached **before** the release is published. Nothing in this workflow changes for that: what changes is who publishes, set in `.goreleaser.yaml` and in the jobs around this one.
+
+| Setup | What to configure |
+| --- | --- |
+| GoReleaser alone, on `push: tags:` | Nothing. GoReleaser always creates the release as a draft, uploads, then publishes. |
+| After `release-app.yml`, nothing after this job | release-please config `"draft": true` + `"force-tag-creation": true`, release-app's `PUBLISH_DRAFT_RELEASE` **off**; `.goreleaser.yaml` `release.use_existing_draft: true` (and `release.draft: false`, the default). GoReleaser attaches the binaries to release-please's draft and publishes it. |
+| Followed by [`attest-go.yml`](./33-attest-go.md) with `SBOM` or `SIGN` | Also `release.draft: true`, so the release stays a draft, and `PUBLISH_DRAFT_RELEASE: true` on attest-go, which publishes it last — see [its example](./33-attest-go.md#on-a-repository-with-immutable-releases). |
+
+Worth knowing:
+
+- **`use_existing_draft` matches the draft by name, not by tag.** `release.name_template` has to render the name release-please gave the release — the bare tag, `{{ .Tag }}`, for a single package. Without `use_existing_draft`, GoReleaser looks the tag up through the endpoint that only returns published releases, misses the draft and tries to create another release for the same tag.
+- **Do not set `release.replace_existing_draft`.** It deletes the draft with the same name before creating one — release-please's draft, notes included.
+- **The App credentials go to whichever job publishes.** A release published with `GITHUB_TOKEN` fires no `release:` trigger; when attest-go publishes, it is the one that needs them.
+- **An already-published immutable release fails cleanly.** GoReleaser refuses it before uploading anything (`release … already exists and is immutable, it cannot be updated`). Its preflight check notices it before the build, but only warns unless `release.preflight.fail_on_error: true` is set.
 
 ## Notes
 

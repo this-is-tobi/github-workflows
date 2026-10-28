@@ -343,6 +343,7 @@ jobs:
 Worth knowing:
 
 - **`PUBLISH_DRAFT_RELEASE` is an explicit opt-in.** release-please's `draft` option is also the documented way to hold a release back for manual publication, so this workflow never publishes a draft unless asked to.
+- **Leave it off when a later job attaches assets.** It publishes at the end of this job, before a `needs:` job such as [`release-go.yml`](./58-release-go.md#immutable-releases) or [`attest-go.yml`](./33-attest-go.md#immutable-releases) runs; the last of them publishes instead.
 - **The step is idempotent.** An already-published release is left untouched, so the step is safe to re-run.
 - **`release:` events fire later.** A draft fires nothing; `release: published`/`released` comes from the publish step, once the assets are attached. Check the triggers of any workflow that reacts to your releases.
 - **A mid-run failure leaves a draft**, which you can publish with `gh release edit <tag> --draft=false` or by re-running. That is exactly what this setup buys you: without it, on a repository with immutable releases, a failed asset upload leaves a published, incomplete release that is **unrecoverable** — the tag name stays burned even after deleting the release.

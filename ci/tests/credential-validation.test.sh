@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every job that mints a GitHub App token guards against half-configured
-# credentials. The guard is duplicated across nine jobs by necessity - reusable
+# credentials. The guard is duplicated across ten jobs by necessity - reusable
 # workflows cannot share a script - so it is verified in one place instead.
 
 # shellcheck source=ci/tests/lib.sh
@@ -8,6 +8,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 # <workflow>:<job>:<step name>
 GUARDED_JOBS=(
+  "attest-go.yml:attest:Validate inputs"
   "build-docker.yml:build:Validate credentials"
   "release-app.yml:release:Validate inputs"
   "release-go.yml:release:Validate inputs"
@@ -57,6 +58,12 @@ guard_env() {
   export SIGN_CHART="false"
   export SIGNING_KEY_ID=""
   export HAS_GPG_KEY="false"
+  # attest-go.yml has no default release and refuses a run that attests
+  # nothing, so it is given a tag and one capability, the same way.
+  export TAG="v1.2.3"
+  export PROVENANCE="true"
+  export SBOM="false"
+  export SIGN="false"
 }
 
 test_partial_credentials_fail_every_guarded_job() {
