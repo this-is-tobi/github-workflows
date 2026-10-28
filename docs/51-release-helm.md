@@ -37,7 +37,7 @@ For a **monorepo** — a chart living alongside application code, where the tag 
 | GPG_PRIVATE_KEY   | ASCII-armored GPG private key used to sign chart packages. Required with `SIGN_CHART` | No       |
 | GPG_PASSPHRASE    | Passphrase for `GPG_PRIVATE_KEY`. Pass an empty value only if the key genuinely has none | No       |
 
-> **Why supply App credentials here.** Releases created with `GITHUB_TOKEN` cannot fire `release:` triggers — GitHub's anti-recursion rule. If you have a workflow that should run when a chart release is published, chart-releaser needs an App token. Otherwise `GITHUB_TOKEN` is fine.
+> **Why supply App credentials here.** Releases created with `GITHUB_TOKEN` cannot fire `release:` triggers — GitHub's anti-recursion rule. If you have a workflow that should run when a chart release is published, chart-releaser needs an App token, and that workflow has to listen on `release: types: [published]` — see [Immutable releases](#immutable-releases) for why `created` never fires. Otherwise `GITHUB_TOKEN` is fine.
 >
 > The `PAGES_BRANCH` pull and push use the same token as the release creation: the checkout is given it, and git sends the credential a checkout persists in preference to any token embedded in a push URL. So an App token or `GH_PAT` also lets **that** push trigger workflows. Harmless unless a workflow triggers on the pages branch — check before pointing one at it.
 >
@@ -65,7 +65,7 @@ The workflow packages charts once and can ship them through two channels, enable
 | Repo prerequisites | the `PAGES_BRANCH` (default `gh-pages`) must already exist | none |
 | Private charts | GitHub Release assets follow repo visibility, but the pages site is public — see below | registry auth |
 | Extra permission used | `contents: write` | `packages: write` |
-| [Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) | **not compatible** — see the warning below | compatible (creates no GitHub Release) |
+| [Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) | compatible, with `SKIP_EXISTING: true` — see [Immutable releases](#immutable-releases) | compatible (creates no GitHub Release) |
 
 Enabling both is fine and publishes the same packages through both paths.
 
@@ -120,7 +120,7 @@ chart-releaser packages every chart whose **files** changed since the last tag �
 
 The OCI channel never pushes over a version the registry already holds, in either mode: a consumer pins a chart by version, and the [signature](./56-attest-helm.md) is bound to the digest first pushed, so pushing again would silently change what that version means and orphan its signature. Each package is looked up in the registry (`helm show chart oci://…/<name> --version <version>`) before anything is pushed, so a run cannot publish half of its charts, and only a clear "not found" lets a push through — an answer such as *denied*, *rate limited* or *unreachable* stops the run instead of being read as "not published". That holds with `SKIP_EXISTING` too: it leaves a version alone when the registry says it is there, not when the registry could not be asked.
 
-A dedicated chart repository usually wants `SKIP_EXISTING: true`, so a merge that touches a chart without releasing it is not a red run. Because a skipped version is not in `published-charts`, [`attest-helm.yml`](./56-attest-helm.md) does not sign it a second time.
+A dedicated chart repository usually wants `SKIP_EXISTING: true`, so a merge that touches a chart without releasing it is not a red run. On a repository with [immutable releases](#immutable-releases) it is also what lets a run that failed halfway be re-run. Because a skipped version is not in `published-charts`, [`attest-helm.yml`](./56-attest-helm.md) does not sign it a second time.
 
 ## Signing
 
@@ -149,6 +149,18 @@ Export the key with `gpg --armor --export-secret-keys <key-id>` and store it as 
 
 Missing pieces fail up front rather than producing unsigned charts: chart-releaser does not treat a missing key as fatal, it simply packages without a signature — so an empty `GPG_PRIVATE_KEY`, an empty `SIGNING_KEY_ID`, or a key that fails to export all stop the run.
 
+## Immutable releases
+
+[Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) lock a GitHub Release the moment it is published: its assets can no longer be added, changed or removed, and its tag can no longer be moved or deleted — nor reused, even once the release is deleted.
+
+Both channels are compatible, with nothing to configure beyond `SKIP_EXISTING`. The OCI channel creates no GitHub Release at all. The classic channel goes through a draft: chart-releaser creates each chart's release as a draft, attaches the `.tgz` (and the `.prov` with `SIGN_CHART`), and only then publishes it, so the release is complete before it is locked. That ordering arrived in chart-releaser v1.9.0 ([helm/chart-releaser#587](https://github.com/helm/chart-releaser/pull/587)), the version this workflow pins; a test keeps it from going back below.
+
+Worth knowing:
+
+- **Turn `SKIP_EXISTING` on.** chart-releaser releases the changed charts one after the other, so a run that fails on the third chart has already published the first two. Their tags can never be used again, so a re-run only gets through by leaving those two alone — without `SKIP_EXISTING` it fails on the first of them, and deleting the two releases to start over is not a way out here.
+- **A failed upload leaves a draft**, never a published release missing its package: the tag is not burned, and a re-run releases the chart. That re-run does not see the draft, though — chart-releaser looks releases up through the API endpoint that only returns published ones — so it creates another, and the first stays behind. Delete it from the repository's *Releases* page rather than with `gh release delete <tag>`: with two releases on one tag, which of them `gh` resolves is not guaranteed, and deleting the published one burns its tag.
+- **`release:` events fire on publication, on every repository.** The draft ordering does not depend on the setting. Workflows never run for draft events, and publishing a draft sends `published` and `released` but not `created` — so a workflow listening on `release: types: [created]` never runs for these releases. Listen on `published`.
+
 ## Notes
 
 - **CREATE_GITHUB_RELEASE behavior**: When `true`, creates a GitHub Release and git tag for each changed chart and updates `index.yaml` on the pages branch (e.g. `gh-pages`); this **requires that pages branch to already exist**. When `false`, chart-releaser is not run at all: no GitHub Release, no tag and no pages branch are involved, and no git credential is kept in the checkout. The charts that changed since the latest tag (the same set chart-releaser would pick) are packaged with `helm package` for the OCI channel. `SIGN_CHART` requires `true`.
@@ -158,11 +170,6 @@ Missing pieces fail up front rather than producing unsigned charts: chart-releas
 - **HELM_REPOS is optional**: The "add repos" step is skipped when `HELM_REPOS` is empty. Provide it when your charts pull dependencies from external repositories.
 - Detects charts via `git diff` from the latest git tag: a chart with **any** changed file is packaged, whether or not its `Chart.yaml` version was bumped — see [Charts that did not change version](#charts-that-did-not-change-version) for what happens to a version that is already published. Requires SemVer chart versions and `fetch-depth: 0` (the workflow sets it).
 - Charts can be pulled using: `helm pull oci://ghcr.io/<owner>/<repo>/<chart-name> --version <version>`
-
-> [!WARNING]
-> **`CREATE_GITHUB_RELEASE: true` is not compatible with [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).** `chart-releaser` creates the GitHub Release and then attaches the chart `.tgz` in two separate API calls, with no way to go through a draft; on a repository with immutable releases enabled the second call is rejected and the release is left incomplete. Upstream support is tracked in [helm/chart-releaser#591](https://github.com/helm/chart-releaser/issues/591).
->
-> The OCI channel on its own (`PUBLISH_OCI: true`, `CREATE_GITHUB_RELEASE: false`) creates no GitHub Release and is unaffected — so on a repository with immutable releases enabled, that is the channel to use.
 
 ## Examples
 
