@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.46.0](https://github.com/this-is-tobi/github-workflows/compare/v0.45.0...v0.46.0) (2026-10-28)
+
+
+### Features
+
+* **attest-go:** publish a draft release once everything is attached ([1ce2e00](https://github.com/this-is-tobi/github-workflows/commit/1ce2e00795c912a27e6c7e1558ba8aa9cc180c8e))
+
+
+### Dependencies
+
+* **deps:** update chart-releaser to v1.9.0 ([d3a867e](https://github.com/this-is-tobi/github-workflows/commit/d3a867e201ac1d393f8ce18807a536f0969abe6d))
+* **deps:** update helm/chart-releaser-action to v1.8.0 ([18b125f](https://github.com/this-is-tobi/github-workflows/commit/18b125ff2b54bf4874cfc55e1cff9079672acb18))
+* **deps:** update oras-project/setup-oras to v2.0.3 ([3fd123d](https://github.com/this-is-tobi/github-workflows/commit/3fd123d559b1930f3bbb0054d7a801f9a5abb0bb))
+* **deps:** update sonarsource/sonarqube-scan-action to v8.4.0 ([85721be](https://github.com/this-is-tobi/github-workflows/commit/85721be3f4eb8d351b316f85b6b261a50448cdcd))
+
 ## [0.45.0](https://github.com/this-is-tobi/github-workflows/compare/v0.44.1...v0.45.0) (2026-10-26)
 
 
