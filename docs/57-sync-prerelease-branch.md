@@ -138,14 +138,15 @@ Moving the tag is not an option: registries and mirrors build versions from tags
 
 1. it reads the version in the prerelease manifest and finds its tag: `v<version>` or `<version>`, else the one tag ending in the version (a component prefix); several candidates (lockstep chart and application versions) are ambiguous, the job says so and sets nothing;
 2. if that tag is no longer in the branch, it finds the replayed release commit: same subject **and same author date** (a rebase, a cherry-pick and a rebase-merge keep both), among the commits replayed onto the release branch; or, after a rebase-merge promotion that copied the whole series onto the release branch, the rebase replays nothing (everything is already upstream) and the copy of that commit on the release branch is used;
-3. it commits `chore(develop): anchor release-please on 1.1.0-rc.1`, setting `last-release-sha` to that commit in `PRERELEASE_CONFIG_FILE`, before the single push.
+3. it takes the anchor commits of earlier rebases out of the series (see below), then commits `chore(develop): anchor release-please on 1.1.0-rc.1`, setting `last-release-sha` to that commit in `PRERELEASE_CONFIG_FILE`, before the single push.
 
 The key has to be in a commit of the branch because release-please reads its config from GitHub, not from a workspace. Once the next prerelease is tagged, release-please reaches that tag before the anchor commit and the key is inert; the next rebase that takes a tag out refreshes it.
 
 - **A single-package prerelease manifest.** The key is one commit for the whole repository: it cannot be the starting point of several packages. Beyond one, the job says so and sets nothing.
 - **Idempotent.** Without a new rebase, or if the key already names the replayed commit, no commit is added.
 - **The config is edited, not re-serialised.** The key is replaced on its line or inserted as the first property, so a formatted file keeps its layout and a JSON linter has nothing to say about the anchor commit. Only a file the edit cannot be checked against (an object that does not open on a line of its own) is rewritten with `jq`.
-- **One anchor commit per rebase that takes a tag out.** Earlier ones are replayed with the rest and stack up: one more small `chore` commit per resynchronised hotfix, which reaches the release branch at the promotion, where the key is inert.
+- **One anchor commit at a time.** The anchor commit of an earlier rebase is replayed with the rest of the series and its key names a commit that is gone. Left in place, one more `chore` commit would pile up on every push to the release branch. The job takes the anchor commits of that version out of the series first, and only the commits after the release commit are replayed, so the release commit keeps the SHA the new key names. The commits that landed after an earlier anchor stay, in the same order, below the new one.
+- **A commit that does not apply without the old anchor commit** (a later edit of the lines of the config next to the key) cannot be replayed without it. The job then restores the branch, says so in a warning and adds the new anchor commit on top of the old one, as it did before this step existed. That repeats on every resynchronisation for as long as the later commit is in the series.
 - **`jq` must be on the runner** (it is on GitHub-hosted ones; install it on a self-hosted runner).
 - **In the steady state, nothing to do**: after a promotion the manifest holds the stable version, whose tag is on the release branch.
 
