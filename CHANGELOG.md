@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.46.2](https://github.com/this-is-tobi/github-workflows/compare/v0.46.1...v0.46.2) (2026-10-31)
+
+
+### Dependencies
+
+* **deps:** update chart-releaser to v1.10.0 ([960673a](https://github.com/this-is-tobi/github-workflows/commit/960673ab0fecedc7f462bbc8c6898535a3eb29fb))
+* **deps:** update chart-releaser to v1.10.1 ([4bad6aa](https://github.com/this-is-tobi/github-workflows/commit/4bad6aa0d389d71914bc13cc89080469e45c064b))
+* **deps:** update helm/chart-releaser-action to v1.9.0 ([389b30d](https://github.com/this-is-tobi/github-workflows/commit/389b30dfc125b029591c3698679c9bc451f92274))
+
 ## [0.46.1](https://github.com/this-is-tobi/github-workflows/compare/v0.46.0...v0.46.1) (2026-10-28)
 
 
