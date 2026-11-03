@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.47.0](https://github.com/this-is-tobi/github-workflows/compare/v0.46.1...v0.47.0) (2026-11-03)
+
+
+### Features
+
+* **lint-actions:** add a reusable workflow linting workflows with actionlint ([11e024d](https://github.com/this-is-tobi/github-workflows/commit/11e024df2cdacba618566fe4acb34da402ee5f8f))
+
+
+### Bug Fixes
+
+* **release-helm:** retry a failed OCI push and list the charts pushed before it ([dcc37a5](https://github.com/this-is-tobi/github-workflows/commit/dcc37a5bd1488d2912ef14fce97aab7503a11508))
+
+
+### Dependencies
+
+* **deps:** update chart-releaser to v1.10.0 ([960673a](https://github.com/this-is-tobi/github-workflows/commit/960673ab0fecedc7f462bbc8c6898535a3eb29fb))
+* **deps:** update chart-releaser to v1.10.1 ([4bad6aa](https://github.com/this-is-tobi/github-workflows/commit/4bad6aa0d389d71914bc13cc89080469e45c064b))
+* **deps:** update helm/chart-releaser-action to v1.9.0 ([389b30d](https://github.com/this-is-tobi/github-workflows/commit/389b30dfc125b029591c3698679c9bc451f92274))
+* **deps:** update zizmor to v1.32.0 ([63be311](https://github.com/this-is-tobi/github-workflows/commit/63be311c476b54835fe7377ede689edb3c702646))
+
 ## [0.46.1](https://github.com/this-is-tobi/github-workflows/compare/v0.46.0...v0.46.1) (2026-10-28)
 
 
