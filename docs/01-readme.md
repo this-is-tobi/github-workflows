@@ -49,6 +49,7 @@ For more details, see:
 - [Lint YAML files using yamllint (`lint-yaml.yml`)](../.github/workflows/lint-yaml.yml)
 - [Lint a Go module with gofmt, go vet and golangci-lint (`lint-go.yml`)](../.github/workflows/lint-go.yml)
 - [Lint Protocol Buffers with buf, including breaking-change detection (`lint-proto.yml`)](../.github/workflows/lint-proto.yml)
+- [Lint GitHub Actions workflows with actionlint (`lint-actions.yml`)](../.github/workflows/lint-actions.yml)
 
 **Test**
 

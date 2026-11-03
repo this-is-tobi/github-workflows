@@ -3,7 +3,7 @@
 # actionlint checks `runs-on` against a list of GitHub-hosted runner labels baked
 # into the binary at build time, so any label GitHub ships after a release is
 # reported as unknown even though the runner exists and works. 1.7.12 — the
-# digest pinned in the `Lint workflows` step of ci.yml, and the newest release —
+# digest pinned in lint-actions.yml, and the newest release —
 # was cut before the 2026-06-11 runner image preview, so it rejects
 # `ubuntu-26.04`.
 #
