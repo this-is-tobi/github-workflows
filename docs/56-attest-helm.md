@@ -66,11 +66,11 @@ A signature says who vouched for the bytes. Provenance says where they came from
 | | `release-helm.yml` `SIGN_CHART: true` | `attest-helm.yml` |
 | --- | --- | --- |
 | Produces | a `.prov` GPG provenance file | cosign signatures and/or SLSA provenance in the registry |
-| Covers | the GitHub Release / `helm repo add` channel | the OCI channel |
-| Verified with | `helm verify` / `helm install --verify` | `cosign verify` / `gh attestation verify` |
+| Covers | the GitHub Release / `helm repo add` channel, and the OCI package when both channels are on | the OCI channel |
+| Verified with | `helm verify` / `helm install --verify` / `helm pull --verify` | `cosign verify` / `gh attestation verify` |
 | Key management | your GPG key, as repository secrets | keyless — no key to hold |
 
-`helm verify` implements OpenPGP only, so the classic channel cannot use the keyless flow — that is why GPG still exists here rather than being a preference. Conversely `helm push` does not carry a `.prov` file to an OCI registry, which is why `SIGN_CHART` requires `CREATE_GITHUB_RELEASE`.
+`helm verify` implements OpenPGP only, so the classic channel cannot use the keyless flow — that is why GPG still exists here rather than being a preference. `SIGN_CHART` requires `CREATE_GITHUB_RELEASE` because only chart-releaser signs. With both channels on, `helm push` also carries the `.prov` to the registry, where `helm pull --verify` reads it.
 
 If you publish only to OCI, prefer this workflow and hold no GPG key at all. A long-lived signing key is worth its key-management burden only if consumers actually run `helm verify`.
 

@@ -68,11 +68,12 @@ on:
         description: >-
           GPG-sign each packaged chart, producing the .prov provenance file
           that `helm verify` and `helm install --verify` check. Requires
-          CREATE_GITHUB_RELEASE, since the .prov is published as a release
-          asset alongside the .tgz - `helm push` does not carry it to an OCI
-          registry, where cosign signatures are the equivalent (see
-          attest-helm.yml). Needs SIGNING_KEY_ID plus the GPG_PRIVATE_KEY and
-          GPG_PASSPHRASE secrets.
+          CREATE_GITHUB_RELEASE: chart-releaser does the signing, and the OCI
+          channel on its own packages without it. The .prov is published as a
+          release asset beside the .tgz and, with PUBLISH_OCI, `helm push`
+          also sends it to the registry as an extra layer that
+          `helm pull --verify` reads. Needs SIGNING_KEY_ID plus the
+          GPG_PRIVATE_KEY and GPG_PASSPHRASE secrets.
         type: boolean
         required: false
         default: false
@@ -221,13 +222,9 @@ jobs:
         fi
 
         if [ "$SIGN_CHART" = "true" ]; then
-          # The .prov file rides along as a GitHub Release asset. `helm push`
-          # does not carry it to an OCI registry, so on the OCI channel alone
-          # signing would produce a provenance file that nothing ever
-          # publishes - silently, which is exactly the shape this workflow
-          # refuses elsewhere. cosign covers the OCI side (attest-helm.yml).
+          # Only chart-releaser signs; the OCI channel alone packages unsigned.
           if [ "$CREATE_GITHUB_RELEASE" != "true" ]; then
-            echo "::error::SIGN_CHART requires CREATE_GITHUB_RELEASE. The .prov provenance file is published as a GitHub Release asset; 'helm push' does not carry it to an OCI registry, so on the OCI channel alone it would be generated and discarded. Sign OCI artifacts with attest-helm.yml instead."
+            echo "::error::SIGN_CHART requires CREATE_GITHUB_RELEASE: only chart-releaser signs packages, and the OCI channel on its own packages them unsigned. Sign OCI artifacts with attest-helm.yml instead."
             exit 1
           fi
 
