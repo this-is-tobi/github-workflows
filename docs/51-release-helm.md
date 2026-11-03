@@ -108,6 +108,23 @@ On a private repository, three options, best first:
 
 `repository` and `digest` are kept apart so they can be fed straight to [`attest-helm.yml`](./56-attest-helm.md), which passes them on as cosign's subject and as the `subject-name`/`subject-digest` pair `actions/attest-build-provenance` expects — the same shape `attest-docker.yml` consumes for images. The name and version are read back from `helm push`'s own output rather than parsed out of the package file name, which cannot be split reliably: a prerelease version contains dashes of its own (`my-chart-1.2.3-rc.1.tgz`).
 
+## When a push fails
+
+Each chart is pushed up to three times, 15 and 30 seconds apart: GHCR sometimes answers the last step of a push with a 404, mostly on the first push of a package, and the same package pushed again goes through. A chart that still fails stops the run there, and `published-charts` lists the charts pushed before it.
+
+The release job is then red, so a job that signs them has to run anyway or they stay published and unsigned for good: the re-run finds their versions already in the registry and leaves them out of the list.
+
+```yaml
+attest:
+  needs: release
+  if: ${{ !cancelled() }}
+  uses: this-is-tobi/github-workflows/.github/workflows/attest-helm.yml@v0
+  with:
+    CHARTS: ${{ needs.release.outputs.published-charts }}
+```
+
+Re-running the failed jobs pushes the rest, provided `SKIP_EXISTING` is on: without it the run stops at the first chart already published.
+
 ## Charts that did not change version
 
 chart-releaser packages every chart whose **files** changed since the last tag — a fixed README or a comment in `values.yaml` included — whether or not its `version` was bumped. Such a chart carries a version that is already published, and what happens next is the caller's choice:

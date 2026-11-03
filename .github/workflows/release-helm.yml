@@ -497,13 +497,32 @@ jobs:
         # its own ('my-chart-1.2.3-rc.1.tgz').
         PUBLISHED='[]'
 
+        # Written however the step ends: charts pushed before a failure still
+        # reach attest-helm.yml.
+        trap 'printf "published-charts=%s\n" "$PUBLISHED" >> "$GITHUB_OUTPUT"' EXIT
+
+        # GHCR sometimes answers the tag step of a push with a 404, mostly on a
+        # package's first push; pushing again goes through. An attempt can leave
+        # an untagged manifest behind, harmless as nothing is signed yet.
+        push_chart() {
+          local attempt
+          for attempt in 1 2 3; do
+            push_output=$(helm push "$1" "$2" 2>&1 | tee /dev/stderr) && return 0
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 15))
+          done
+          return 1
+        }
+
         # The expansion form that stays defined for an empty array: with
         # SKIP_EXISTING every package can be a version already published, and
         # an older bash (a self-hosted runner) fails `set -u` on "${TO_PUSH[@]}".
         for chart_package in ${TO_PUSH[@]+"${TO_PUSH[@]}"}; do
           chart_file=$(basename "$chart_package")
           echo "Publishing $chart_file to oci://$REGISTRY/$OCI_REPO"
-          push_output=$(helm push "$chart_package" "oci://$REGISTRY/$OCI_REPO" 2>&1 | tee /dev/stderr)
+          if ! push_chart "$chart_package" "oci://$REGISTRY/$OCI_REPO"; then
+            echo "::error::Could not push $chart_file after 3 attempts."
+            exit 1
+          fi
 
           pushed=$(printf '%s\n' "$push_output" | awk '/^Pushed:/ { print $2 }')
           digest=$(printf '%s\n' "$push_output" | awk '/^Digest:/ { print $2 }')
@@ -531,7 +550,6 @@ jobs:
              }]')
         done
 
-        printf 'published-charts=%s\n' "$PUBLISHED" >> "$GITHUB_OUTPUT"
         printf 'Published %s chart(s)\n' "$(printf '%s' "$PUBLISHED" | jq 'length')"
 
     # Helm stores registry credentials in the runner's Helm config, which on a

@@ -50,7 +50,9 @@ No GitHub App/PAT credentials — this workflow never creates a git tag, release
 
 Identical in shape to the [output of the same name on `release-helm.yml`](./51-release-helm.md#outputs), so [`attest-helm.yml`](./56-attest-helm.md) consumes either without caring which one published — a monorepo chart is no less entitled to a signature and a provenance statement than one from a dedicated chart repository. `repository` and `digest` are kept apart so they can be fed straight through, as cosign's subject and as the `subject-name`/`subject-digest` pair `actions/attest-build-provenance` expects. The name and version are read back from `helm push`'s own output rather than parsed out of the package file name, which cannot be split reliably: a prerelease version contains dashes of its own (`my-chart-1.2.3-rc.1.tgz`).
 
-Unlike `release-helm.yml`, this output is never an empty array — there is no input that turns publishing off, and a run that found no chart to package fails rather than succeeding with nothing to show. A downstream `attest-helm.yml` therefore needs no guard against attesting nothing.
+Unlike `release-helm.yml`, a successful run never leaves this output an empty array — there is no input that turns publishing off, and a run that found no chart to package fails rather than succeeding with nothing to show. A downstream `attest-helm.yml` therefore needs no guard against attesting nothing.
+
+Each chart is pushed up to three times, as in [`release-helm.yml`](./51-release-helm.md#when-a-push-fails). When one still fails, the output lists the charts pushed before it, and a job that signs them has to run despite the failed release: `if: ${{ !cancelled() && needs.<release job>.outputs.published-charts != '' }}`. The output is empty when the run failed before the first push.
 
 ## Permissions
 
