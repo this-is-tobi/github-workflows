@@ -18,8 +18,16 @@ WORKFLOW="release-helm-local.yml"
 
 # `package` writes a real (empty) file so the glob that follows it has something
 # to find; `push` answers from STUB_HELM_PUSHED/STUB_HELM_DIGEST, and omits
-# either line on demand to exercise the guard.
+# either line on demand to exercise the guard. STUB_HELM_PUSH_FAILS=n fails the
+# first n pushes the way GHCR's tag step does, STUB_HELM_PUSH_FAIL_FOR names a
+# chart whose push always fails. `sleep` is logged, never slept.
 install_helm_stub() {
+  cat >"$SANDBOX/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+printf 'sleep|%s\n' "$*" >>"$CALL_LOG"
+STUB
+  chmod +x "$SANDBOX/bin/sleep"
+
   cat >"$SANDBOX/bin/helm" <<'STUB'
 #!/usr/bin/env bash
 printf 'helm|%s\n' "$*" >>"$CALL_LOG"
@@ -62,6 +70,15 @@ case "$1" in
     esac
     ;;
   push)
+    pushes=$(cat "$SANDBOX/pushes" 2>/dev/null || echo 0)
+    echo $((pushes + 1)) >"$SANDBOX/pushes"
+    fail=false
+    [ "$pushes" -lt "${STUB_HELM_PUSH_FAILS:-0}" ] && fail=true
+    case "$2" in *"/${STUB_HELM_PUSH_FAIL_FOR:-@}-"*) fail=true ;; esac
+    if $fail; then
+      echo 'Error: failed to perform "Tag" on destination: ghcr.io/owner/repo/my-chart: not found' >&2
+      exit 1
+    fi
     [ "${STUB_HELM_PUSH_OMIT:-}" = "reference" ] || \
       printf 'Pushed: %s\n' "${STUB_HELM_PUSHED:-ghcr.io/owner/repo/my-chart:1.2.3-rc.1}"
     [ "${STUB_HELM_PUSH_OMIT:-}" = "digest" ] || \
@@ -163,6 +180,63 @@ test_publishes_every_chart_when_no_chart_name_is_given() {
   count=$(published | jq 'length')
   if [ "$count" != "2" ]; then
     printf 'FAIL: expected 2 published charts, got %s\n---- published ----\n%s\n-------------------\n' \
+      "$count" "$(published)" >&2
+    exit 1
+  fi
+}
+
+# --- a push that fails ------------------------------------------------------
+
+test_retries_a_failed_push_and_publishes_the_chart_once() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export STUB_HELM_PUSH_FAILS="2"
+
+  run_publish
+
+  assert_status 0
+  assert_call_count "helm|push" 3
+  assert_entry name "my-chart"
+  assert_called "sleep|15"
+  assert_called "sleep|30"
+}
+
+test_gives_up_on_a_chart_after_three_attempts() {
+  install_helm_stub
+  in_workspace
+  make_chart my-chart
+  publish_env
+  export STUB_HELM_PUSH_FAILS="3"
+
+  run_publish
+
+  assert_status 1
+  assert_call_count "helm|push" 3
+  # No wait after the last attempt: there is nothing left to wait for.
+  assert_call_count "sleep|" 2
+  assert_output_contains "Could not push my-chart-1.2.3-rc.1.tgz after 3 attempts"
+}
+
+# attest-helm.yml signs what the output lists, so a chart pushed before the
+# failure must be in it or it stays unsigned for good.
+test_lists_the_charts_pushed_before_one_that_fails() {
+  install_helm_stub
+  in_workspace
+  make_chart first
+  make_chart second
+  publish_env
+  export CHART_NAME=""
+  export STUB_HELM_PUSH_FAIL_FOR="second"
+
+  run_publish
+
+  assert_status 1
+  local count
+  count=$(published | jq 'length')
+  if [ "$count" != "1" ]; then
+    printf 'FAIL: expected 1 published chart, got %s\n---- published ----\n%s\n-------------------\n' \
       "$count" "$(published)" >&2
     exit 1
   fi
