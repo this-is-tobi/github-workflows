@@ -32,7 +32,7 @@ jobs:
       pull-requests: read
     with:
       # actionlint's config sits outside `workflows/`, but it decides what the
-      # `Test workflows` job accepts, so editing it has to re-run that job the
+      # `lint-actions` job accepts, so editing it has to re-run that job the
       # same way editing a workflow does. yamllint's config is the same for
       # `lint-yaml`, and zizmor's for `scan-zizmor`: each group re-runs that
       # job alone.
@@ -57,6 +57,18 @@ jobs:
     with:
       CONFIG_FILE: ci/configs/yamllint.yaml
       SCAN_PATH: ./.github/workflows
+
+  # This repository's own workflows, linted by the workflow it publishes, as
+  # for the classifier above: the pull request's copy runs.
+  lint-actions:
+    uses: ./.github/workflows/lint-actions.yml
+    if: ${{ fromJSON(needs.path-filter.outputs.groups).workflows }}
+    needs:
+    - path-filter
+    permissions:
+      contents: read
+    with:
+      CONFIG_FILE: .github/actionlint.yaml
 
   # This repository's own workflows, audited by the workflow it publishes: a
   # finding fails the pull request that introduces it instead of waiting for a
@@ -106,13 +118,6 @@ jobs:
         # No later step talks to the git remote, so the job's token need not
         # stay in .git/config while the rest of the job runs.
         persist-credentials: false
-
-    # Schema, context availability and expression validation, plus shellcheck
-    # over every `run:` block.
-    - name: Lint workflows
-      uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667  # 1.7.12
-      with:
-        args: -color
 
     # Executes the shell logic straight out of the workflow YAML against stubbed
     # credentials and a stubbed `gh`, one suite per CPU at a time. See

@@ -1,0 +1,106 @@
+name: Lint Actions
+
+on:
+  workflow_call:
+    inputs:
+      CONFIG_FILE:
+        description: >-
+          Path to an actionlint configuration file, without whitespace. Defaults
+          to the one actionlint finds itself (`.github/actionlint.yaml` or
+          `.github/actionlint.yml`), if any.
+        type: string
+        required: false
+        default: ""
+      RUNS_ON:
+        description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]'); a Linux runner with Docker
+        required: false
+        type: string
+        default: '["ubuntu-24.04"]'
+
+# Every `run:` below is bash. Without this GitHub reads the shell off the runner
+# — PowerShell on Windows — so a caller pointing RUNS_ON at one gets a parse
+# error where a run should be. `bash` is the portable value: GitHub resolves it
+# to Git Bash on Windows and to /usr/bin/bash elsewhere.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint-actions:
+    name: Lint workflows with actionlint
+    runs-on: ${{ fromJSON(inputs.RUNS_ON) }}
+    permissions:
+      contents: read
+    steps:
+    - name: Checks-out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # No later step talks to the git remote, so the job's token need not
+        # stay in .git/config while the rest of the job runs.
+        persist-credentials: false
+
+    # The `docker://` step below splits its `args` on whitespace, so a path that
+    # would split, or that does not exist, stops the run here instead of
+    # reaching actionlint as something else.
+    - name: Prepare the actionlint arguments
+      id: args
+      env:
+        CONFIG_FILE: ${{ inputs.CONFIG_FILE }}
+      run: |
+        set -euo pipefail
+
+        ARGS=()
+
+        if [ -n "$CONFIG_FILE" ]; then
+          if [[ "$CONFIG_FILE" =~ [[:space:]] ]]; then
+            echo "::error::CONFIG_FILE must not contain whitespace: the runner splits the arguments of the actionlint step on it."
+            exit 1
+          fi
+
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "::error::CONFIG_FILE '$CONFIG_FILE' does not exist."
+            exit 1
+          fi
+
+          ARGS+=(-config-file "$CONFIG_FILE")
+        fi
+
+        echo "args=${ARGS[*]-}" >> "$GITHUB_OUTPUT"
+
+    # Each finding becomes an annotation on the file and line it points at,
+    # which is where a pull request reviewer looks.
+    - name: Register the problem matcher
+      run: |
+        set -euo pipefail
+
+        MATCHER="$RUNNER_TEMP/actionlint-matcher.json"
+
+        cat > "$MATCHER" << 'EOF'
+        {
+          "problemMatcher": [
+            {
+              "owner": "actionlint",
+              "pattern": [
+                {
+                  "regexp": "^(.+?):(\\d+):(\\d+): (.+) \\[(.+?)\\]$",
+                  "file": 1,
+                  "line": 2,
+                  "column": 3,
+                  "message": 4,
+                  "code": 5
+                }
+              ]
+            }
+          ]
+        }
+        EOF
+
+        echo "::add-matcher::$MATCHER"
+
+    # Schema, expression and context checks, plus shellcheck over every `run:`
+    # block (the image ships shellcheck). Runs from its release image pinned by
+    # digest - a tag can be repointed, a digest cannot.
+    - name: Run actionlint
+      uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667  # 1.7.12
+      with:
+        args: ${{ steps.args.outputs.args }}
