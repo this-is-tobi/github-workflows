@@ -129,11 +129,13 @@ The two channels are signed by different mechanisms, and they are complementary 
 | | `SIGN_CHART: true` (here) | [`attest-helm.yml`](./56-attest-helm.md) |
 | --- | --- | --- |
 | Produces | a `.prov` GPG provenance file | cosign signatures and/or SLSA build provenance in the registry |
-| Covers | the GitHub Release / `helm repo add` channel | the OCI channel |
-| Verified with | `helm verify`, `helm install --verify` | `cosign verify` / `gh attestation verify` |
+| Covers | the GitHub Release / `helm repo add` channel, and the OCI package when both channels are on | the OCI channel |
+| Verified with | `helm verify`, `helm install --verify`, `helm pull --verify` | `cosign verify` / `gh attestation verify` |
 | Key management | your GPG key, as repository secrets | keyless — no key to hold |
 
-**`SIGN_CHART` requires `CREATE_GITHUB_RELEASE`.** The `.prov` file is published as a release asset; `helm push` does not carry it to an OCI registry, so on the OCI channel alone it would be generated and silently discarded. The workflow fails rather than let that happen — use `attest-helm.yml` for the OCI side.
+**`SIGN_CHART` requires `CREATE_GITHUB_RELEASE`.** Only chart-releaser signs: the OCI channel on its own packages with a plain `helm package`, so the option would do nothing there, silently. The workflow fails rather than let that happen — use `attest-helm.yml` for the OCI side.
+
+With both channels on, the `.prov` reaches the registry too: `helm push` sends the file it finds beside a package as an extra layer, so `helm pull oci://<registry>/<repository>/<chart> --version <version> --verify --keyring <keyring>` checks the GPG signature from the registry.
 
 ```yaml
 with:

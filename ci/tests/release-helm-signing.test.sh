@@ -35,8 +35,7 @@ test_rejects_signing_without_the_github_release_channel() {
 
   run_block "$BLOCK"
 
-  # `helm push` does not carry the .prov to an OCI registry, so signing on the
-  # OCI channel alone generates provenance that nothing publishes.
+  # Only chart-releaser signs; the OCI channel on its own packages unsigned.
   assert_status 1
   assert_output_contains "SIGN_CHART requires CREATE_GITHUB_RELEASE"
 }
