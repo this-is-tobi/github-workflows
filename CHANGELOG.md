@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.47.1](https://github.com/this-is-tobi/github-workflows/compare/v0.47.0...v0.47.1) (2026-11-05)
+
+
+### Dependencies
+
+* **deps:** update bufbuild/buf-action to v1.7.0 ([6832b26](https://github.com/this-is-tobi/github-workflows/commit/6832b26e0062fef3fb527505ba4f08167a31fa5a))
+* **deps:** update docker/login-action to v4.8.0 ([49d3c58](https://github.com/this-is-tobi/github-workflows/commit/49d3c58c6c55e995d43b9320aa1f6b9e2f02ff56))
+* **deps:** update github/codeql-action to v4.39.2 ([d1439d9](https://github.com/this-is-tobi/github-workflows/commit/d1439d9d02fa2da8ad99f976c5b645c356638ad4))
+* **deps:** update github/codeql-action to v4.39.3 ([1ddadeb](https://github.com/this-is-tobi/github-workflows/commit/1ddadebe81dc9fc0479369f47042d2c90684ad83))
+* **deps:** update helm/kind-action to v1.15.2 ([d109250](https://github.com/this-is-tobi/github-workflows/commit/d109250b39d8e14550bfa4e246851720fea3a649))
+* **deps:** update sigstore/cosign-installer to v4.1.3 ([b88624e](https://github.com/this-is-tobi/github-workflows/commit/b88624ef94da044cc89c213ae52f89e2541fd68d))
+* **deps:** update sonarsource/sonarqube-scan-action to v8.4.1 ([3c3da56](https://github.com/this-is-tobi/github-workflows/commit/3c3da560e6c0b212153f329c87d7ee95ae65ad69))
+
 ## [0.47.0](https://github.com/this-is-tobi/github-workflows/compare/v0.46.1...v0.47.0) (2026-11-03)
 
 
