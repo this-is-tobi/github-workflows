@@ -73,6 +73,15 @@ on:
           it reads as a broken scan rather than as a slow one.
         required: false
         type: string
+      TRIVY_VERSION:
+        description: >-
+          Trivy version used to perform the scan, without the 'v' prefix. Set
+          here rather than left to trivy-action's built-in default, which only
+          moves when trivy-action cuts a release.
+        required: false
+        type: string
+        # renovate: datasource=github-releases depName=aquasecurity/trivy
+        default: 0.76.1
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
@@ -169,6 +178,7 @@ jobs:
       id: scan
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
       with:
+        version: v${{ inputs.TRIVY_VERSION }}
         image-ref: ${{ inputs.IMAGE_ARTIFACT == '' && inputs.IMAGE || '' }}
         input: ${{ inputs.IMAGE_ARTIFACT != '' && format('/tmp/trivy-image/{0}', inputs.IMAGE_ARTIFACT_FILE) || '' }}
         format: ${{ inputs.FORMAT }}
@@ -322,6 +332,7 @@ jobs:
       id: scan
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
       with:
+        version: v${{ inputs.TRIVY_VERSION }}
         scan-ref: "${{ inputs.PATH }}"
         scan-type: config
         format: ${{ inputs.FORMAT }}
