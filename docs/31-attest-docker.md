@@ -13,6 +13,7 @@ Generate and attach security attestations (SLSA provenance and/or SBOM) and/or a
 | SIGN           | boolean | Keyless-sign the image digest with [cosign](https://github.com/sigstore/cosign)                                                                                                                             | No       | false            |
 | PREDICATE_TYPE | string  | URI identifying the type of a custom in-toto predicate to attach **in addition** to the standard attestations. Set together with `PREDICATE`. Use a URI you control (not `https://slsa.dev/provenance/v1`). | No       | -                |
 | PREDICATE      | string  | JSON content for the custom in-toto predicate. Set together with `PREDICATE_TYPE`.                                                                                                                          | No       | -                |
+| TRIVY_VERSION  | string  | Trivy version used to generate the SBOM, without the `v` prefix                                                                                                                                             | No       | 0.76.1           |
 | RUNS_ON        | string  | Runner labels as JSON array (e.g., `'["ubuntu-24.04"]'` or `'["self-hosted", "linux"]'`)                                                                                                                    | No       | ["ubuntu-24.04"] |
 
 ## Secrets
