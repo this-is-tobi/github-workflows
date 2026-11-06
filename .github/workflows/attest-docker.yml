@@ -51,7 +51,7 @@ on:
         required: false
         type: string
         # renovate: datasource=github-releases depName=aquasecurity/trivy
-        default: 0.76.1
+        default: 0.76.2
       RUNS_ON:
         description: Runner labels as JSON array (e.g., '["ubuntu-24.04"]' or '["self-hosted", "linux"]')
         required: false
