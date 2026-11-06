@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.1](https://github.com/this-is-tobi/github-workflows/compare/v0.48.0...v0.48.1) (2026-11-06)
+
+
+### Dependencies
+
+* **deps:** update browser-actions/setup-edge to v1.1.3 ([eca502e](https://github.com/this-is-tobi/github-workflows/commit/eca502ead1a95f4bc98cf97b6aaa1b658490cd41))
+
 ## [0.48.0](https://github.com/this-is-tobi/github-workflows/compare/v0.47.1...v0.48.0) (2026-11-06)
 
 
