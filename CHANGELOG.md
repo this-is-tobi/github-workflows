@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.48.0](https://github.com/this-is-tobi/github-workflows/compare/v0.47.1...v0.48.0) (2026-11-06)
+
+
+### Features
+
+* **scan-trivy:** pin the Trivy version so Renovate can bump it ([511111d](https://github.com/this-is-tobi/github-workflows/commit/511111d181bcca53062aebfeb41b87b0ed0a023c))
+
+
+### Dependencies
+
+* **deps:** update aquasecurity/trivy to v0.76.2 ([3120f1c](https://github.com/this-is-tobi/github-workflows/commit/3120f1cd4623860a48c72b64e839335d194f57cf))
+
 ## [0.47.1](https://github.com/this-is-tobi/github-workflows/compare/v0.47.0...v0.47.1) (2026-11-05)
 
 
