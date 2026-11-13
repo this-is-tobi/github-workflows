@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.48.2](https://github.com/this-is-tobi/github-workflows/compare/v0.48.1...v0.48.2) (2026-11-13)
+
+
+### Dependencies
+
+* **deps:** update azure/setup-helm to v5.1.0 ([0f4a74c](https://github.com/this-is-tobi/github-workflows/commit/0f4a74cf5ad2f32deb393fd51a75e1ce7f98a3da))
+* **deps:** update peter-evans/create-pull-request to v8.1.3 ([653fd3e](https://github.com/this-is-tobi/github-workflows/commit/653fd3e63e732f8696f3038189dab999becaa879))
+* **deps:** update sonarsource/sonarqube-scan-action to v8.5.0 ([6295c1e](https://github.com/this-is-tobi/github-workflows/commit/6295c1ef7eb41341d8be5b174549db9ded96181d))
+
 ## [0.48.1](https://github.com/this-is-tobi/github-workflows/compare/v0.48.0...v0.48.1) (2026-11-09)
 
 
