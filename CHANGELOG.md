@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.48.3](https://github.com/this-is-tobi/github-workflows/compare/v0.48.2...v0.48.3) (2026-11-19)
+
+
+### Dependencies
+
+* **deps:** update actions/create-github-app-token to v3.4.0 ([8ed239a](https://github.com/this-is-tobi/github-workflows/commit/8ed239a2ffce719097edde7813f0dd3a64a8a6d8))
+* **deps:** update actions/setup-go to v7.1.0 ([735a8cb](https://github.com/this-is-tobi/github-workflows/commit/735a8cb6729925f463e83f705f76ac998a8b9037))
+* **deps:** update golang.org/x/vuln/cmd/govulncheck to v1.10.0 ([afbf8fe](https://github.com/this-is-tobi/github-workflows/commit/afbf8fe9a02e22bd113fc0e0e8a933d654d7e3b1))
+* **deps:** update oras-project/setup-oras to v2.0.4 ([f8d9143](https://github.com/this-is-tobi/github-workflows/commit/f8d914395c0020e9e9342fbb3b90b8c33e19bbf4))
+* **deps:** update ossf/scorecard-action to v2.6.0 ([8cb435f](https://github.com/this-is-tobi/github-workflows/commit/8cb435f2c85da9f3f802b993bb24a0785b9496ac))
+
 ## [0.48.2](https://github.com/this-is-tobi/github-workflows/compare/v0.48.1...v0.48.2) (2026-11-13)
 
 
