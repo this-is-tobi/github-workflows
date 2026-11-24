@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.48.4](https://github.com/this-is-tobi/github-workflows/compare/v0.48.3...v0.48.4) (2026-11-24)
+
+
+### Dependencies
+
+* **deps:** update anchore/sbom-action to v0.24.4 ([f764098](https://github.com/this-is-tobi/github-workflows/commit/f764098d81e8887b98c940a97e916ed51245878e))
+* **deps:** update github/codeql-action to v4.39.4 ([4debe78](https://github.com/this-is-tobi/github-workflows/commit/4debe785fce1b86fff45928320bc3d75e36aee73))
+* **deps:** update github/codeql-action to v4.39.5 ([fb88195](https://github.com/this-is-tobi/github-workflows/commit/fb88195f9a78295559eebb3ebc5e9a32f43a89eb))
+* **deps:** update sigstore/cosign-installer to v4.1.4 ([0ab99f5](https://github.com/this-is-tobi/github-workflows/commit/0ab99f5cf79bc648ddede4ee44275d4fd81c83e2))
+* **deps:** update sonarsource/sonarqube-scan-action to v8.5.1 ([dfb2e40](https://github.com/this-is-tobi/github-workflows/commit/dfb2e406dde5048533d8ecad458857a9d0380e02))
+* **deps:** update zizmor to v1.33.0 ([3c84092](https://github.com/this-is-tobi/github-workflows/commit/3c8409263f55a23d53d5a442c7e4c83716606a5f))
+* **deps:** update zizmor to v1.33.1 ([9a9f783](https://github.com/this-is-tobi/github-workflows/commit/9a9f783e2fd7aca50a0f1a914821648343c187a6))
+
 ## [0.48.3](https://github.com/this-is-tobi/github-workflows/compare/v0.48.2...v0.48.3) (2026-11-19)
 
 
